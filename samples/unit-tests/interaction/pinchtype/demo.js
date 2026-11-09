@@ -58,7 +58,7 @@
                 },
                 {
                     pageX: 300 + offset.left,
-                    pageY: 100 + offset.top
+                    pageY: 150 + offset.top
                 }
             ],
             preventDefault: function () {}
@@ -69,11 +69,11 @@
             touches: [
                 {
                     pageX: 150 + offset.left,
-                    pageY: 100 + offset.top
+                    pageY: 80 + offset.top
                 },
                 {
                     pageX: 350 + offset.left,
-                    pageY: 100 + offset.top
+                    pageY: 170 + offset.top
                 }
             ],
             preventDefault: function () {}
@@ -84,11 +84,11 @@
             touches: [
                 {
                     pageX: 150 + offset.left,
-                    pageY: 100 + offset.top
+                    pageY: 80 + offset.top
                 },
                 {
                     pageX: 350 + offset.left,
-                    pageY: 100 + offset.top
+                    pageY: 170 + offset.top
                 }
             ]
         });
@@ -241,25 +241,125 @@
                     data: getData(),
                     kdNow: true
                 }
-            ]
+            ],
+            xAxis: {
+                minPadding: 0,
+                maxPadding: 0
+            }
         });
 
-        var xAxis = chart.xAxis[0];
+        const xAxis = chart.xAxis[0],
+            initialRange = xAxis.max - xAxis.min;
 
         assert.ok(xAxis.min <= 0, 'Initial min');
 
-        assert.ok(xAxis.max >= 1000, 'Initial max');
+        assert.ok(xAxis.max >= 999, 'Initial max');
+
+        singleTouchDrag(chart);
+
+        assert.close(
+            xAxis.max - xAxis.min,
+            initialRange,
+            0.5,
+            'The range should be preserved during a single touch pan'
+        );
 
         dualTouchZoom(chart);
-        var initialExtremes = [xAxis.min, xAxis.max].toString();
+        const initialExtremes = [xAxis.min, xAxis.max].toString();
 
         singleTouchDrag(chart);
         assert.notEqual(
             [xAxis.min, xAxis.max].toString(),
             initialExtremes,
-            'Extremes have changed'
+            'Extremes should change after single-panning a zoomed chart'
         );
     });
+
+    QUnit.test(
+        'Reset zoom button should appear after pinch ends (#22128)',
+        function (assert) {
+            var chart = Highcharts.chart('container', {
+                chart: {
+                    zooming: {
+                        type: 'x',
+                        pinchType: 'x'
+                    },
+                    panning: {
+                        enabled: true,
+                        type: 'x'
+                    },
+                    animation: false,
+                    width: 600
+                },
+                tooltip: {
+                    followTouchMove: false
+                },
+                series: [
+                    {
+                        animation: false,
+                        data: getData(),
+                        kdNow: true
+                    }
+                ]
+            });
+            var offset = Highcharts.offset(chart.container),
+                xAxis = chart.xAxis[0],
+                initialMin = xAxis.min,
+                initialMax = xAxis.max,
+                movedTouches = [
+                    {
+                        pageX: 150 + offset.left,
+                        pageY: 80 + offset.top
+                    },
+                    {
+                        pageX: 350 + offset.left,
+                        pageY: 170 + offset.top
+                    }
+                ];
+
+            chart.pointer.onContainerTouchStart({
+                type: 'touchstart',
+                touches: [
+                    {
+                        pageX: 200 + offset.left,
+                        pageY: 100 + offset.top
+                    },
+                    {
+                        pageX: 300 + offset.left,
+                        pageY: 150 + offset.top
+                    }
+                ],
+                preventDefault: function () {}
+            });
+
+            chart.pointer.onContainerTouchMove({
+                type: 'touchmove',
+                touches: movedTouches,
+                preventDefault: function () {}
+            });
+
+            assert.strictEqual(
+                chart.resetZoomButton,
+                void 0,
+                'Reset zoom button should not appear during pinch.'
+            );
+
+            chart.pointer.onDocumentTouchEnd({
+                type: 'touchend',
+                touches: movedTouches
+            });
+
+            assert.notEqual(
+                [xAxis.min, xAxis.max].toString(),
+                [initialMin, initialMax].toString(),
+                'The chart should be zoomed after pinch.'
+            );
+            assert.ok(
+                chart.resetZoomButton,
+                'Reset zoom button should appear after pinch ends.'
+            );
+        }
+    );
 
     QUnit.test('pinchType is on, zoomType is off (#5840)', function (assert) {
         var chart = Highcharts.chart('container', {
@@ -330,10 +430,10 @@
     });
 
     QUnit.test('zoomType is on, pinchType inherited', function (assert) {
-        var chart = Highcharts.chart('container', {
+        const chart = Highcharts.chart('container', {
             chart: {
                 zooming: {
-                    type: 'x'
+                    type: 'xy'
                 },
                 animation: false,
                 width: 600
@@ -351,11 +451,21 @@
             }
         });
 
-        var xAxis = chart.xAxis[0];
+        const xAxis = chart.xAxis[0],
+            yAxis = chart.yAxis[0];
 
         dualTouchZoom(chart);
         assert.notEqual(xAxis.min, 0, 'Altered min');
         assert.notEqual(xAxis.max, 999, 'Altered max');
+
+        assert.ok(
+            yAxis.tickPositions.includes(yAxis.min),
+            'The y-axis should start on a tick after touch-zooming'
+        );
+        assert.ok(
+            yAxis.tickPositions.includes(yAxis.max),
+            'The y-axis should end on a tick after touch-zooming'
+        );
     });
 
     QUnit.test('zoomBySingleTouch is true', assert => {

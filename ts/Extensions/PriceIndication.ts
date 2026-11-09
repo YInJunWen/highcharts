@@ -1,56 +1,253 @@
-/**
- * (c) 2009-2021 Sebastian Bochann
+/* *
  *
- * Price indicator for Highcharts
+ *  (c) 2018-2026 Highsoft AS
+ *  Author: Sebastian Bochan
  *
- * License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
+ *  Price indicator for Highcharts Stock
+ *
  */
 
 'use strict';
 
-import type { AxisCrosshairOptions } from '../Core/Axis/AxisOptions';
-import type SVGElement from '../Core/Renderer/SVG/SVGElement';
-import Series from '../Core/Series/Series.js';
-import U from '../Core/Utilities.js';
-import ColorType from '../Core/Color/ColorType';
-const {
-    addEvent,
-    isArray,
-    merge
-} = U;
+/* *
+ *
+ *  Imports
+ *
+ * */
 
-declare module '../Core/Series/SeriesLike' {
-    interface SeriesLike {
+import type { AxisCrosshairOptions } from '../Core/Axis/AxisOptions';
+import type Series from '../Core/Series/Series';
+import type SVGElement from '../Core/Renderer/SVG/SVGElement';
+
+import H from '../Core/Globals.js';
+const { composed } = H;
+import { addEvent, clamp, merge, pushUnique } from '../Shared/Utilities.js';
+
+/* *
+ *
+ *  Declarations
+ *
+ * */
+
+/** @internal */
+declare module '../Core/Series/SeriesBase' {
+    interface SeriesBase {
         lastPrice?: SVGElement;
+        lastPriceLabel?: SVGElement;
         lastVisiblePrice?: SVGElement;
-        crossLabel?: SVGElement;
+        lastVisiblePriceLabel?: SVGElement;
     }
 }
 
 declare module '../Core/Series/SeriesOptions' {
     interface SeriesOptions {
-        lastPrice?: Highcharts.LastPriceOptions;
-        lastVisiblePrice?: Highcharts.LastVisiblePriceOptions;
+        /**
+         * The line marks the last price from all points.
+         *
+         * @sample {highstock} stock/indicators/last-price
+         *         Last price
+         *
+         * @since     7.0.0
+         * @product   highstock
+         * @requires  modules/price-indicator
+         */
+        lastPrice?: LastPriceOptions;
+
+        /**
+         * The line marks the last price from visible range of points.
+         *
+         * @sample {highstock} stock/indicators/last-visible-price
+         *         Last visible price
+         *
+         * @since     7.0.0
+         * @product   highstock
+         * @requires  modules/price-indicator
+         */
+        lastVisiblePrice?: LastVisiblePriceOptions;
     }
 }
 
-declare global {
-    namespace Highcharts {
-        interface LastPriceOptions extends AxisCrosshairOptions {
-            enabled?: boolean;
-        }
-        interface LastVisiblePriceOptions {
-            enabled?: boolean;
-            label?: LastVisiblePriceLabelOptions;
-        }
-        interface LastVisiblePriceLabelOptions {
-            enabled: true;
-            color?: ColorType;
-        }
+export interface LastPriceOptions extends AxisCrosshairOptions {
+    /**
+     * The color of the line of last price.
+     * If not set, the line has the same color as the series.
+     *
+     * @default undefined
+     */
+    color?: AxisCrosshairOptions['color'];
+
+    /**
+     * Enable or disable the indicator.
+     *
+     * @default false
+     */
+    enabled?: boolean;
+}
+
+export interface LastVisiblePriceOptions extends LastPriceOptions {
+    /**
+     * The color of the line of last visible price.
+     * By default, the line is not visible.
+     *
+     * @default 'transparent'
+     */
+    color?: LastPriceOptions['color'];
+}
+
+/* *
+ *
+ *  Composition
+ *
+ * */
+
+/**
+ * Extends series class with price indication.
+ * @internal
+ */
+export function composePriceIndication(
+    SeriesClass: typeof Series
+): void {
+    if (pushUnique(composed, 'PriceIndication')) {
+        addEvent(SeriesClass, 'afterRender', onSeriesAfterRender);
+        addEvent(SeriesClass, 'hide', onSeriesHide);
     }
 }
+
+/**
+ * Hides price indication when parent series is hidden. Showing the indicator is
+ * handled by the `onSeriesAfterRender` function.
+ *
+ * @internal
+ */
+function onSeriesHide(
+    this: Series
+): void {
+    const series = this;
+    ([
+        'lastPrice',
+        'lastPriceLabel',
+        'lastVisiblePrice',
+        'lastVisiblePriceLabel'
+    ] as const).forEach((key): void => {
+        series[key]?.hide();
+    });
+}
+
+/**
+ * Sets up price indication after series is rendered.
+ * @internal
+ */
+function onSeriesAfterRender(
+    this: Series
+): void {
+    const series = this,
+        seriesOptions = series.options,
+        lastVisiblePrice = seriesOptions.lastVisiblePrice,
+        lastPrice = seriesOptions.lastPrice;
+
+    if (
+        (lastVisiblePrice || lastPrice) &&
+        seriesOptions.id !== 'highcharts-navigator-series' &&
+        series.visible
+    ) {
+        const { points, xAxis, yAxis } = series,
+            { cross, crosshair, crossLabel } = yAxis,
+            pLength = points.length,
+            dataLength = series.dataTable.rowCount,
+            x = series.getColumn('x')[dataLength - 1],
+            y = series.getColumn('y')[dataLength - 1] ??
+                series.getColumn('close')[dataLength - 1],
+            modifiedY = series.dataModify?.modifyValue(y) ?? y;
+
+        if (lastPrice?.enabled) {
+            yAxis.crosshair = yAxis.options.crosshair = seriesOptions.lastPrice;
+
+            if (
+                !series.chart.styledMode &&
+                yAxis.crosshair &&
+                yAxis.options.crosshair &&
+                seriesOptions.lastPrice
+            ) {
+                // Set the default color from the series, #14888.
+                yAxis.crosshair.color = yAxis.options.crosshair.color =
+                    seriesOptions.lastPrice.color || series.color;
+            }
+
+            yAxis.cross = series.lastPrice;
+
+            if (series.lastPriceLabel) {
+                series.lastPriceLabel.destroy();
+            }
+
+            delete yAxis.crossLabel;
+
+            yAxis.drawCrosshair(void 0, ({
+                x: x,
+                y,
+                series,
+                plotX: clamp(xAxis.toPixels(x, true), 0, xAxis.len),
+                plotY: yAxis.toPixels(modifiedY, true)
+            }) as any);
+
+            // Save price
+            if (series.yAxis.cross) {
+                series.lastPrice = series.yAxis.cross;
+                series.lastPrice.addClass(
+                    'highcharts-color-' + series.colorIndex
+                ); // #15222
+                series.lastPrice.y = y;
+            }
+
+            series.lastPriceLabel = yAxis.crossLabel;
+        }
+
+        if (lastVisiblePrice?.enabled && pLength > 0) {
+            yAxis.crosshair = yAxis.options.crosshair = merge({
+                color: 'transparent' // Line invisible by default
+            }, seriesOptions.lastVisiblePrice);
+
+            yAxis.cross = series.lastVisiblePrice;
+
+            const lastPoint = points[pLength - 1].isInside ?
+                points[pLength - 1] :
+                points[pLength - 2];
+
+            series.lastVisiblePriceLabel?.destroy();
+
+            // Set to undefined to avoid collision with
+            // the yAxis crosshair #11480
+            // Delete the crossLabel each time the code is invoked, #13876.
+            delete yAxis.crossLabel;
+
+            // Save price
+            yAxis.drawCrosshair(void 0, lastPoint);
+
+            if (yAxis.cross) {
+                series.lastVisiblePrice = yAxis.cross;
+                if (lastPoint && typeof lastPoint.y === 'number') {
+                    series.lastVisiblePrice.y = lastPoint.y;
+                }
+            }
+
+            series.lastVisiblePriceLabel = yAxis.crossLabel;
+        }
+
+        // Restore crosshair:
+        yAxis.crosshair = yAxis.options.crosshair = crosshair;
+        yAxis.cross = cross;
+        yAxis.crossLabel = crossLabel;
+    }
+}
+
+/* *
+ *
+ *  API Options
+ *
+ * */
 
 /**
  * The line marks the last price from visible range of points.
@@ -62,6 +259,39 @@ declare global {
  * @product   highstock
  * @requires  modules/price-indicator
  * @apioption plotOptions.series.lastVisiblePrice
+ */
+
+/**
+ * The color of the line of last visible price.
+ * By default, color is not applied and the line is not visible.
+ *
+ * @type      {string}
+ * @product   highstock
+ * @apioption plotOptions.series.lastVisiblePrice.color
+ *
+ */
+
+/**
+ * Name of the dash style to use for the line of last visible price.
+ *
+ * @sample {highstock} highcharts/plotoptions/series-dashstyle-all/
+ *         Possible values demonstrated
+ *
+ * @type      {Highcharts.DashStyleValue}
+ * @product   highstock
+ * @default   Solid
+ * @apioption plotOptions.series.lastVisiblePrice.dashStyle
+ *
+ */
+
+/**
+ * Width of the last visible price line.
+ *
+ * @type      {number}
+ * @product   highstock
+ * @default   1
+ * @apioption plotOptions.series.lastVisiblePrice.width
+ *
  */
 
 /**
@@ -302,102 +532,27 @@ declare global {
  *
  */
 
-/* eslint-disable no-invalid-this */
+/**
+ * Name of the dash style to use for the line of last price.
+ *
+ * @sample {highstock} highcharts/plotoptions/series-dashstyle-all/
+ *         Possible values demonstrated
+ *
+ * @type      {Highcharts.DashStyleValue}
+ * @product   highstock
+ * @default   Solid
+ * @apioption plotOptions.series.lastPrice.dashStyle
+ *
+ */
 
-addEvent(Series, 'afterRender', function (): void {
-    const series = this,
-        seriesOptions = series.options,
-        pointRange = seriesOptions.pointRange,
-        lastVisiblePrice = seriesOptions.lastVisiblePrice,
-        lastPrice = seriesOptions.lastPrice;
+/**
+ * Width of the last price line.
+ *
+ * @type      {number}
+ * @product   highstock
+ * @default   1
+ * @apioption plotOptions.series.lastPrice.width
+ *
+ */
 
-    if (
-        (lastVisiblePrice || lastPrice) &&
-         seriesOptions.id !== 'highcharts-navigator-series'
-    ) {
-        let xAxis = series.xAxis,
-            yAxis = series.yAxis,
-            origOptions = yAxis.crosshair,
-            origGraphic = yAxis.cross,
-            origLabel = yAxis.crossLabel,
-            points = series.points,
-            yLength = (series.yData as any).length,
-            pLength = points.length,
-            x = (series.xData as any)[(series.xData as any).length - 1],
-            y = (series.yData as any)[yLength - 1],
-            lastPoint,
-            yValue,
-            crop;
-
-        if (lastPrice && lastPrice.enabled) {
-            yAxis.crosshair = yAxis.options.crosshair = seriesOptions.lastPrice;
-
-            if (!series.chart.styledMode &&
-                    yAxis.crosshair &&
-                    yAxis.options.crosshair &&
-                    seriesOptions.lastPrice
-            ) {
-                // Set the default color from the series, #14888.
-                yAxis.crosshair.color = yAxis.options.crosshair.color =
-                    seriesOptions.lastPrice.color || series.color;
-            }
-
-            yAxis.cross = series.lastPrice;
-            yValue = isArray(y) ? y[3] : y;
-
-            yAxis.drawCrosshair((null as any), ({
-                x: x,
-                y: yValue,
-                plotX: xAxis.toPixels(x, true),
-                plotY: yAxis.toPixels(yValue, true)
-            }) as any);
-
-            // Save price
-            if (series.yAxis.cross) {
-                series.lastPrice = series.yAxis.cross;
-                series.lastPrice.addClass(
-                    'highcharts-color-' + series.colorIndex
-                ); // #15222
-                series.lastPrice.y = yValue;
-            }
-        }
-
-        if (lastVisiblePrice && lastVisiblePrice.enabled && pLength > 0) {
-            crop = (points[pLength - 1].x === x) || pointRange === null ? 1 : 2;
-
-            yAxis.crosshair = yAxis.options.crosshair = merge({
-                color: 'transparent' // line invisible by default
-            }, seriesOptions.lastVisiblePrice);
-
-            yAxis.cross = series.lastVisiblePrice;
-            lastPoint = points[pLength - crop];
-
-            if (series.crossLabel) {
-                series.crossLabel.destroy();
-            }
-            // Set to undefined to avoid collision with
-            // the yAxis crosshair #11480
-            // Delete the crossLabel each time the code is invoked, #13876.
-            delete yAxis.crossLabel;
-
-            // Save price
-            yAxis.drawCrosshair((null as any), lastPoint);
-
-            if (yAxis.cross) {
-                series.lastVisiblePrice = yAxis.cross;
-                if (typeof lastPoint.y === 'number') {
-                    series.lastVisiblePrice.y = lastPoint.y;
-                }
-            }
-
-            series.crossLabel = yAxis.crossLabel;
-        }
-
-        // Restore crosshair:
-        yAxis.crosshair = yAxis.options.crosshair = origOptions;
-        yAxis.cross = origGraphic;
-        yAxis.crossLabel = origLabel;
-    }
-});
-
-/* eslint-enable no-invalid-this */
+''; // Keeps doclets above in JS file

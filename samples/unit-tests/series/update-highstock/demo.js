@@ -33,7 +33,7 @@ QUnit.test('Series clip-path after updating axis. (#4526)', function (assert) {
 });
 
 QUnit.test(
-    "Navigator series' should keep its position in series array, " +
+    'Navigator series\' should keep its position in series array, ' +
         'even after series.update()',
     function (assert) {
         var chart = Highcharts.stockChart('container', {
@@ -80,7 +80,7 @@ QUnit.test(
 );
 
 QUnit.test(
-    "Navigator series' do not allow linkeTo (#6734).",
+    'Navigator series\' do not allow linkedTo (#6734).',
     function (assert) {
         var chart = Highcharts.stockChart('container', {
             series: [
@@ -155,7 +155,8 @@ QUnit.test('Series.update', function (assert) {
             high: config[2],
             low: config[3],
             close: config[4],
-            y: config[4] // let the closing value represent the data in single-value series
+            y: config[4] // let the closing value represent the data in
+            // single-value series
         })
     );
 
@@ -214,20 +215,20 @@ QUnit.test('Series.update', function (assert) {
             // Color
             assert.strictEqual(
                 chart.series[0].graph.element.getAttribute('stroke'),
-                Highcharts.getOptions().colors[0],
+                'var(--highcharts-color-0)',
                 'Color initial'
             );
             chart.series[0].update({
-                color: Highcharts.getOptions().colors[1]
+                color: 'var(--highcharts-color-1)'
             });
             assert.strictEqual(
                 chart.series[0].graph.element.getAttribute('stroke'),
-                Highcharts.getOptions().colors[1],
+                'var(--highcharts-color-1)',
                 'Color changed - graph'
             );
             assert.strictEqual(
                 lastPoint().graphic.element.getAttribute('fill'),
-                Highcharts.getOptions().colors[1],
+                'var(--highcharts-color-1)',
                 'Color changed - marker'
             );
 
@@ -300,8 +301,8 @@ QUnit.test('Series.update', function (assert) {
             );
             assert.strictEqual(chart.series[0].area, undefined, 'No area');
             assert.strictEqual(
-                lastPoint().graphic.element.nodeName,
-                'rect',
+                lastPoint().graphic.symbolName,
+                'roundedRect',
                 'Has column'
             );
 
@@ -324,7 +325,7 @@ QUnit.test('Series.update', function (assert) {
             );
             assert.strictEqual(
                 lastPoint().graphic.element.getAttribute('fill'),
-                Highcharts.getOptions().colors[1],
+                'var(--highcharts-color-1)',
                 'Filled last point'
             );
 

@@ -1,0 +1,547 @@
+/* *
+ *
+ *  (c) 2010-2026 Highsoft AS
+ *  Author: Mateusz Bernacik
+ *
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
+ *
+ *
+ * */
+
+'use strict';
+
+/* *
+ *
+ *  Imports
+ *
+ * */
+
+import type { StandaloneNavigatorOptions } from './NavigatorOptions';
+import type { SeriesOptions } from '../../Core/Series/SeriesOptions';
+import type { DeepPartial } from '../../Shared/Types';
+import type { Options } from '../../Core/Options';
+import type Navigator from './Navigator';
+import type { SetRangeEvent } from './Navigator';
+
+import Chart from '../../Core/Chart/Chart.js';
+import G from '../../Core/Globals.js';
+import Axis from '../../Core/Axis/Axis.js';
+import standaloneNavigatorDefaults, {
+    getChartDefaults
+} from './StandaloneNavigatorDefaults.js';
+import {
+    addEvent,
+    defined,
+    find,
+    fireEvent,
+    merge
+} from '../../Shared/Utilities.js';
+import { error } from '../../Core/Utilities.js';
+
+/** @internal */
+declare module '../../Core/GlobalsBase' {
+    interface GlobalsBase {
+        navigators: Array<StandaloneNavigator>;
+    }
+}
+
+/** @internal */
+interface BoundAxis {
+    axis: Axis;
+    callbacks: Array<Function>;
+    oldMin?: (null|number|string);
+    oldMax?: (null|number|string);
+}
+
+/* *
+ *
+ *  Functions
+ *
+ * */
+
+/**
+ * Support for the deprecated `chart` option, renamed to `chartOptions`.
+ * The new option takes precedence. #24715
+ *
+ * @internal
+ */
+function compatChartOptions(
+    options: StandaloneNavigatorOptions,
+    chart?: Chart
+): StandaloneNavigatorOptions {
+    if (options.chart) {
+        error(32, false, chart, {
+            'standaloneNavigator.chart':
+                'use standaloneNavigator.chartOptions'
+        });
+
+        return merge({ chartOptions: options.chart }, options);
+    }
+
+    return options;
+}
+
+/** @internal */
+function getSizeOptions(
+    options: StandaloneNavigatorOptions
+): DeepPartial<Options> {
+    const { height, width, margin, inverted } =
+            options.chartOptions?.chart || {},
+        chartHeight = height ?? (
+            !inverted && options.height ?
+                options.height + 30 :
+                void 0
+        ),
+        chartWidth = width ?? (
+            inverted && options.height ?
+                options.height + 20 :
+                void 0
+        );
+
+    return merge(
+        getChartDefaults(inverted, chartWidth),
+        defined(margin) ? { chart: { margin } } : void 0,
+        defined(chartWidth) ? { chart: { width: chartWidth } } : void 0,
+        defined(chartHeight) ? { chart: { height: chartHeight } } : void 0
+    );
+}
+
+/* *
+ *
+ *  Class
+ *
+ * */
+
+/**
+ * The StandaloneNavigator class. The StandaloneNavigator class allows for
+ * creating a standalone navigator component that synchronizes the extremes
+ * across multiple bound charts.
+ *
+ * @internal
+ * @class
+ * @name Highcharts.StandaloneNavigator
+ *
+ * @param {string|Highcharts.HTMLDOMElement} [renderTo]
+ * The DOM element to render to, or its id.
+ *
+ * @param {StandaloneNavigatorOptions} userOptions
+ * The standalone navigator options.
+ */
+class StandaloneNavigator {
+
+    public navigator: Navigator;
+    public boundAxes: Array<BoundAxis> = [];
+    public chartOptions: Partial<Options>;
+    public userOptions: StandaloneNavigatorOptions;
+
+    /* *
+     *
+     *  Static Functions
+     *
+     * */
+
+    /**
+     * Factory function for standalone navigator.
+     *
+     * @function Highcharts.navigator
+     *
+     * @param {string|Highcharts.HTMLDOMElement} [renderTo]
+     * The DOM element to render to, or its id.
+     *
+     * @param {StandaloneNavigatorOptions} options
+     * The standalone navigator options with chart-like structure.
+     *
+     * Returns the navigator object.
+     */
+    public static navigator(
+        renderTo: (string|globalThis.HTMLElement),
+        options: StandaloneNavigatorOptions
+    ): StandaloneNavigator {
+        const nav = new StandaloneNavigator(renderTo, options);
+
+        if (!G.navigators) {
+            G.navigators = [nav];
+        } else {
+            G.navigators.push(nav);
+        }
+
+        return nav;
+    }
+
+
+    /* *
+     *
+     *  Constructor
+     *
+     * */
+
+    constructor(
+        element: (string | globalThis.HTMLElement),
+        userOptions: StandaloneNavigatorOptions
+    ) {
+        this.userOptions = userOptions = compatChartOptions(userOptions);
+
+        this.chartOptions = merge(
+            (G as any).getOptions(),
+            standaloneNavigatorDefaults,
+            userOptions.chartOptions,
+            getSizeOptions(userOptions),
+            { navigator: userOptions },
+            { navigator: { enabled: true } }
+        );
+
+        const chart = new Chart(element, this.chartOptions),
+            navigator = this.navigator = chart.navigator as Navigator,
+            { min, max } = navigator.xAxis.getExtremes();
+
+        chart.xAxis[0].userMin = min;
+        chart.xAxis[0].userMax = max;
+
+        navigator.render(min, max);
+    }
+
+    /**
+     * Binds an axis to the standalone navigator,
+     * allowing the navigator to control the axis' range.
+     *
+     * @sample stock/standalone-navigator/bind/
+     *         Bind chart with a button
+     *
+     * @function Highcharts.StandaloneNavigator#bind
+     *
+     * @param {Axis | Chart} axisOrChart
+     *        The Axis or Chart to bind to the navigator.
+     *
+     * @param {boolean} [twoWay=true]
+     *        Enables two-way binding between the navigator and the axis/chart.
+     *        When true, changes in the navigator's range will update the axis
+     *        and vice versa. When false, changes in the navigator's range will
+     *        be reflected in the axis, but changes in the axis ranges won't be
+     *        reflected on the navigator.
+     */
+    public bind(axisOrChart: Axis | Chart, twoWay: boolean = true): void {
+        const nav = this;
+        // If the chart is passed, bind the first xAxis
+        const axis = (axisOrChart instanceof Chart) ?
+            axisOrChart.xAxis[0] :
+            axisOrChart;
+
+        if (!(axis instanceof Axis)) {
+            return;
+        }
+
+        const navigator = this.navigator,
+            { min, max } = navigator.xAxis,
+            removeEventCallbacks = [];
+
+        if (twoWay) {
+            const removeSetExtremesEvent = addEvent(
+                axis,
+                'setExtremes',
+                (e: AnyRecord): void => {
+                    if (
+                        e.trigger === 'pan' ||
+                        e.trigger === 'zoom' ||
+                        e.trigger === 'mousewheel' ||
+                        e.trigger === 'rangeSelectorButton' ||
+                        e.trigger === 'rangeSelectorInput'
+                    ) {
+                        nav.setRange(
+                            e.min,
+                            e.max,
+                            true,
+                            e.trigger !== 'pan' && e.trigger !== 'mousewheel',
+                            { trigger: axis }
+                        );
+                    }
+                });
+
+            removeEventCallbacks.push(removeSetExtremesEvent);
+        }
+
+        const removeSetRangeEvent = addEvent(
+            navigator,
+            'setRange',
+            (e: SetRangeEvent): void => {
+                axis.setExtremes(e.min, e.max, e.redraw, e.animation);
+            }
+        );
+        removeEventCallbacks.push(removeSetRangeEvent);
+
+        let boundAxis = find(
+            this.boundAxes,
+            (boundAxis): boolean => boundAxis.axis === axis
+        );
+
+        if (!boundAxis) {
+            boundAxis = { axis, callbacks: [] };
+
+            // A navigator bound to a yAxis defines the full range the axis
+            // should cover. Stash the axis' own bounds before overriding them,
+            // so `unbind` can restore them, #24716
+            if (axis.coll === 'yAxis') {
+                boundAxis.oldMin = axis.options.min ?? axis.min;
+                boundAxis.oldMax = axis.options.max ?? axis.max;
+            }
+
+            this.boundAxes.push(boundAxis);
+        }
+        boundAxis.callbacks = removeEventCallbacks;
+
+        // Show axis' series in navigator based on showInNavigator property
+        axis.series.forEach((series): void => {
+            if (series.options.showInNavigator) {
+                nav.addSeries(series.options);
+            }
+        });
+
+        // Bind a yAxis to the navigator's full range so vertical panning isn't
+        // capped at the series' data extremes, #24716
+        if (axis.coll === 'yAxis') {
+            const { dataMin, dataMax } = navigator.xAxis.getExtremes();
+            axis.update({ min: dataMin, max: dataMax }, false);
+        }
+
+        // Set extremes to match the navigator's extremes
+        axis.setExtremes(min, max);
+
+        // Unbind the axis before it's destroyed
+        addEvent(axis, 'destroy', (): void => {
+            this.unbind(axis);
+        });
+    }
+
+    /**
+     * Unbinds a single axis or all bound axes from the standalone navigator.
+     *
+     * @sample stock/standalone-navigator/unbind/
+     *         Unbind chart with a button
+     *
+     * @function Highcharts.StandaloneNavigator#unbind
+     *
+     * @param {Chart | Axis | undefined} axisOrChart
+     *        Passing a Chart object unbinds the first X axis of the chart,
+     *        an Axis object unbinds that specific axis,
+     *        and undefined unbinds all axes bound to the navigator.
+     * @param {boolean} restoreExtremes
+     *        Whether to restore the axis' original min/max that were
+     *        overridden when binding a yAxis.
+     */
+    public unbind(
+        axisOrChart?: Chart | Axis,
+        restoreExtremes?: boolean
+    ): void {
+        // If no axis or chart is provided, unbind all bound axes
+        if (!axisOrChart) {
+            this.boundAxes.forEach((boundAxis): void => {
+                this.releaseAxis(boundAxis, restoreExtremes);
+            });
+
+            this.boundAxes.length = 0;
+
+            return;
+        }
+
+        const axis = (axisOrChart instanceof Axis) ?
+            axisOrChart :
+            axisOrChart.xAxis[0];
+
+        for (let i = this.boundAxes.length - 1; i >= 0; i--) {
+            if (this.boundAxes[i].axis === axis) {
+                this.releaseAxis(this.boundAxes[i], restoreExtremes);
+                this.boundAxes.splice(i, 1);
+            }
+        }
+    }
+
+    /**
+     * Disconnect a bound axis' events and restore the axis' own bounds that
+     * were overridden when binding a yAxis.
+     *
+     * @internal
+     *
+     * @param {BoundAxis} boundAxis
+     *        The bound axis entry to release.
+     * @param {boolean} [restoreExtremes=false]
+     *        Whether to restore the axis' original min/max that were
+     *        overridden when binding a yAxis.
+     */
+    private releaseAxis(
+        boundAxis: BoundAxis,
+        restoreExtremes = false
+    ): void {
+        // Disconnect events
+        boundAxis.callbacks.forEach(
+            (removeCallback): void => removeCallback()
+        );
+
+        // Restore the axis' original min/max that were overridden in `bind`
+        if (boundAxis.axis.coll === 'yAxis' && restoreExtremes) {
+            const min = boundAxis.oldMin ?? void 0,
+                max = boundAxis.oldMax ?? void 0;
+
+            boundAxis.axis.update({ min, max }, false);
+            boundAxis.axis.setExtremes(min, max);
+        }
+    }
+
+    /**
+     * Destroys allocated standalone navigator elements.
+     *
+     * @function Highcharts.StandaloneNavigator#destroy
+     *
+     * @param {boolean} restoreExtremes
+     *        Whether to restore the axis' original min/max that were
+     *        overridden when binding a yAxis.
+     */
+    public destroy(restoreExtremes?: boolean): void {
+        this.boundAxes.forEach((boundAxis): void => {
+            this.releaseAxis(boundAxis, restoreExtremes);
+        });
+        this.boundAxes.length = 0;
+        this.navigator.destroy();
+        this.navigator.chart.destroy();
+    }
+
+    /**
+     * Updates the standalone navigator's options with a new set of user
+     * options.
+     *
+     * @sample stock/standalone-navigator/update/
+     *         Bind chart with a button
+     *
+     * @function Highcharts.StandaloneNavigator#update
+     *
+     * @param  {StandaloneNavigatorOptions} newOptions
+     *         Updates the standalone navigator's options with new user options.
+     *
+     * @param  {boolean | undefined} redraw
+     *         Whether to redraw the standalone navigator. By default, if not
+     *         specified, the standalone navigator will be redrawn.
+     */
+    public update(
+        newOptions: StandaloneNavigatorOptions,
+        redraw?: boolean
+    ): void {
+        newOptions = compatChartOptions(newOptions, this.navigator.chart);
+
+        this.userOptions = merge(this.userOptions, newOptions);
+
+        this.chartOptions = merge(
+            this.chartOptions,
+            newOptions.chartOptions,
+            getSizeOptions(this.userOptions),
+            { navigator: newOptions }
+        );
+
+        this.navigator.chart.update(this.chartOptions, redraw);
+    }
+
+    /**
+     * Redraws the standalone navigator.
+     *
+     * @function Highcharts.StandaloneNavigator#redraw
+     */
+    public redraw(): void {
+        this.navigator.chart.redraw();
+    }
+
+    /**
+     * Adds a series to the standalone navigator.
+     *
+     * @internal
+     *
+     * @param {SeriesOptions} seriesOptions
+     *        Options for the series to be added to the navigator.
+     */
+    public addSeries(seriesOptions: SeriesOptions): void {
+        this.navigator.chart.addSeries(merge(
+            seriesOptions,
+            { showInNavigator: (seriesOptions.showInNavigator ?? true) }
+        ));
+
+        this.navigator.setBaseSeries();
+    }
+
+    /**
+     * Get the current range of the standalone navigator.
+     *
+     * @sample stock/standalone-navigator/getrange/
+     *         Report the standalone navigator's range by clicking on a button
+     *
+     * @function Highcharts.StandaloneNavigator#getRange
+     *
+     * @return {Highcharts.ExtremesObject}
+     *         The current range of the standalone navigator.
+     */
+    public getRange(): Axis.ExtremesObject {
+        const { min, max } = this.navigator.chart.xAxis[0].getExtremes(),
+            { userMin, userMax, min: dataMin, max: dataMax } =
+                this.navigator.xAxis.getExtremes();
+
+        return {
+            min: (min ?? dataMin),
+            max: (max ?? dataMax),
+            dataMin,
+            dataMax,
+            userMin,
+            userMax
+        };
+    }
+
+    /**
+     * Set the range of the standalone navigator.
+     *
+     * @sample stock/standalone-navigator/setrange/
+     *         Set range from a button
+     *
+     * @function Highcharts.StandaloneNavigator#setRange
+     *
+     * @param {number | undefined} min
+     *        The new minimum value.
+     *
+     * @param {number | undefined} max
+     *        The new maximum value.
+     *
+     * @emits Highcharts.StandaloneNavigator#event:setRange
+     */
+    public setRange(
+        min?: number,
+        max?: number,
+        redraw?: boolean,
+        animation?: boolean,
+        eventArguments?: AnyRecord
+    ): void {
+        fireEvent(
+            this.navigator,
+            'setRange',
+            {
+                min,
+                max,
+                redraw,
+                animation,
+                eventArguments: merge(eventArguments, { trigger: 'navigator' })
+            }
+        );
+    }
+}
+
+/** @internal */
+export default StandaloneNavigator;
+
+/* *
+ *
+ *  API Declarations
+ *
+ * */
+
+/**
+ * Standalone Navigator options.
+ *
+ * @interface Highcharts.StandaloneNavigatorOptions
+ *//**
+ */
+
+''; // Detach doclets above

@@ -1,0 +1,2225 @@
+/* *
+ *
+ *  (c) 2010-2026 Highsoft AS
+ *  Author: Torstein Hønsi
+ *
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
+ *
+ *
+ * */
+
+'use strict';
+
+/* *
+ *
+ *  Imports
+ *
+ * */
+
+import type { DeepPartial } from '../Shared/Types';
+import type { DefaultOptions, Options } from './Options';
+import type Time from './Time';
+
+import ChartDefaults from './Chart/ChartDefaults.js';
+import H from './Globals.js';
+const {
+    isTouchDevice
+} = H;
+import langDefaults from './LangDefaults.js';
+import PaletteDefaults from './Color/PaletteDefaults.js';
+import timeDefaults, { defaultTime } from './TimeDefaults.js';
+import { fireEvent, merge } from '../Shared/Utilities.js';
+
+/* *
+ *
+ *  Declarations
+ *
+ * */
+
+declare module './GlobalsBase' {
+    interface GlobalsBase {
+        /**
+         * Global default settings.
+         *
+         * @name Highcharts.defaultOptions
+         * @type {Highcharts.Options}
+         */
+        defaultOptions: DefaultOptions;
+        time: Time;
+    }
+}
+
+/* *
+ *
+ *  API Options
+ *
+ * */
+
+/**
+ * Global default settings.
+ *
+ * @name Highcharts.defaultOptions
+ * @type {Highcharts.Options}
+ *//**
+ * @optionparent
+ * @internal
+ */
+const defaultOptions: DefaultOptions = {
+
+    palette: PaletteDefaults,
+
+    /**
+     * An array containing the default colors for the chart's series. When
+     * all colors are used, new colors are pulled from the start again.
+     *
+     * Default colors can also be set on a series or series.type basis,
+     * see [column.colors](#plotOptions.column.colors),
+     * [pie.colors](#plotOptions.pie.colors).
+     *
+     * In styled mode, the colors option doesn't exist. Instead, colors
+     * are defined in CSS and applied either through series or point class
+     * names, or through the [chart.colorCount](#chart.colorCount) option.
+     *
+     * The defaults from v13 invoke CSS variables that are set by the
+     * `palette` option's light and dark themes.
+     *
+     * @sample {highcharts} highcharts/chart/colors/
+     *         Assign a global color theme
+     * @sample highcharts/members/theme-v10/
+     *         Latest release styled like version 10
+     *
+     * @type    {Array<Highcharts.ColorType>}
+     * @default [
+     *     'var(--highcharts-color-0)',
+     *     'var(--highcharts-color-1)',
+     *     'var(--highcharts-color-2)',
+     *     'var(--highcharts-color-3)',
+     *     'var(--highcharts-color-4)',
+     *     'var(--highcharts-color-5)',
+     *     'var(--highcharts-color-6)',
+     *     'var(--highcharts-color-7)',
+     *     'var(--highcharts-color-8)',
+     *     'var(--highcharts-color-9)'
+     * ]
+     */
+    colors: new Array(10).fill(1).map(
+        (_, i): string => `var(--highcharts-color-${i})`
+    ),
+
+    /**
+     * Options for one or many chart-level data tables. The `dataTable` option,
+     * or its array members, can be either configuration objects or instances of
+     * the `DataTable` class. If a `DataTable` instance is passed, it
+     * will be used directly. If a configuration object is passed, a new
+     * `DataTable` instance will be created based on the provided
+     * configuration.
+     *
+     * The data table is mapped to the series data points based on the
+     * [series.dataMapping](#plotOptions.series.dataMapping) option, unless the
+     * column keys match the point property names (`x`, `y` etc.), in which case
+     * the mapping is automatic.
+     *
+     * @sample {highstock} stock/datatable/candlestick
+     *         Candlestick chart with data table
+     * @sample {highstock} stock/datatable/live-candlestick
+     *         Live candlestick
+     * @sample {highmaps} maps/datatable/chart-datatable
+     *         Map with data table and data mapping
+     * @sample {highmaps} maps/demo/basic-map
+     *         World map
+     * @sample {gantt} gantt/datatable/chart-datatable
+     *         Gantt chart with data table
+     *
+     * @sample highcharts/datatable/chart-datatable-single/
+     *         Chart with one data table as option
+     * @sample highcharts/datatable/chart-datatable-single/
+     *         Chart with one data table as instance
+     * @sample highcharts/datatable/chart-datatable-multiple/
+     *         Chart with two data tables
+     * @sample highcharts/data/getdatatable
+     *         Data table from CSV
+     *
+     * @type {Highcharts.DataTable|Highcharts.DataTableOptionsObject|Array<Highcharts.DataTable|Highcharts.DataTableOptionsObject>}
+     * @since     13.0.0
+     * @apioption dataTable
+     */
+
+    /**
+     * Styled mode only. Configuration object for adding SVG definitions for
+     * reusable elements. See [gradients, shadows and
+     * patterns](https://www.highcharts.com/docs/chart-design-and-style/gradients-shadows-and-patterns)
+     * for more information and code examples.
+     *
+     * @type      {*}
+     * @since     5.0.0
+     * @apioption defs
+     */
+
+    /**
+     * @ignore-option
+     */
+    symbols: ['circle', 'diamond', 'square', 'triangle', 'triangle-down'],
+
+    lang: langDefaults,
+
+    /**
+     * Global options that don't apply to each chart. These options must be set
+     * using the `Highcharts.setOptions` method.
+     *
+     * ```js
+     * Highcharts.setOptions({
+     *     global: {
+     *         buttonTheme: {
+     *             fill: '#d0d0d0'
+     *         }
+     *     }
+     * });
+     * ```
+     */
+    global: {
+        /**
+         * General theme for buttons. This applies to the zoom button, exporting
+         * context menu, map navigation, range selector buttons and custom
+         * buttons generated using the `SVGRenderer.button` function. However,
+         * each of these may be overridden with more specific options.
+         *
+         * @sample highcharts/global/buttontheme
+         *         General button theme
+         * @since 11.4.2
+         */
+        buttonTheme: {
+            /**
+             * The fill color for buttons
+             */
+            fill: 'var(--highcharts-neutral-color-3)',
+            /**
+             * The padding of buttons
+             */
+            padding: 8,
+            /**
+             * The border radius for buttons
+             */
+            r: 2,
+            /**
+             * The stroke color for buttons
+             */
+            stroke: 'var(--highcharts-neutral-color-20)',
+            /**
+             * The stroke width for buttons
+             */
+            'stroke-width': 1,
+            /**
+             * CSS styling for the buttons' text
+             */
+            style: {
+                /**
+                 * @type {Highcharts.ColorType}
+                 */
+                color: 'var(--highcharts-neutral-color-80)',
+                cursor: 'pointer',
+                fontSize: '0.8em',
+                fontWeight: 'normal'
+            },
+            /**
+             * State overrides for the buttons
+             */
+            states: {
+                /**
+                 * Hover state overrides for the buttons are applied in addition
+                 * to the normal state options
+                 */
+                hover: {
+                    fill: 'var(--highcharts-neutral-color-10)'
+                },
+                /**
+                 * Select state overrides for the buttons are applied in
+                 * addition to the normal state options
+                 */
+                select: {
+                    /**
+                     * @type {Highcharts.ColorType}
+                     */
+                    fill: 'var(--highcharts-highlight-color-10)',
+                    style: {
+                        /**
+                         * @type {Highcharts.ColorType}
+                         */
+                        color: 'var(--highcharts-neutral-color-100)',
+                        fontWeight: 'bold'
+                    }
+                },
+                /**
+                 * Disabled state overrides for the buttons are applied in
+                 * addition to the normal state options
+                 */
+                disabled: {
+                    /**
+                     * Disabled state CSS style overrides for the buttons' text
+                     */
+                    style: {
+                        color: 'var(--highcharts-neutral-color-20)'
+                    }
+                }
+            }
+        }
+
+    },
+
+    time: timeDefaults,
+
+    chart: ChartDefaults,
+
+    /**
+     * The chart's main title.
+     *
+     * @sample {highmaps} maps/title/title/
+     *         Title options demonstrated
+     * @sample {highcharts} highcharts/title/align-auto/
+     *         Default title alignment
+     */
+    title: {
+
+        /**
+         * When the title is floating, the plot area will not move to make space
+         * for it.
+         *
+         * @sample {highcharts} highcharts/chart/zoomtype-none/
+         *         False by default
+         * @sample {highcharts} highcharts/title/floating/
+         *         True - title on top of the plot area
+         * @sample {highstock} stock/chart/title-floating/
+         *         True - title on top of the plot area
+         *
+         * @type      {boolean}
+         * @default   false
+         * @since     2.1
+         * @apioption title.floating
+         */
+
+        /**
+         * Whether to
+         * [use HTML](https://www.highcharts.com/docs/chart-concepts/labels-and-string-formatting#html)
+         * to render the text.
+         *
+         * @type      {boolean}
+         * @default   false
+         * @apioption title.useHTML
+         */
+
+        /**
+         * The vertical alignment of the title. Can be one of `"top"`,
+         * `"middle"` and `"bottom"`. When a value is given, the title behaves
+         * as if [floating](#title.floating) were `true`.
+         *
+         * @sample {highcharts} highcharts/title/verticalalign/
+         *         Chart title in bottom right corner
+         * @sample {highstock} stock/chart/title-verticalalign/
+         *         Chart title in bottom right corner
+         *
+         * @type      {Highcharts.VerticalAlignValue}
+         * @since     2.1
+         * @apioption title.verticalAlign
+         */
+
+        /**
+         * The x position of the title relative to the alignment within
+         * `chart.spacingLeft` and `chart.spacingRight`.
+         *
+         * @sample {highcharts} highcharts/title/align/
+         *         Aligned to the plot area (x = 70px = margin left - spacing
+         *         left)
+         * @sample {highstock} stock/chart/title-align/
+         *         Aligned to the plot area (x = 50px = margin left - spacing
+         *         left)
+         *
+         * @type      {number}
+         * @default   0
+         * @since     2.0
+         * @apioption title.x
+         */
+
+        /**
+         * The y position of the title relative to the alignment within
+         * [chart.spacingTop](#chart.spacingTop) and [chart.spacingBottom](
+         * #chart.spacingBottom). By default it depends on the font size.
+         *
+         * @sample {highcharts} highcharts/title/y/
+         *         Title inside the plot area
+         * @sample {highstock} stock/chart/title-verticalalign/
+         *         Chart title in bottom right corner
+         *
+         * @type      {number}
+         * @since     2.0
+         * @apioption title.y
+         */
+
+        /**
+         * CSS styles for the title. Use this for font styling, but use `align`,
+         * `x` and `y` for text alignment.
+         *
+         * Note that the default [title.minScale](#title.minScale) option also
+         * affects the rendered font size. In order to keep the font size fixed
+         * regardless of title length, set `minScale` to 1.
+         *
+         * In styled mode, the title style is given in the `.highcharts-title`
+         * class.
+         *
+         * @sample {highcharts} highcharts/title/style/
+         *         Custom color and weight
+         * @sample {highstock} stock/chart/title-style/
+         *         Custom color and weight
+         * @sample highcharts/css/titles/
+         *         Styled mode
+         *
+         * @type      {Highcharts.CSSObject}
+         * @default   {highcharts|highmaps} { "color": "#333333", "fontSize": "18px" }
+         * @default   {highstock} { "color": "#333333", "fontSize": "16px" }
+         */
+        style: {
+            /**
+             * @type {Highcharts.ColorType}
+             */
+            color: 'var(--highcharts-neutral-color-80)',
+            fontWeight: 'bold'
+        },
+
+        /**
+         * The title of the chart. To disable the title, set the `text` to
+         * `undefined`.
+         *
+         * @sample {highcharts} highcharts/title/text/
+         *         Custom title
+         * @sample {highstock} stock/chart/title-text/
+         *         Custom title
+         *
+         * @default {highcharts|highmaps} Chart title
+         * @default {highstock} undefined
+         */
+        text: 'Chart title',
+        /**
+         * The horizontal alignment of the title. Can be one of "left", "center"
+         * and "right".
+         *
+         * Since v12 it defaults to `undefined`, meaning the alignment is
+         * computed for best fit. If the text fits in one line, it aligned to
+         * the center, but if it is wrapped into multiple lines, it is aligned
+         * to the left.
+         *
+         * @sample {highcharts} highcharts/title/align-auto/
+         *         Default alignment, dynamic
+         * @sample {highcharts} highcharts/title/align/
+         *         Aligned to the plot area (x = 70px = margin left - spacing
+         *         left)
+         * @sample {highstock} stock/chart/title-align/
+         *         Aligned to the plot area (x = 50px = margin left - spacing
+         *         left)
+         *
+         * @type      {Highcharts.AlignValue}
+         * @default   undefined
+         * @since     2.0
+         * @apioption title.align
+         */
+
+        /**
+         * A CSS class name to apply to the title's container div,
+         * allowing unique CSS styling for each chart.
+         *
+         * @type      {string}
+         * @apioption title.className
+         */
+
+        /**
+         * The margin between the title and the plot area, or if a subtitle
+         * is present, the margin between the subtitle and the plot area.
+         *
+         * @sample {highcharts} highcharts/title/margin-50/
+         *         A chart title margin of 50
+         * @sample {highcharts} highcharts/title/margin-subtitle/
+         *         The same margin applied with a subtitle
+         * @sample {highstock} stock/chart/title-margin/
+         *         A chart title margin of 50
+         *
+         * @since 2.1
+         */
+        margin: 15,
+
+        /**
+         * When the title is too wide to fit in the chart, the default behavior
+         * is to scale it down to fit, or apply word wrap if it is scaled down
+         * to `minScale` and still doesn't fit.
+         *
+         * The default value reflects the scale, when using default font sizes,
+         * when the title font size matches that of the subtitle. The title
+         * still stands out as it is bold by default.
+         *
+         * Set `minScale` to 1 to avoid downscaling.
+         *
+         * @sample {highcharts} highcharts/title/align-auto/
+         *         Downscaling demonstrated
+         *
+         * @since 12.0.0
+         */
+        minScale: 0.67
+
+    },
+
+    /**
+     * The chart's subtitle. This can be used both to display a subtitle below
+     * the main title, and to display random text anywhere in the chart. The
+     * subtitle can be updated after chart initialization through the
+     * `Chart.setTitle` method.
+     *
+     * @sample {highcharts} highcharts/title/align-auto/
+     *         Default title alignment
+     * @sample {highmaps} maps/title/subtitle/
+     *         Subtitle options demonstrated
+     */
+    subtitle: {
+
+        /**
+         * The horizontal alignment of the subtitle. Can be one of "left",
+         * "center" and "right". Since v12, it defaults to `undefined`, meaning
+         * the actual alignment is inherited from the alignment of the main
+         * title.
+         *
+         * @sample {highcharts} highcharts/title/align-auto/
+         *         Default title and subtitle alignment, dynamic
+         * @sample {highcharts} highcharts/subtitle/align/
+         *         Footnote at right of plot area
+         * @sample {highstock} stock/chart/subtitle-footnote
+         *         Footnote at bottom right of plot area
+         *
+         * @type  {Highcharts.AlignValue}
+         * @default undefined
+         * @since 2.0
+         * @apioption subtitle.align
+         */
+
+        /**
+         * A CSS class name to apply to the subtitle's container div,
+         * allowing unique CSS styling for each chart.
+         *
+         * @type      {string}
+         * @apioption subtitle.className
+         */
+
+        /**
+         * When the subtitle is floating, the plot area will not move to make
+         * space for it.
+         *
+         * @sample {highcharts} highcharts/subtitle/floating/
+         *         Floating title and subtitle
+         * @sample {highstock} stock/chart/subtitle-footnote
+         *         Footnote floating at bottom right of plot area
+         *
+         * @type      {boolean}
+         * @default   false
+         * @since     2.1
+         * @apioption subtitle.floating
+         */
+
+        /**
+         * Whether to
+         * [use HTML](https://www.highcharts.com/docs/chart-concepts/labels-and-string-formatting#html)
+         * to render the text.
+         *
+         * @type      {boolean}
+         * @default   false
+         * @apioption subtitle.useHTML
+         */
+
+        /**
+         * The vertical alignment of the title. Can be one of `"top"`,
+         * `"middle"` and `"bottom"`. When middle, the subtitle behaves as
+         * floating.
+         *
+         * @sample {highcharts} highcharts/subtitle/verticalalign/
+         *         Footnote at the bottom right of plot area
+         * @sample {highstock} stock/chart/subtitle-footnote
+         *         Footnote at the bottom right of plot area
+         *
+         * @type      {Highcharts.VerticalAlignValue}
+         * @since     2.1
+         * @apioption subtitle.verticalAlign
+         */
+
+        /**
+         * The x position of the subtitle relative to the alignment within
+         * `chart.spacingLeft` and `chart.spacingRight`.
+         *
+         * @sample {highcharts} highcharts/subtitle/align/
+         *         Footnote at right of plot area
+         * @sample {highstock} stock/chart/subtitle-footnote
+         *         Footnote at the bottom right of plot area
+         *
+         * @type      {number}
+         * @default   0
+         * @since     2.0
+         * @apioption subtitle.x
+         */
+
+        /**
+         * The y position of the subtitle relative to the alignment within
+         * `chart.spacingTop` and `chart.spacingBottom`. By default the subtitle
+         * is laid out below the title unless the title is floating.
+         *
+         * @sample {highcharts} highcharts/subtitle/verticalalign/
+         *         Footnote at the bottom right of plot area
+         * @sample {highstock} stock/chart/subtitle-footnote
+         *         Footnote at the bottom right of plot area
+         *
+         * @type      {number}
+         * @since     2.0
+         * @apioption subtitle.y
+         */
+
+        /**
+         * CSS styles for the title.
+         *
+         * In styled mode, the subtitle style is given in the
+         * `.highcharts-subtitle` class.
+         *
+         * @sample {highcharts} highcharts/subtitle/style/
+         *         Custom color and weight
+         * @sample {highcharts} highcharts/css/titles/
+         *         Styled mode
+         * @sample {highstock} stock/chart/subtitle-style
+         *         Custom color and weight
+         * @sample {highstock} highcharts/css/titles/
+         *         Styled mode
+         * @sample {highmaps} highcharts/css/titles/
+         *         Styled mode
+         *
+         * @type      {Highcharts.CSSObject}
+         * @default   {"color": "#666666"}
+         */
+        style: {
+            /**
+             * @type {Highcharts.ColorType}
+             */
+            color: 'var(--highcharts-neutral-color-60)',
+            /**
+             * @type {number|string}
+             */
+            fontSize: '0.8em'
+        },
+
+        /**
+         * The subtitle of the chart.
+         *
+         * @sample {highcharts|highstock} highcharts/subtitle/text/
+         *         Custom subtitle
+         * @sample {highcharts|highstock} highcharts/subtitle/text-formatted/
+         *         Formatted and linked text.
+         */
+        text: ''
+    },
+
+    /**
+     * The chart's caption, which will render below the chart and will be part
+     * of exported charts. The caption can be updated after chart initialization
+     * through the `Chart.update` or `Chart.caption.update` methods.
+     *
+     * @sample highcharts/caption/text/
+     *         A chart with a caption
+     * @since  7.2.0
+     */
+    caption: {
+
+        /**
+         * When the caption is floating, the plot area will not move to make
+         * space for it.
+         *
+         * @type      {boolean}
+         * @default   false
+         * @apioption caption.floating
+         */
+
+        /**
+         * The margin between the caption and the plot area.
+         */
+        margin: 15,
+
+        /**
+         * Whether to
+         * [use HTML](https://www.highcharts.com/docs/chart-concepts/labels-and-string-formatting#html)
+         * to render the text.
+         *
+         * @type      {boolean}
+         * @default   false
+         * @apioption caption.useHTML
+         */
+
+        /**
+         * The x position of the caption relative to the alignment within
+         * `chart.spacingLeft` and `chart.spacingRight`.
+         *
+         * @type      {number}
+         * @default   0
+         * @apioption caption.x
+         */
+
+        /**
+         * The y position of the caption relative to the alignment within
+         * `chart.spacingTop` and `chart.spacingBottom`.
+         *
+         * @type      {number}
+         * @apioption caption.y
+         */
+
+        /**
+         * CSS styles for the caption.
+         *
+         * In styled mode, the caption style is given in the
+         * `.highcharts-caption` class.
+         *
+         * @sample {highcharts} highcharts/css/titles/
+         *         Styled mode
+         *
+         * @type      {Highcharts.CSSObject}
+         * @default   {"color": "#666666"}
+         */
+        style: {
+            /**
+             * @type {Highcharts.ColorType}
+             */
+            color: 'var(--highcharts-neutral-color-60)',
+            /**
+             * @type {number|string}
+             */
+            fontSize: '0.8em'
+        },
+
+        /**
+         * The caption text of the chart.
+         *
+         * @sample {highcharts} highcharts/caption/text/
+         *         Custom caption
+         */
+        text: '',
+
+        /**
+         * The horizontal alignment of the caption. Can be one of "left",
+         *  "center" and "right".
+         *
+         * @type  {Highcharts.AlignValue}
+         */
+        align: 'left',
+
+        /**
+         * The vertical alignment of the caption. Can be one of `"top"`,
+         * `"middle"` and `"bottom"`. When middle, the caption behaves as
+         * floating.
+         *
+         * @type      {Highcharts.VerticalAlignValue}
+         */
+        verticalAlign: 'bottom'
+
+    },
+
+    /**
+     * The plotOptions is a wrapper object for config objects for each series
+     * type. The config objects for each series can also be overridden for
+     * each series item as given in the series array.
+     *
+     * Configuration options for the series are given in three levels. Options
+     * for all series in a chart are given in the [plotOptions.series](
+     * #plotOptions.series) object. Then options for all series of a specific
+     * type are given in the plotOptions of that type, for example
+     * `plotOptions.line`. Next, options for one single series are given in
+     * [the series array](#series).
+     */
+    plotOptions: {},
+
+    /**
+     * The loading options control the appearance of the loading screen
+     * that covers the plot area on chart operations. This screen only
+     * appears after an explicit call to `chart.showLoading()`. It is a
+     * utility for developers to communicate to the end user that something
+     * is going on, for example while retrieving new data via an XHR connection.
+     * The "Loading..." text itself is not part of this configuration
+     * object, but part of the `lang` object.
+     */
+    loading: {
+
+        /**
+         * The duration in milliseconds of the fade out effect.
+         *
+         * @sample highcharts/loading/hideduration/
+         *         Fade in and out over a second
+         *
+         * @type      {number}
+         * @default   100
+         * @since     1.2.0
+         * @apioption loading.hideDuration
+         */
+
+        /**
+         * The duration in milliseconds of the fade in effect.
+         *
+         * @sample highcharts/loading/hideduration/
+         *         Fade in and out over a second
+         *
+         * @type      {number}
+         * @default   100
+         * @since     1.2.0
+         * @apioption loading.showDuration
+         */
+
+        /**
+         * CSS styles for the loading label `span`.
+         *
+         * @see In styled mode, the loading label is styled with the
+         *      `.highcharts-loading-inner` class.
+         *
+         * @sample {highcharts|highmaps} highcharts/loading/labelstyle/
+         *         Vertically centered
+         * @sample {highstock} stock/loading/general/
+         *         Label styles
+         *
+         * @type    {Highcharts.CSSObject}
+         * @default {"fontWeight": "bold", "position": "relative", "top": "45%"}
+         * @since   1.2.0
+         */
+        labelStyle: {
+            /**
+             * @ignore
+             */
+            fontWeight: 'bold',
+            /**
+             * @ignore
+             */
+            position: 'relative',
+            /**
+             * @ignore
+             */
+            top: '45%'
+        },
+
+        /**
+         * CSS styles for the loading screen that covers the plot area.
+         *
+         * In styled mode, the loading label is styled with the
+         * `.highcharts-loading` class.
+         *
+         * @sample  {highcharts|highmaps} highcharts/loading/style/
+         *          Gray plot area, white text
+         * @sample  {highstock} stock/loading/general/
+         *          Gray plot area, white text
+         *
+         * @type    {Highcharts.CSSObject}
+         * @default {"position": "absolute", "backgroundColor": "#ffffff", "opacity": 0.5, "textAlign": "center"}
+         * @since   1.2.0
+         */
+        style: {
+            /**
+             * @ignore
+             */
+            position: 'absolute',
+            /**
+             * @ignore
+             */
+            backgroundColor: 'var(--highcharts-background-color)',
+            /**
+             * @ignore
+             */
+            opacity: 0.5,
+            /**
+             * @ignore
+             */
+            textAlign: 'center'
+        }
+    },
+
+    /**
+     * Options for the tooltip that appears when the user hovers over a
+     * series or point.
+     *
+     * @declare Highcharts.TooltipOptions
+     */
+    tooltip: {
+
+        /**
+         * A CSS class name to apply to the tooltip, allowing unique CSS
+         * styling for each chart.
+         *
+         * **Note:** The class is applied to the SVG element of the tooltip
+         * (the tooltip label group), not to a container div. This allows you
+         * to style the tooltip using CSS applicable to SVG elements.
+         *
+         * When [tooltip.outside](#tooltip.outside) is `true`, a separate
+         * container div with class `highcharts-tooltip-container` is created
+         * as the parent to the SVG tooltip element, but the `className` option
+         * is still applied to the SVG element itself, not to the container.
+         *
+         * @type      {string}
+         * @apioption tooltip.className
+         */
+
+        /**
+         * Since 4.1, the crosshair definitions are moved to the Axis object
+         * in order for a better separation from the tooltip. See
+         * [xAxis.crosshair](#xAxis.crosshair).
+         *
+         * @sample {highcharts} highcharts/tooltip/crosshairs-x/
+         *         Enable a crosshair for the x value
+         *
+         * @deprecated 4.1.0
+         *
+         * @type      {*}
+         * @default   true
+         * @apioption tooltip.crosshairs
+         */
+
+        /**
+         * Distance from point to tooltip in pixels.
+         *
+         * @type      {number}
+         * @default   16
+         * @apioption tooltip.distance
+         */
+
+        /**
+         * Whether the tooltip should be fixed to one position in the chart, or
+         * located next to the point or mouse. When the tooltip is fixed, the
+         * position can be further specified with the
+         * [tooltip.position](#tooltip.position) options set.
+         *
+         * @sample    highcharts/tooltip/fixed/
+         *            Fixed tooltip and position options
+         * @sample    {highstock} stock/tooltip/fixed/
+         *            Stock chart with fixed tooltip
+         * @sample    {highmaps} maps/tooltip/fixed/
+         *            Map with fixed tooltip
+         *
+         * @type      {boolean}
+         * @default   false
+         * @since 12.2.0
+         * @apioption tooltip.fixed
+         */
+
+        /**
+         * Whether the tooltip should follow the mouse as it moves across
+         * columns, pie slices and other point types with an extent.
+         * By default it behaves this way for pie, polygon, map, sankey
+         * and wordcloud series by override in the `plotOptions`
+         * for those series types.
+         *
+         * Does not apply if [split](#tooltip.split) is `true`.
+         *
+         * For touch moves to behave the same way, [followTouchMove](
+         * #tooltip.followTouchMove) must be `true` also.
+         *
+         * @sample highcharts/tooltip/followpointer/
+         *         Tooltip follow pointer comparison
+         *
+         * @type      {boolean}
+         * @default   {highcharts} false
+         * @default   {highstock} false
+         * @default   {highmaps} true
+         * @since     3.0
+         * @apioption tooltip.followPointer
+         */
+
+        /**
+         * Whether the tooltip should update as the finger moves on a touch
+         * device. If this is `true` and [chart.panning](#chart.panning) is
+         * set,`followTouchMove` will take over one-finger touches, so the user
+         * needs to use two fingers for zooming and panning.
+         *
+         * Note the difference to [followPointer](#tooltip.followPointer) that
+         * only defines the _position_ of the tooltip. If `followPointer` is
+         * false in for example a column series, the tooltip will show above or
+         * below the column, but as `followTouchMove` is true, the tooltip will
+         * jump from column to column as the user swipes across the plot area.
+         *
+         * @sample {highcharts} highcharts/tooltip/followtouchmove/
+         *         Tooltip follows touch move
+         *
+         * @type      {boolean}
+         * @default   {highcharts} true
+         * @default   {highstock} true
+         * @default   {highmaps} false
+         * @since     3.0.1
+         * @apioption tooltip.followTouchMove
+         */
+
+        /**
+         * A [format string](https://www.highcharts.com/docs/chart-concepts/labels-and-string-formatting)
+         * for the whole shared tooltip. When format strings are a requirement,
+         * it is usually more convenient to use `headerFormat`, `pointFormat`
+         * and `footerFormat`, but the `format` option allows combining them
+         * into one setting.
+         *
+         * The context of the format string is the same as that of the
+         * `tooltip.formatter` callback.
+         *
+         * @sample {highcharts} highcharts/tooltip/format-shared/
+         *         Format for shared tooltip
+         *
+         * @type      {string}
+         * @default   undefined
+         * @since     11.1.0
+         * @apioption tooltip.format
+         */
+
+        /**
+         * Callback function to format the text of the tooltip from scratch. In
+         * case of single or [shared](#tooltip.shared) tooltips, a string should
+         * be returned. In case of [split](#tooltip.split) tooltips, it should
+         * return an array where the first item is the header, and subsequent
+         * items are mapped to the points. Return `false` to disable tooltip for
+         * a specific point on series.
+         *
+         * A subset of HTML is supported. Unless `useHTML` is true, the HTML of
+         * the tooltip is parsed and converted to SVG, therefore this isn't a
+         * complete HTML renderer. The following HTML tags are supported: `b`,
+         * `br`, `em`, `i`, `span`, `strong`. Spans can be styled with a `style`
+         * attribute, but only text-related CSS, that is shared with SVG, is
+         * handled.
+         *
+         * The context of the formatter (since v12) is the
+         * [Point](https://api.highcharts.com/class-reference/Highcharts.Point)
+         * instance. If the tooltip is shared or split, an array `this.points`
+         * contains all points of the hovered x-value.
+         *
+         * Common properties from the Point to use in the formatter include:
+         *
+         * - **Point.percentage**:
+         *   Stacked series and pies only. The point's percentage of the total.
+         *
+         * - **Point.points**:
+         *   In a shared or split tooltip, this is an array containing all the
+         *   hovered points.
+         *
+         * - **this.series**:
+         *   The series object. The series name is available through
+         *   `this.series.name`.
+         *
+         * - **this.total**:
+         *   The total value at this point's x value in a stacked series, or the
+         *   sum of all slices in a pie series.
+         *
+         * - **this.x**:
+         *   The x value.
+         *
+         * - **this.y**:
+         *   The y value.
+         *
+         * @sample {highcharts} highcharts/tooltip/formatter-simple/
+         *         Simple string formatting
+         * @sample {highcharts} highcharts/tooltip/formatter-shared/
+         *         Formatting with shared tooltip
+         * @sample {highcharts|highstock} highcharts/tooltip/formatter-split/
+         *         Formatting with split tooltip
+         * @sample highcharts/tooltip/formatter-conditional-default/
+         *         Extending default formatter
+         * @sample {highstock} stock/tooltip/formatter/
+         *         Formatting with shared tooltip
+         * @sample {highmaps} maps/tooltip/formatter/
+         *         String formatting
+         *
+         * Since v12.6.0, the callback also receives `ctx` as the second
+         * argument, so that arrow functions can access the same context as
+         * regular functions using `this`.
+         *
+         * @type      {Highcharts.TooltipFormatterCallbackFunction}
+         * @apioption tooltip.formatter
+         */
+
+        /**
+         * Callback function to format the text of the tooltip for
+         * visible null points.
+         * Works analogously to [formatter](#tooltip.formatter), including the
+         * `ctx` callback argument added in v12.5.0.
+         *
+         * @sample highcharts/plotoptions/series-nullformat
+         *         Format data label and tooltip for null point.
+         *
+         * @type      {Highcharts.TooltipFormatterCallbackFunction}
+         * @apioption tooltip.nullFormatter
+         */
+
+        /**
+         * Whether to allow the tooltip to render outside the chart's SVG
+         * element box. By default (`false`), the tooltip is rendered within the
+         * chart's SVG element, which results in the tooltip being aligned
+         * inside the chart area. For small charts, this may result in clipping
+         * or overlapping. When `true`, a separate SVG element is created and
+         * overlaid on the page, allowing the tooltip to be aligned inside the
+         * page itself. Beware that with this option active, CSS classes on the
+         * chart's target container, with classnames matching the pattern
+         * 'highcharts-*', will be set on the tooltip as well. This is done to
+         * support theming for tooltips with this option.
+         *
+         * Defaults to `true` if `chart.scrollablePlotArea` is activated,
+         * otherwise `false`.
+         *
+         * @sample highcharts/tooltip/outside
+         *         Small charts with tooltips outside
+         *
+         * @type      {boolean|undefined}
+         * @default   undefined
+         * @since     6.1.1
+         * @apioption tooltip.outside
+         */
+
+        /**
+         * A callback function for formatting the HTML output for a single point
+         * in the tooltip. Like the `pointFormat` string, but with more
+         * flexibility. Since v12.6.0, the callback also receives `ctx` as the
+         * first argument, so that arrow functions can access the same context
+         * as regular functions using `this`.
+         *
+         * @type      {Highcharts.FormatterCallbackFunction<Highcharts.Point>}
+         * @since     4.1.0
+         * @context   Highcharts.Point
+         * @apioption tooltip.pointFormatter
+         */
+
+        /**
+         * A callback function to place the tooltip in a custom position. The
+         * callback receives four parameters: `labelWidth`, `labelHeight`,
+         * `point`, and `ctx`, where point contains values for `plotX` and
+         * `plotY` telling where the reference point is in the plot area, and
+         * `ctx` is the tooltip context (so that arrow-functions can access the
+         * same context as a normal function using `this`). Add
+         * `chart.plotLeft` and `chart.plotTop` to get the full coordinates.
+         * Since v12.6.0, the callback receives `ctx`.
+         *
+         * To find the actual hovered `Point` instance, use
+         * `this.chart.hoverPoint`. For shared or split tooltips, all the hover
+         * points are available in `this.chart.hoverPoints`.
+         *
+         * Since v7, when [tooltip.split](#tooltip.split) option is enabled,
+         * positioner is called for each of the boxes separately, including
+         * xAxis header. xAxis header is not a point, instead `point` argument
+         * contains info: `{ plotX: Number, plotY: Number, isHeader: Boolean }`
+         *
+         * Since v12.2, the [tooltip.fixed](#tooltip.fixed) option combined with
+         * [tooltip.position](#tooltip.position) covers most of the use cases
+         * for custom tooltip positioning.
+         *
+         * The return should be an object containing x and y values, for example
+         * `{ x: 100, y: 100 }`.
+         *
+         * @sample {highcharts} highcharts/tooltip/positioner/
+         *         A fixed tooltip position
+         * @sample {highstock} stock/tooltip/positioner/
+         *         A fixed tooltip position on top of the chart
+         * @sample {highmaps} maps/tooltip/positioner/
+         *         A fixed tooltip position
+         * @sample {highstock} stock/tooltip/split-positioner/
+         *         Split tooltip with fixed positions
+         * @sample {highstock} stock/tooltip/positioner-scrollable-plotarea/
+         *         Scrollable plot area combined with tooltip positioner
+         *
+         * @see [position](#tooltip.position)
+         *
+         * @type      {Highcharts.TooltipPositionerCallbackFunction}
+         * @since     2.2.4
+         * @apioption tooltip.positioner
+         */
+
+        /**
+         * Shows tooltip for all points with the same X value. Splits the
+         * tooltip into one label per series, with the header close to the axis.
+         * This is recommended over [shared](#tooltip.shared)
+         * tooltips for charts with multiple line series, generally making them
+         * easier to read. This option takes precedence over `tooltip.shared`.
+         *
+         * Not supported for [polar](#chart.polar) and [inverted](#chart.inverted) charts.
+         *
+         * @productdesc {highstock} In Highcharts Stock, tooltips are split
+         * by default since v6.0.0. Stock charts typically contain
+         * multi-dimension points and multiple panes, making split tooltips
+         * the preferred layout over
+         * the previous `shared` tooltip.
+         *
+         * @sample highcharts/tooltip/split/
+         *         Split tooltip
+         * @sample {highcharts|highstock} highcharts/tooltip/formatter-split/
+         *         Split tooltip and custom formatter callback
+         *
+         * @type      {boolean}
+         * @default   {highcharts} false
+         * @default   {highstock} true
+         * @since     5.0.0
+         * @product   highcharts highstock
+         * @apioption tooltip.split
+         */
+
+        /**
+         * How many decimals to show in each series' y value. This is
+         * overridable in each series' tooltip options object. The default is to
+         * preserve all decimals.
+         *
+         * @sample {highcharts|highstock} highcharts/tooltip/valuedecimals/
+         *         Set decimals, prefix and suffix for the value
+         * @sample {highmaps} maps/tooltip/valuedecimals/
+         *         Set decimals, prefix and suffix for the value
+         *
+         * @type      {number|undefined}
+         * @since     2.2
+         * @apioption tooltip.valueDecimals
+         */
+
+        /**
+         * A string to prepend to each series' y value. Overridable in each
+         * series' tooltip options object.
+         *
+         * @sample {highcharts|highstock} highcharts/tooltip/valuedecimals/
+         *         Set decimals, prefix and suffix for the value
+         * @sample {highmaps} maps/tooltip/valuedecimals/
+         *         Set decimals, prefix and suffix for the value
+         *
+         * @type      {string}
+         * @since     2.2
+         * @apioption tooltip.valuePrefix
+         */
+
+        /**
+         * A string to append to each series' y value. Overridable in each
+         * series' tooltip options object.
+         *
+         * @sample {highcharts|highstock} highcharts/tooltip/valuedecimals/
+         *         Set decimals, prefix and suffix for the value
+         * @sample {highmaps} maps/tooltip/valuedecimals/
+         *         Set decimals, prefix and suffix for the value
+         *
+         * @type      {string}
+         * @since     2.2
+         * @apioption tooltip.valueSuffix
+         */
+
+        /**
+         * The format for the date in the tooltip header if the X axis is a
+         * datetime axis. The default is a best guess based on the smallest
+         * distance between points in the chart.
+         *
+         * @sample {highcharts} highcharts/tooltip/xdateformat/
+         *         A different format
+         *
+         * @type      {string|Highcharts.DateTimeFormatOptions}
+         * @product   highcharts highstock gantt
+         * @apioption tooltip.xDateFormat
+         */
+
+        /**
+         * How many decimals to show for the `point.change`
+         * or the `point.cumulativeSum` value when the `series.compare`
+         * or the `series.cumulative` option is set.
+         * This is overridable in each series' tooltip options object.
+         *
+         * @type      {number}
+         * @default   2
+         * @since     1.0.1
+         * @product   highstock
+         * @apioption tooltip.changeDecimals
+         */
+
+        /**
+         * Enable or disable the tooltip.
+         *
+         * @sample {highcharts} highcharts/tooltip/enabled/
+         *         Disabled
+         * @sample {highcharts} highcharts/plotoptions/series-point-events-mouseover/
+         *         Disable tooltip and show values on chart instead
+         */
+        enabled: true,
+
+        /**
+         * Enable or disable animation of the tooltip.
+         *
+         * @type       {boolean|Partial<Highcharts.AnimationOptionsObject>}
+         * @since      2.3.0
+         */
+        animation: {
+            duration: 300,
+            // EaseOutCirc
+            easing: (x: number): number => Math.sqrt(1 - Math.pow(x - 1, 2))
+        },
+
+        /**
+         * The color of the tooltip border. When `undefined` or `null`, the
+         * border takes the color of the corresponding series or point.
+         *
+         * By default, in light mode the border color matches the background
+         * color because the shadow makes the tooltip stand out. In dark mode, a
+         * visible line is used because the default shadow is too dark to be
+         * visible on a dark background.
+         *
+         * @sample {highcharts} highcharts/tooltip/bordercolor-default/
+         *         Default border color
+         * @sample {highcharts} highcharts/tooltip/bordercolor-black/
+         *         Black border
+         * @sample {highstock} stock/tooltip/general/
+         *         Styled tooltip
+         * @sample {highmaps} maps/tooltip/background-border/
+         *         Background and border demo
+         *
+         * @type {Highcharts.ColorType}
+         */
+        borderColor: 'light-dark(var(--highcharts-neutral-color-5), var(--highcharts-neutral-color-20))', // eslint-disable-line max-len
+
+        /**
+         * The radius of the rounded border corners.
+         *
+         * @sample {highcharts} highcharts/tooltip/bordercolor-default/
+         *         Default border radius
+         * @sample {highcharts} highcharts/tooltip/borderradius-0/
+         *         Square borders
+         * @sample {highmaps} maps/tooltip/background-border/
+         *         Background and border demo
+         */
+        borderRadius: 5,
+
+        /**
+         * For series on datetime axes, the date format in the tooltip's
+         * header will by default be guessed based on the closest data points.
+         * This member gives the default string representations used for
+         * each unit. For an overview of the string or object configuration, see
+         * [dateFormat](/class-reference/Highcharts.Time#dateFormat).
+         *
+         * @see [xAxis.dateTimeLabelFormats](#xAxis.dateTimeLabelFormats)
+         *
+         * @type    {Highcharts.Dictionary<string|Highcharts.DateTimeFormatOptions>}
+         * @product highcharts highstock gantt
+         */
+        dateTimeLabelFormats: {
+            millisecond: '%[AebHMSL]',
+            second: '%[AebHMS]',
+            minute: '%[AebHM]',
+            hour: '%[AebHM]',
+            day: '%[AebY]',
+            week: '%v %[AebY]',
+            month: '%[BY]',
+            year: '%[Y]'
+        },
+
+        /**
+         * A string to append to the tooltip format.
+         *
+         * @sample {highcharts} highcharts/tooltip/footerformat/
+         *         A table for value alignment
+         * @sample {highmaps} maps/tooltip/format/
+         *         Format demo
+         *
+         * @since 2.2
+         */
+        footerFormat: '',
+
+        /**
+         * The name of a symbol to use for the border around the tooltip
+         * header. Applies only when [tooltip.split](#tooltip.split) is
+         * enabled.
+         *
+         * Custom callbacks for symbol path generation can also be added to
+         * `Highcharts.SVGRenderer.prototype.symbols` the same way as for
+         * [series.marker.symbol](plotOptions.line.marker.symbol).
+         *
+         * @see [tooltip.shape](#tooltip.shape)
+         *
+         * @sample {highstock} stock/tooltip/split-positioner/
+         *         Different shapes for header and split boxes
+         *
+         * @type       {Highcharts.TooltipShapeValue}
+         * @validvalue ["callout", "rect"]
+         * @since      7.0
+         * @deprecated 13.0
+         * @apioption tooltip.headerShape
+         */
+
+        /**
+         * Options for the tooltip header when [tooltip.split](#tooltip.split)
+         * is enabled. The header is the box containing the X value in a split
+         * tooltip.
+         *
+         * @sample {highcharts} highcharts/tooltip/header
+         *         Header options for split tooltip
+         * @sample {highstock} stock/tooltip/header
+         *         Header options for split tooltip
+         * @since  13.0.0
+         */
+        header: {
+            /**
+             * Background color for the tooltip header when
+             * [tooltip.split](#tooltip.split) is enabled.
+             *
+             * @sample {highcharts} highcharts/tooltip/header
+             *         Header options for split tooltip
+             * @sample {highstock} stock/tooltip/header
+             *         Header options for split tooltip
+             *
+             * @type {Highcharts.ColorType}
+             * @apioption tooltip.header.backgroundColor
+             */
+            /**
+             * Border color for the tooltip header when
+             * [tooltip.split](#tooltip.split) is enabled.
+             *
+             * @sample {highcharts} highcharts/tooltip/header
+             *         Header options for split tooltip
+             * @sample {highstock} stock/tooltip/header
+             *         Header options for split tooltip
+             * @type {Highcharts.ColorType}
+             * @apioption tooltip.header.borderColor
+             */
+            /**
+             * The width of the border for the tooltip header when
+             * [tooltip.split](#tooltip.split) is enabled.
+             *
+             * @sample {highcharts} highcharts/tooltip/header
+             *         Header options for split tooltip
+             * @sample {highstock} stock/tooltip/header
+             *         Header options for split tooltip
+             * @type {number}
+             * @apioption tooltip.header.borderWidth
+             */
+            /**
+             * Distance between the plot area and the header (except the
+             * chevron) in a split tooltip, in pixels. The default value makes
+             * the header text align with the axis labels.
+             *
+             * @sample {highcharts} highcharts/tooltip/header
+             *         Header options for split tooltip
+             * @sample {highstock} stock/tooltip/header
+             *         Header options for split tooltip
+             */
+            distance: 5,
+            /**
+             * The name of a symbol to use for the border around the tooltip
+             * header. Applies only when [tooltip.split](#tooltip.split) is
+             * enabled.
+             *
+             * Custom callbacks for symbol path generation can also be added to
+             * `Highcharts.SVGRenderer.prototype.symbols` the same way as for
+             * [series.marker.symbol](plotOptions.line.marker.symbol).
+             *
+             * @see [tooltip.shape](#tooltip.shape)
+             *
+             * @sample {highstock} stock/tooltip/split-positioner/
+             *         Different shapes for header and split boxes
+             */
+            shape: 'callout',
+            /**
+             * CSS styles for the tooltip header. The default is `{ fontSize:
+             * '1em' }`, ensuring that the header text is the same size as the
+             * axis labels.
+             *
+             * @sample {highcharts} highcharts/tooltip/header
+             *         Header options for split tooltip
+             * @sample {highstock} stock/tooltip/header
+             *         Header options for split tooltip
+             */
+            style: {
+                /** @internal */
+                fontSize: '1em'
+            }
+        },
+
+        /**
+         * The number of milliseconds to wait until the tooltip is hidden when
+         * mouse out from a point or chart.
+         *
+         * @since 3.0
+         */
+        hideDelay: 500,
+
+        /**
+         * The number of milliseconds to wait until the tooltip is shown when
+         * mouse over a point. Works on initial hover.
+         *
+         * @sample {highcharts|highstock} highcharts/tooltip/showdelay/
+         *         Show tooltip after 2 seconds
+         *
+         * @since 12.6.0
+         */
+        showDelay: 0,
+
+        /**
+         * Padding inside the tooltip, in pixels.
+         *
+         * @since 5.0.0
+         */
+        padding: 8,
+
+        /**
+         * Positioning options for fixed tooltip, taking effect only when
+         * [tooltip.fixed](#tooltip.fixed) is `true`.
+         *
+         * @sample {highcharts} highcharts/tooltip/fixed/
+         *         Fixed tooltip and position options
+         * @sample {highstock} stock/tooltip/fixed/
+         *         Stock chart with fixed tooltip
+         * @sample {highmaps} maps/tooltip/fixed/
+         *         Map with fixed tooltip
+         *
+         * @since 12.2.0
+         */
+        position: {
+            /**
+             * The horizontal alignment of the fixed tooltip.
+             *
+             * @sample highcharts/tooltip/fixed/
+             *         Fixed tooltip
+             * @sample {highstock} stock/tooltip/fixed/
+             *         Stock chart with fixed tooltip
+             *
+             * @type {Highcharts.AlignValue}
+             * @default left
+             * @apioption tooltip.position.align
+             */
+            /**
+             * The vertical alignment of the fixed tooltip.
+             *
+             * @sample highcharts/tooltip/fixed/
+             *         Fixed tooltip
+             * @sample {highstock} stock/tooltip/fixed/
+             *         Stock chart with fixed tooltip
+             *
+             * @type {Highcharts.VerticalAlignValue}
+             * @default top
+             * @apioption tooltip.position.verticalAlign
+             */
+            /**
+             * What the fixed tooltip alignment should be relative to.
+             *
+             * The default, `pane`, means that it is aligned within the plot
+             * area for that given series. If the tooltip is split (as default
+             * in Stock charts), each partial tooltip is aligned within the
+             * series' pane.
+             *
+             * @sample highcharts/tooltip/fixed/
+             *         Fixed tooltip
+             * @sample {highstock} stock/tooltip/fixed/
+             *         Stock chart with fixed tooltip
+             *
+             * @type {string}
+             * @default pane
+             * @validvalue ["pane", "chart", "plotBox", "spacingBox"]
+             * @apioption tooltip.position.relativeTo
+             */
+            /**
+             * X pixel offset from the given position. Can be used to shy away
+             * from axis lines, grid lines etc to avoid the tooltip overlapping
+             * other elements.
+             *
+             * @sample highcharts/tooltip/fixed/
+             *         Fixed tooltip
+             * @sample {highstock} stock/tooltip/fixed/
+             *         Stock chart with fixed tooltip
+             */
+            x: 0,
+            /**
+             * Y pixel offset from the given position. Can be used to shy away
+             * from axis lines, grid lines etc to avoid the tooltip overlapping
+             * other elements.
+             *
+             * @sample highcharts/tooltip/fixed/
+             *         Fixed tooltip
+             * @sample {highstock} stock/tooltip/fixed/
+             *         Stock chart with fixed tooltip
+             */
+            y: 3
+        },
+
+        /**
+         * The name of a symbol to use for the border around the tooltip. Can
+         * be one of: `"callout"`, `"circle"` or `"rect"`. When
+         * [tooltip.split](#tooltip.split)
+         * option is enabled, shape is applied to all boxes except header, which
+         * is controlled by
+         * [tooltip.headerShape](#tooltip.headerShape).
+         *
+         * Custom callbacks for symbol path generation can also be added to
+         * `Highcharts.SVGRenderer.prototype.symbols` the same way as for
+         * [series.marker.symbol](plotOptions.line.marker.symbol).
+         *
+         * Defaults to `callout` for floating tooltip, `rect` for
+         * [fixed](#tooltip.fixed) tooltip.
+         *
+         * @type  {Highcharts.TooltipShapeValue}
+         * @since 4.0
+         * @default undefined
+         * @apioption tooltip.shape
+         */
+
+        /**
+         * Shows information in the tooltip for all points with the same X
+         * value. When the tooltip is shared, the entire plot area will capture
+         * mouse movement or touch events. Tooltip texts for series types with
+         * ordered data (not pie, scatter, flags etc) will be shown in a single
+         * bubble. This is recommended for single series charts and for
+         * tablet/mobile optimized charts.
+         *
+         * See also [tooltip.split](#tooltip.split), that is better suited for
+         * charts with many series, especially line-type series. The
+         * `tooltip.split` option takes precedence over `tooltip.shared`.
+         *
+         * @sample {highcharts} highcharts/tooltip/shared-false/
+         *         False by default
+         * @sample {highcharts} highcharts/tooltip/shared-true/
+         *         True
+         * @sample {highcharts} highcharts/tooltip/shared-x-crosshair/
+         *         True with x axis crosshair
+         * @sample {highcharts} highcharts/tooltip/shared-true-mixed-types/
+         *         True with mixed series types
+         *
+         * @since   2.1
+         * @product highcharts highstock
+         */
+        shared: false,
+
+        /**
+         * Proximity snap for graphs or single points. It defaults to 10 for
+         * mouse-powered devices and 25 for touch devices.
+         *
+         * Note that in most cases the whole plot area captures the mouse
+         * movement, and in these cases `tooltip.snap` doesn't make sense. This
+         * applies when [stickyTracking](#plotOptions.series.stickyTracking)
+         * is `true` (default) and when the tooltip is [shared](#tooltip.shared)
+         * or [split](#tooltip.split).
+         *
+         * @sample {highcharts} highcharts/tooltip/bordercolor-default/
+         *         10 px by default
+         * @sample {highcharts} highcharts/tooltip/snap-50/
+         *         50 px on graph
+         *
+         * @type    {number}
+         * @default 10/25
+         * @since   1.2.0
+         * @product highcharts highstock
+         */
+        snap: isTouchDevice ? 25 : 10,
+
+        /**
+         * The HTML of the tooltip header line. The context is the
+         * [Point class](https://api.highcharts.com/class-reference/Highcharts.Point).
+         * Variables are enclosed in curly brackets. Examples of common
+         * variables to include are `x`, `y`, `series.name` and `series.color`
+         * and other properties on the same form. The `point.key` variable
+         * contains the category name, x value or datetime string depending on
+         * the type of axis. For datetime axes, the `point.key` date format can
+         * be set using `tooltip.xDateFormat`.
+         * In v12+, locale-aware date names follow the browser's casing and can
+         * be lower-case, so use the `ucfirst` helper (for example
+         * `{ucfirst point.key}`) if you want a capitalized header.
+         *
+         * @sample {highcharts} highcharts/tooltip/footerformat/
+         *         An HTML table in the tooltip
+         * @sample {highstock} highcharts/tooltip/footerformat/
+         *         An HTML table in the tooltip
+         * @sample {highmaps} maps/tooltip/format/
+         *         Format demo
+         *
+         * @type      {string}
+         * @apioption tooltip.headerFormat
+         */
+        headerFormat: '<span style="font-size: 0.8em">{ucfirst point.key}</span><br/>',
+
+        /**
+         * The
+         * [format string](https://www.highcharts.com/docs/chart-concepts/labels-and-string-formatting)
+         * specifying what to show for _nodes_ in a network-type data series,
+         * like sankey, organization, and dependency wheel. This is relevant
+         * when nodes and links require different formatting, where the links
+         * are formatted by `tooltip.pointFormat`.
+         *
+         * @sample highcharts/plotoptions/sankey-link-datalabels/
+         *         Node and link data labels
+         *
+         * @type      {string}
+         * @apioption tooltip.nodeFormat
+         */
+
+        /**
+         * The HTML of the null point's line in the tooltip. Works analogously
+         * to [pointFormat](#tooltip.pointFormat).
+         *
+         * @sample {highcharts} highcharts/series/null-interaction
+         *         Line chart with null interaction
+         * @sample {highcharts} highcharts/plotoptions/series-nullformat
+         *         Heatmap with null interaction
+         *
+         * @type      {string}
+         * @apioption tooltip.nullFormat
+         */
+
+        /**
+         * The HTML of the point's line in the tooltip. The context is the
+         * [Point class](https://api.highcharts.com/class-reference/Highcharts.Point).
+         * Variables are enclosed in curly brackets. Examples of common
+         * variables to include are `x`, `y`, `series.name` and `series.color`
+         * and other properties on the same form. Furthermore, `y` can be
+         * extended by the `tooltip.valuePrefix` and `tooltip.valueSuffix`
+         * variables. This can also be overridden for each series, which makes
+         * it a good hook for displaying units.
+         *
+         * In styled mode, the dot is colored by a class name rather than the
+         * point color.
+         *
+         * @sample {highcharts} highcharts/tooltip/pointformat/
+         *         A different point format with value suffix
+         * @sample {highcharts|highstock} highcharts/tooltip/pointformat-extra-information/
+         *         Show extra information about points in the tooltip
+         * @sample {highmaps} maps/tooltip/format/
+         *         Format demo
+         *
+         * @type       {string}
+         * @since      2.2
+         * @apioption  tooltip.pointFormat
+         */
+        pointFormat: '<span style="color:{point.color}">\u25CF</span> {series.name}: <b>{point.y}</b><br/>',
+
+        /**
+         * The background color or gradient for the tooltip.
+         *
+         * In styled mode, the stroke width is set in the
+         * `.highcharts-tooltip-box` class.
+         *
+         * @sample {highcharts} highcharts/tooltip/backgroundcolor-solid/
+         *         Yellowish background
+         * @sample {highcharts} highcharts/tooltip/backgroundcolor-gradient/
+         *         Gradient
+         * @sample {highcharts} highcharts/css/tooltip-border-background/
+         *         Tooltip in styled mode
+         * @sample {highstock} stock/tooltip/general/
+         *         Custom tooltip
+         * @sample {highstock} highcharts/css/tooltip-border-background/
+         *         Tooltip in styled mode
+         * @sample {highmaps} maps/tooltip/background-border/
+         *         Background and border demo
+         * @sample {highmaps} highcharts/css/tooltip-border-background/
+         *         Tooltip in styled mode
+         *
+         * @type {Highcharts.ColorType}
+         */
+        backgroundColor: 'var(--highcharts-background-color)',
+
+        /**
+         * The pixel width of the tooltip border. Defaults to 1, but with a
+         * `borderColor` to match the background in light mode, and a visible
+         * lighter border in dark mode.
+         *
+         * In styled mode, the stroke width is set in the
+         * `.highcharts-tooltip-box` class.
+         *
+         * @sample {highcharts} highcharts/tooltip/bordercolor-default/
+         *         2 pixels
+         * @sample {highcharts} highcharts/tooltip/borderwidth/
+         *         No border (shadow only)
+         * @sample {highcharts} highcharts/css/tooltip-border-background/
+         *         Tooltip in styled mode
+         * @sample {highstock} stock/tooltip/general/
+         *         Custom tooltip
+         * @sample {highstock} highcharts/css/tooltip-border-background/
+         *         Tooltip in styled mode
+         * @sample {highmaps} maps/tooltip/background-border/
+         *         Background and border demo
+         * @sample {highmaps} highcharts/css/tooltip-border-background/
+         *         Tooltip in styled mode
+         *
+         * @type {number}
+         */
+        borderWidth: void 0,
+
+        /**
+         * Whether to apply a drop shadow to the tooltip. Defaults to true,
+         * unless the tooltip is [fixed](#tooltip.fixed).
+         *
+         * @sample {highcharts} highcharts/tooltip/bordercolor-default/
+         *         True by default
+         * @sample {highcharts} highcharts/tooltip/shadow/
+         *         False
+         * @sample {highmaps} maps/tooltip/positioner/
+         *         Fixed tooltip position, border and shadow disabled
+         *
+         * @type {boolean|Highcharts.ShadowOptionsObject}
+         * @default undefined
+         * @apioption tooltip.shadow
+         */
+
+        /**
+         * Prevents the tooltip from switching or closing, when touched or
+         * pointed.
+         *
+         * @sample highcharts/tooltip/stickoncontact/
+         *         Tooltip sticks on pointer contact
+         * @sample highcharts/tooltip/stickoncontact-anchor-link/
+         *         Tooltip with clickable links
+         *
+         * @type      {boolean}
+         * @since     8.0.1
+         */
+        stickOnContact: false,
+
+        /**
+         * CSS styles for the tooltip. The tooltip can also be styled through
+         * the CSS class `.highcharts-tooltip`.
+         *
+         * Note that the default `pointerEvents` style makes the tooltip ignore
+         * mouse events, so in order to use clickable tooltips, this value must
+         * be set to `auto`.
+         *
+         * @sample {highcharts} highcharts/tooltip/style/
+         *         Greater padding, bold text
+         *
+         * @type {Highcharts.CSSObject}
+         */
+        style: {
+            /**
+             * @type {Highcharts.ColorType}
+             */
+            color: 'var(--highcharts-neutral-color-80)',
+
+            cursor: 'default',
+
+            /**
+             * @type {number|string}
+             */
+            fontSize: '0.8em'
+        },
+
+        /**
+         * Use HTML to render the contents of the tooltip instead of SVG. Using
+         * HTML allows advanced formatting like tables and images in the
+         * tooltip. It is also recommended for rtl languages as it works around
+         * rtl bugs in early Firefox.
+         *
+         * @sample {highcharts|highstock} highcharts/tooltip/footerformat/
+         *         A table for value alignment
+         * @sample {highcharts|highstock} highcharts/tooltip/fullhtml/
+         *         Full HTML tooltip
+         * @sample {highmaps} maps/tooltip/usehtml/
+         *         Pure HTML tooltip
+         *
+         * @since     2.2
+         */
+        useHTML: false
+    },
+
+    /**
+     * Highcharts by default puts a credits label in the lower right corner
+     * of the chart. This can be changed using these options.
+     */
+    credits: {
+
+        /**
+         * Credits for map source to be concatenated with conventional credit
+         * text. By default this is a format string that collects copyright
+         * information from the map if available.
+         *
+         * @see [mapTextFull](#credits.mapTextFull)
+         * @see [text](#credits.text)
+         *
+         * @type      {string}
+         * @default   \u00a9 <a href="{geojson.copyrightUrl}">{geojson.copyrightShort}</a>
+         * @since     4.2.2
+         * @product   highmaps
+         * @apioption credits.mapText
+         */
+
+        /**
+         * Detailed credits for map source to be displayed on hover of credits
+         * text. By default this is a format string that collects copyright
+         * information from the map if available.
+         *
+         * @see [mapText](#credits.mapText)
+         * @see [text](#credits.text)
+         *
+         * @type      {string}
+         * @default   {geojson.copyright}
+         * @since     4.2.2
+         * @product   highmaps
+         * @apioption credits.mapTextFull
+         */
+
+        /**
+         * Events for the credits label.
+         *
+         * @type     {object}
+         * @since    12.6.0
+         * @apioption credits.events
+         */
+
+        /**
+         * Callback function to handle click events on the credits label.
+         * The callback can call `event.preventDefault()` to prevent the
+         * default navigation behavior. Alternatively, you can add a general
+         * event handler using `Highcharts.addEvent(Chart, 'creditsClick',
+         * callback)` instead of providing it in the options tree.
+         *
+         * @sample {highcharts} highcharts/credits/events-click/
+         *         Custom click handler
+         *
+         * @param {Event} event
+         *        The click event object.
+         *
+         * @type  {Function}
+         * @since 12.6.0
+         * @apioption credits.events.click
+         */
+
+        /**
+         * Whether to render the credits as HTML
+         *
+         * @since     13.0.0
+         * @sample    highcharts/palette/branding
+         *            Branding with HTML credits
+         * @type      {boolean}
+         * @default   false
+         * @apioption credits.useHTML
+         */
+
+        /**
+         * Whether to show the credits text.
+         *
+         * @sample {highcharts} highcharts/credits/enabled-false/
+         *         Credits disabled
+         * @sample {highstock} stock/credits/enabled/
+         *         Credits disabled
+         * @sample {highmaps} maps/credits/enabled-false/
+         *         Credits disabled
+         */
+        enabled: true,
+
+        /**
+         * The URL for the credits label.
+         *
+         * URLs that do not start with one of the
+         * [AST.allowedReferences](https://api.highcharts.com/class-reference/Highcharts.AST#.allowedReferences),
+         * for example `javascript:` URLs, are ignored.
+         *
+         * @sample {highcharts} highcharts/credits/href/
+         *         Custom URL and text
+         * @sample {highmaps} maps/credits/customized/
+         *         Custom URL and text
+         */
+        href: 'https://www.highcharts.com?credits',
+
+        /**
+         * Position configuration for the credits label.
+         *
+         * @sample highcharts/credits/position/
+         *         Credits position
+         * @sample {highcharts} highcharts/credits/position-left/
+         *         Left aligned
+         * @sample {highmaps} maps/credits/customized/
+         *         Left aligned
+         *
+         * @type  {Highcharts.AlignObject}
+         * @since 2.1
+         */
+        position: {
+            align: 'right',
+            relativeTo: 'spacingBox',
+            verticalAlign: 'bottom',
+            x: 0,
+            y: 10
+        },
+
+        /**
+         * CSS styles for the credits label.
+         *
+         * @see In styled mode, credits styles can be set with the
+         *      `.highcharts-credits` class.
+         *
+         * @type {Highcharts.CSSObject}
+         */
+        style: {
+            cursor: 'pointer',
+
+            /**
+             * @type {Highcharts.ColorType}
+             */
+            color: 'var(--highcharts-neutral-color-40)',
+
+            /**
+             * @type {number|string}
+             */
+            fontSize: '0.6em'
+        },
+
+        /**
+         * The text for the credits label.
+         *
+         * @productdesc {highmaps}
+         * If a map is loaded as GeoJSON, the text defaults to
+         * `Highcharts @ {map-credits}`. Otherwise, it defaults to
+         * `Highcharts.com`.
+         *
+         * @sample {highcharts} highcharts/credits/href/
+         *         Custom URL and text
+         * @sample {highmaps} maps/credits/customized/
+         *         Custom URL and text
+         */
+        text: 'Highcharts.com'
+
+    }
+};
+// To do: export directly when highcharts-documentation-generators is fixed.
+export { defaultOptions };
+
+// Named as exposed on the namespace, to resolve as an external (`G.time`)
+export { defaultTime as time };
+
+/**
+ * Get the updated default options. Until 3.0.7, merely exposing defaultOptions
+ * for outside modules wasn't enough because the setOptions method created a new
+ * object.
+ *
+ * @function Highcharts.getOptions
+ *
+ * @return {Highcharts.Options}
+ * Default options.
+ */
+export function getOptions(): DefaultOptions {
+    return defaultOptions;
+}
+
+/**
+ * Merge the default options with custom options and return the new options
+ * structure. Commonly used for defining reusable templates.
+ *
+ * @sample highcharts/members/setoptions Applying a global theme
+ *
+ * @function Highcharts.setOptions
+ *
+ * @param {Highcharts.Options} options
+ * The new custom chart options.
+ *
+ * @return {Highcharts.Options}
+ * Updated options.
+ */
+export function setOptions(
+    options: DeepPartial<DefaultOptions>
+): Options {
+    fireEvent(H, 'setOptions', { options });
+
+    // Copy in the default options
+    merge(true, defaultOptions, options);
+
+    // Update the time object
+    if (options.time) {
+        defaultTime.update(defaultOptions.time);
+    }
+    if (options.lang && 'locale' in options.lang) {
+        defaultTime.update({
+            locale: options.lang.locale as string|Array<string>
+        });
+    }
+
+    if (options.lang?.chartTitle) {
+        defaultOptions.title = {
+            ...defaultOptions.title,
+            text: options.lang.chartTitle
+        } as DefaultOptions['title'];
+    }
+
+    return defaultOptions;
+}
+
+/* *
+ *
+ *  Default Export
+ *
+ * */
+
+const DefaultOptions = {
+    defaultOptions,
+    defaultTime,
+    getOptions,
+    setOptions
+};
+
+export default DefaultOptions;
+
+/* *
+ *
+ *  API Declarations
+ *
+ * */
+
+/**
+ * @typedef {"plotBox"|"spacingBox"} Highcharts.ButtonRelativeToValue
+ */
+
+/**
+ * Gets fired when a series is added to the chart after load time, using the
+ * `addSeries` method. Returning `false` prevents the series from being added.
+ *
+ * @callback Highcharts.ChartAddSeriesCallbackFunction
+ *
+ * @param {Highcharts.Chart} this
+ *        The chart on which the event occurred.
+ *
+ * @param {Highcharts.ChartAddSeriesEventObject} event
+ *        The event that occurred.
+ */
+
+/**
+ * Contains common event information. Through the `options` property you can
+ * access the series options that were passed to the `addSeries` method.
+ *
+ * @interface Highcharts.ChartAddSeriesEventObject
+ *//**
+ * The series options that were passed to the `addSeries` method.
+ * @name Highcharts.ChartAddSeriesEventObject#options
+ * @type {Highcharts.SeriesOptionsType}
+ *//**
+ * Prevents the default behavior of the event.
+ * @name Highcharts.ChartAddSeriesEventObject#preventDefault
+ * @type {Function}
+ *//**
+ * The event target.
+ * @name Highcharts.ChartAddSeriesEventObject#target
+ * @type {Highcharts.Chart}
+ *//**
+ * The event type.
+ * @name Highcharts.ChartAddSeriesEventObject#type
+ * @type {"addSeries"}
+ */
+
+/**
+ * Gets fired when clicking on the plot background.
+ *
+ * @callback Highcharts.ChartClickCallbackFunction
+ *
+ * @param {Highcharts.Chart} this
+ *        The chart on which the event occurred.
+ *
+ * @param {Highcharts.PointerEventObject} event
+ *        The event that occurred.
+ */
+
+/**
+ * Contains an axes of the clicked spot.
+ *
+ * @interface Highcharts.ChartClickEventAxisObject
+ *//**
+ * Axis at the clicked spot.
+ * @name Highcharts.ChartClickEventAxisObject#axis
+ * @type {Highcharts.Axis}
+ *//**
+ * Axis value at the clicked spot.
+ * @name Highcharts.ChartClickEventAxisObject#value
+ * @type {number}
+ */
+
+/**
+ * Contains information about the clicked spot on the chart. Remember the unit
+ * of a datetime axis is milliseconds since 1970-01-01 00:00:00.
+ *
+ * @interface Highcharts.ChartClickEventObject
+ * @extends Highcharts.PointerEventObject
+ *//**
+ * Information about the x-axis on the clicked spot.
+ * @name Highcharts.ChartClickEventObject#xAxis
+ * @type {Array<Highcharts.ChartClickEventAxisObject>}
+ *//**
+ * Information about the y-axis on the clicked spot.
+ * @name Highcharts.ChartClickEventObject#yAxis
+ * @type {Array<Highcharts.ChartClickEventAxisObject>}
+ *//**
+ * Information about the z-axis on the clicked spot.
+ * @name Highcharts.ChartClickEventObject#zAxis
+ * @type {Array<Highcharts.ChartClickEventAxisObject>|undefined}
+ */
+
+/**
+ * Gets fired when the chart is finished loading.
+ *
+ * @callback Highcharts.ChartLoadCallbackFunction
+ *
+ * @param {Highcharts.Chart} this
+ *        The chart on which the event occurred.
+ *
+ * @param {global.Event} event
+ *        The event that occurred.
+ */
+
+/**
+ * Gets fired while the chart is panned by mouse drag. Calling
+ * `event.preventDefault()` or returning `false` prevents the default panning
+ * of the axes.
+ *
+ * @callback Highcharts.ChartPanCallbackFunction
+ *
+ * @param {Highcharts.Chart} this
+ *        The chart on which the event occurred.
+ *
+ * @param {Highcharts.ChartPanEventObject} event
+ *        The event that occurred.
+ */
+
+/**
+ * Contains common event information. Through the `originalEvent` property you
+ * can access the pointer event that triggered the panning.
+ *
+ * @interface Highcharts.ChartPanEventObject
+ *//**
+ * The pointer event that triggered the panning.
+ * @name Highcharts.ChartPanEventObject#originalEvent
+ * @type {Highcharts.PointerEventObject}
+ *//**
+ * Prevents the default behavior of the event.
+ * @name Highcharts.ChartPanEventObject#preventDefault
+ * @type {Function}
+ *//**
+ * The event target.
+ * @name Highcharts.ChartPanEventObject#target
+ * @type {Highcharts.Chart}
+ *//**
+ * The event type.
+ * @name Highcharts.ChartPanEventObject#type
+ * @type {"pan"}
+ */
+
+/**
+ * Fires when the chart is redrawn, either after a call to `chart.redraw()` or
+ * after an axis, series or point is modified with the `redraw` option set to
+ * `true`.
+ *
+ * @callback Highcharts.ChartRedrawCallbackFunction
+ *
+ * @param {Highcharts.Chart} this
+ *        The chart on which the event occurred.
+ *
+ * @param {global.Event} event
+ *        The event that occurred.
+ */
+
+/**
+ * Gets fired after initial load of the chart (directly after the `load` event),
+ * and after each redraw (directly after the `redraw` event).
+ *
+ * @callback Highcharts.ChartRenderCallbackFunction
+ *
+ * @param {Highcharts.Chart} this
+ *        The chart on which the event occurred.
+ *
+ * @param {global.Event} event
+ *        The event that occurred.
+ */
+
+/**
+ * Gets fired when an area of the chart has been selected. The default action
+ * for the selection event is to zoom the chart to the selected area. It can be
+ * prevented by calling `event.preventDefault()` or return false.
+ *
+ * @callback Highcharts.ChartSelectionCallbackFunction
+ *
+ * @param {Highcharts.Chart} this
+ *        The chart on which the event occurred.
+ *
+ * @param {Highcharts.SelectEventObject} event
+ *        Event information
+ *
+ * @return {boolean|undefined}
+ *         Return false to prevent the default action, usually zoom.
+ */
+
+(''); // Detach doclets above

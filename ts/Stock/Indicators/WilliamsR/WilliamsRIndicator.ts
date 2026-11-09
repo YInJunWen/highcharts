@@ -1,8 +1,9 @@
 /* *
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -14,6 +15,7 @@
  *
  * */
 
+import type { IndicatorLinkedSeriesBase } from '../IndicatorBase';
 import type IndicatorValuesObject from '../IndicatorValuesObject';
 import type LineSeries from '../../../Series/Line/LineSeries';
 import type {
@@ -23,16 +25,9 @@ import type {
 import type WilliamsRPoint from './WilliamsRPoint';
 
 import AU from '../ArrayUtilities.js';
+import SMAIndicator from '../SMA/SMAIndicator.js';
 import SeriesRegistry from '../../../Core/Series/SeriesRegistry.js';
-const {
-    sma: SMAIndicator
-} = SeriesRegistry.seriesTypes;
-import U from '../../../Core/Utilities.js';
-const {
-    extend,
-    isArray,
-    merge
-} = U;
+import { extend, isArray, merge } from '../../../Shared/Utilities.js';
 
 /* *
  *
@@ -43,13 +38,19 @@ const {
 /**
  * The Williams %R series type.
  *
- * @private
  * @class
  * @name Highcharts.seriesTypes.williamsr
  *
  * @augments Highcharts.Series
  */
 class WilliamsRIndicator extends SMAIndicator {
+
+    /* *
+     *
+     *  Static Properties
+     *
+     * */
+
     /**
      * Williams %R. This series requires the `linkedTo` option to be
      * set and should be loaded after the `stock/indicators/indicators.js`.
@@ -63,17 +64,18 @@ class WilliamsRIndicator extends SMAIndicator {
      * @excluding    allAreas, colorAxis, joinBy, keys, navigatorOptions,
      *               pointInterval, pointIntervalUnit, pointPlacement,
      *               pointRange, pointStart, showInNavigator, stacking
-     * @requires     stock/indicators/indicators
-     * @requires     stock/indicators/williams-r
+     * @requires     indicators/indicators
+     * @requires     indicators/williams-r
      * @optionparent plotOptions.williamsr
+     * @internal
      */
     public static defaultOptions: WilliamsROptions = merge(SMAIndicator.defaultOptions, {
         /**
-         * Paramters used in calculation of Williams %R series points.
+         * Parameters used in calculation of Williams %R series points.
          * @excluding index
          */
         params: {
-            index: void 0, // unchangeable index, do not inherit (#15362)
+            index: void 0, // Unchangeable index, do not inherit (#15362)
             /**
              * Period for Williams %R oscillator
              */
@@ -81,26 +83,40 @@ class WilliamsRIndicator extends SMAIndicator {
         }
     } as WilliamsROptions);
 
-    public data: Array<WilliamsRPoint> = void 0 as any;
-    public options: WilliamsROptions = void 0 as any;
-    public points: Array<WilliamsRPoint> = void 0 as any;
+    /* *
+     *
+     *  Properties
+     *
+     * */
 
+    public data!: Array<WilliamsRPoint>;
+    public options!: WilliamsROptions;
+    public points!: Array<WilliamsRPoint>;
+
+    /* *
+     *
+     *  Functions
+     *
+     * */
+
+    /** @internal */
     public getValues <TLinkedSeries extends LineSeries>(
         this: WilliamsRIndicator,
-        series: TLinkedSeries,
+        series: TLinkedSeries&IndicatorLinkedSeriesBase,
         params: WilliamsRParamsOptions
     ): (IndicatorValuesObject<TLinkedSeries>|undefined) {
-        let period: number = params.period as any,
+        const period: number = params.period as any,
             xVal: Array<number> = series.xData as any,
             yVal: Array<Array<number>> = series.yData as any,
             yValLen = yVal ? yVal.length : 0,
             WR = [], // 0- date, 1- Williams %R
             xData = [],
             yData = [],
-            slicedY: Array<Array<number>>,
             close = 3,
             low = 2,
-            high = 1,
+            high = 1;
+
+        let slicedY: Array<Array<number>>,
             extremes: Array<number>,
             R: number,
             HH: number, // Highest high value in period
@@ -143,6 +159,7 @@ class WilliamsRIndicator extends SMAIndicator {
             yData: yData
         } as IndicatorValuesObject<TLinkedSeries>;
     }
+
 }
 
 /* *
@@ -194,12 +211,12 @@ export default WilliamsRIndicator;
  * @extends   series,plotOptions.williamsr
  * @since     7.0.0
  * @product   highstock
- * @excluding allAreas, colorAxis, dataParser, dataURL, joinBy, keys,
+ * @excluding allAreas, colorAxis, joinBy, keys,
  *            navigatorOptions, pointInterval, pointIntervalUnit,
  *            pointPlacement, pointRange, pointStart, showInNavigator, stacking
- * @requires  stock/indicators/indicators
- * @requires  stock/indicators/williams-r
+ * @requires  indicators/indicators
+ * @requires  indicators/williams-r
  * @apioption series.williamsr
  */
 
-''; // adds doclets above to the transpiled file
+''; // Adds doclets above to the transpiled file

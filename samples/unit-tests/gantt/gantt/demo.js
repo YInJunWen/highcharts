@@ -3,9 +3,9 @@
         getSpacing = function (chart, tick1, tick2) {
             var yAxis = chart.yAxis[0],
                 ticks = yAxis.ticks,
-                tick1Space = ticks[Highcharts.pick(tick1, '-1')].mark.getBBox()
+                tick1Space = ticks[tick1 ?? '-1'].mark.getBBox()
                     .y,
-                tick2Space = ticks[Highcharts.pick(tick2, '0')].mark.getBBox()
+                tick2Space = ticks[tick2 ?? '0'].mark.getBBox()
                     .y;
 
             return tick2Space - tick1Space;
@@ -140,7 +140,10 @@
             'Point with milestone:true is a milestone'
         );
 
-        assert.equal(typeof milestone.d, 'string', "Milestone has a 'd' value");
+        assert.equal(
+            typeof milestone.d,
+            'string', 'Milestone has a \'d\' value'
+        );
 
         // Remove path letters
         path = milestone.d.replace(/[a-zA-Z]/g, '');
@@ -279,14 +282,15 @@
         assert.equal(
             spaceExpanded,
             spaceCollapsed,
-            'Space between two first ticks does not change after expanding again'
+            'Space between two first ticks does not change after expanding ' +
+            'again'
         );
 
         // Check spacing after collapsing single root parent
         click(chart.yAxis[0].ticks['0'].label.element);
 
         spaceCollapsed = getSpacing(chart);
-        axisLineLength = chart.yAxis[0].axisLine.element.getBBox().height + 1;
+        axisLineLength = chart.yAxis[0].axisLine.element.getBBox().height;
 
         assert.equal(
             axisLineLength,
@@ -335,14 +339,7 @@
     QUnit.test('Point.update', assert => {
         const today = +new Date();
         const day = 24 * 60 * 60 * 1000;
-        const {
-            series: [
-                {
-                    points,
-                    points: [point]
-                }
-            ]
-        } = Highcharts.ganttChart('container', {
+        const chart = Highcharts.ganttChart('container', {
             series: [
                 {
                     data: [
@@ -382,7 +379,12 @@
             start: today + day,
             end: today + 2 * day
         };
-
+        const {
+            series: [{
+                points,
+                points: [point]
+            }]
+        } = chart;
         // Run Point.update
         point.update(updateValues);
 
@@ -402,7 +404,8 @@
         assert.strictEqual(
             points.length,
             5,
-            'Should not change the number of points after update. #11231, #11486'
+            'Should not change the number of points after update. #11231, ' +
+            '#11486'
         );
 
         // Test that collapsed graphics are removed
@@ -411,83 +414,167 @@
             2,
             'Collapsed graphics should not be rendered (#12617)'
         );
+
+        // Changing id of a parent
+        points[1].update({ id: '_moving' });
+
+        assert.strictEqual(
+            chart.series[0].yAxis.treeGrid.tree.children.length,
+            5,
+            'Orphaned nodes should appear as direct children of root (#15196).'
+        );
     });
 
     QUnit.test('Collapsing subtasks', assert => {
         const today = new Date();
         const day = 24 * 60 * 60 * 1000;
 
-        const chart = Highcharts.ganttChart('container', {
-            chart: {
-                height: 300
-            },
+        let chart = Highcharts.ganttChart('container', {
             title: {
                 text: 'Highcharts Gantt With Subtasks'
+            },
+            yAxis: {
+                scrollbar: {
+                    enabled: true
+                },
+                max: 3
             },
             xAxis: {
                 min: today.getTime() - 2 * day,
                 max: today.getTime() + 32 * day
             },
-            series: [
-                {
-                    name: 'Project 1',
-                    data: [
-                        {
-                            name: 'Planning',
-                            id: 'planning',
-                            start: today.getTime(),
-                            end: today.getTime() + 20 * day
-                        },
-                        {
-                            name: 'Requirements',
-                            id: 'requirements',
-                            parent: 'planning',
-                            start: today.getTime(),
-                            end: today.getTime() + 5 * day
-                        },
-                        {
-                            name: 'Design',
-                            id: 'design',
-                            dependency: 'requirements',
-                            parent: 'planning',
-                            start: today.getTime() + 3 * day,
-                            end: today.getTime() + 20 * day
-                        },
-                        {
-                            name: 'Layout',
-                            id: 'layout',
-                            parent: 'design',
-                            start: today.getTime() + 3 * day,
-                            end: today.getTime() + 10 * day
-                        },
-                        {
-                            name: 'Develop',
-                            id: 'develop',
-                            start: today.getTime() + 5 * day,
-                            end: today.getTime() + 30 * day
-                        }
-                    ]
-                }
-            ]
+            series: [{
+                name: 'Project 1',
+                data: [{
+                    name: 'Planning',
+                    id: 'planning',
+                    start: today.getTime(),
+                    end: today.getTime() + 20 * day
+                }, {
+                    name: 'Requirements',
+                    id: 'requirements',
+                    parent: 'planning',
+                    start: today.getTime(),
+                    end: today.getTime() + 5 * day
+                }, {
+                    name: 'Design',
+                    id: 'design',
+                    dependency: 'requirements',
+                    parent: 'planning',
+                    start: today.getTime() + 3 * day,
+                    end: today.getTime() + 20 * day
+                }, {
+                    name: 'Layout',
+                    id: 'layout',
+                    parent: 'design',
+                    start: today.getTime() + 3 * day,
+                    end: today.getTime() + 10 * day
+                }, {
+                    name: 'Develop',
+                    id: 'develop',
+                    start: today.getTime() + 5 * day,
+                    end: today.getTime() + 30 * day
+                }]
+            }]
         });
-        click(chart.yAxis[0].ticks['2'].label.element);
-        click(chart.yAxis[0].ticks['0'].label.element);
+        assert.strictEqual(
+            chart.yAxis[0].len,
+            200,
+            'yAxis should start with 200px height'
+        );
 
+        click(chart.yAxis[0].ticks['2'].label.element);
+        assert.strictEqual(
+            chart.yAxis[0].len,
+            200,
+            'yAxis with some collapse rows should stay at 200px height'
+        );
+
+        click(chart.yAxis[0].ticks['0'].label.element);
+        assert.strictEqual(
+            chart.yAxis[0].len,
+            100,
+            'yAxis should collapse to 100px height'
+        );
         assert.strictEqual(
             document.querySelectorAll('.highcharts-yaxis .highcharts-tick')
                 .length,
             chart.yAxis[0].tickPositions.length + 1,
-            'Should have the correct amount of ticks remaining after collapsing subtask before parent (#12012)'
+            'Should have the correct amount of ticks remaining after ' +
+            'collapsing subtask before parent (#12012)'
         );
 
         click(chart.yAxis[0].ticks['0'].label.element);
+        assert.strictEqual(
+            chart.yAxis[0].len,
+            200,
+            'yAxis with some collapse rows return to 200px height'
+        );
+
         chart.xAxis[0].update({
             min: today.getTime() + 2 * day
         });
         assert.strictEqual(
             chart.pathfinder.connections.length,
             1,
-            '#12691: The connector should not disappear when the task is partially visible'
+            '#12691: The connector should not disappear when the task is ' +
+            'partially visible'
+        );
+
+        chart = Highcharts.ganttChart('container', {
+            series: [{
+                data: [{
+                    name: 'A',
+                    id: 'A'
+                }, {
+                    name: 'A1',
+                    id: 'A1',
+                    parent: 'A'
+                }, {
+                    name: 'A1_a',
+                    id: 'A1_a',
+                    parent: 'A1',
+                    start: today.getTime() + 5 * day,
+                    end: today.getTime() + 30 * day
+                }]
+            }, {
+                data: [{
+                    name: 'B',
+                    id: 'B'
+                }, {
+                    name: 'B1',
+                    id: 'B1',
+                    parent: 'B',
+                    start: today.getTime() + 5 * day,
+                    end: today.getTime() + 30 * day
+                }]
+            }]
+        });
+        chart.series[0].points[1].update({
+            id: '_a1'
+        });
+        click(chart.yAxis[0].ticks[2].label.element);
+        assert.ok(
+            chart.series[1].points[0].collapsed,
+            `After clicking the tick label, the proper point should be
+            collapsed.`
+        );
+
+        click(chart.yAxis[0].ticks[2].label.element);
+        assert.notOk(
+            chart.series[1].points[0].collapsed,
+            `After clicking the tick label again, the proper point should not be
+            collapsed.`
+        );
+
+        chart.yAxis[0].update({
+            visible: false
+        });
+
+        assert.ok(
+            true,
+            `There shouldn't be any error in the console after changing the
+            visibility of axis (#20180).`
         );
     });
 
@@ -498,169 +585,169 @@
             }
         });
 
-        assert.ok(true, 'Gantt should be initialized with no errors (#13246).');
+        assert.ok(true, 'Gantt should be initialized with no errors.');
+    });
+
+    QUnit.test('Scrolling', assert => {
+        const chart = Highcharts.ganttChart('container', {
+            yAxis: {
+                min: 0,
+                max: 2,
+                type: 'category',
+                scrollbar: {
+                    enabled: true
+                },
+                grid: {
+                    enabled: true,
+                    columns: [
+                        {
+                            title: {
+                                text: 'Project'
+                            },
+                            labels: {
+                                format: '{point.name}'
+                            }
+                        },
+                        {
+                            title: {
+                                text: 'Assignee'
+                            },
+                            labels: {
+                                format: '{point.assignee}'
+                            }
+                        }
+                    ]
+                }
+            },
+            series: [
+                {
+                    name: 'Project 1',
+                    data: [
+                        {
+                            start: 1,
+                            end: 2,
+                            name: 'Task A',
+                            assignee: 'Person 1',
+                            y: 0
+                        },
+                        {
+                            start: 3,
+                            end: 4,
+                            name: 'Task B',
+                            assignee: 'Person 2',
+                            y: 1
+                        },
+                        {
+                            start: 5,
+                            end: 6,
+                            name: 'Task C',
+                            assignee: 'Person 3',
+                            y: 2
+                        },
+                        {
+                            start: 6,
+                            end: 9,
+                            name: 'Task D',
+                            assignee: 'Person 4',
+                            y: 3
+                        },
+                        {
+                            start: 4,
+                            end: 10,
+                            name: 'Task E',
+                            assignee: 'Person 5',
+                            y: 4
+                        }
+                    ]
+                }
+            ]
+        });
+
+        assert.ok(
+            chart.yAxis[0].grid.axisLineExtra,
+            'The extra left line for grid should exist.'
+        );
+        assert.notOk(
+            chart.yAxis[0].grid.columns[0].grid.lowerBorder,
+            'The extra lower border for grid should not exist because ' +
+            'the last tick mark exists.'
+        );
+        assert.notOk(
+            chart.yAxis[0].grid.columns[0].grid.upperBorder,
+            'The extra upper border for grid should not exist because ' +
+            'the first tick mark exists.'
+        );
+
+        assert.strictEqual(
+            chart.yAxis[0].ticks[0].label.textStr,
+            'Task A',
+            'First tick on the left columns should be Task A.'
+        );
+        assert.strictEqual(
+            chart.yAxis[0].ticks[2].label.textStr,
+            'Task C',
+            'Third tick on the left columns should be Task C.'
+        );
+        chart.yAxis[0].setExtremes(0.4, 2.4);
+
+        assert.ok(
+            chart.yAxis[0].grid.lowerBorder,
+            'The extra lower border for grid should exist.'
+        );
+        assert.ok(
+            chart.yAxis[0].grid.upperBorder,
+            'The extra upper border for grid should exist.'
+        );
+        assert.strictEqual(
+            chart.yAxis[0].ticks[0].label.textStr,
+            'Task A',
+            'First tick on the left columns should be Task A.'
+        );
+        assert.strictEqual(
+            chart.yAxis[0].grid.columns[0].ticks[3].label.visibility,
+            'hidden',
+            'Fourth tick on the left columns should not be visible.'
+        );
+        chart.yAxis[0].setExtremes(0.8, 2.8);
+
+        assert.strictEqual(
+            chart.yAxis[0].grid.columns[0].ticks[0].label.visibility,
+            'hidden',
+            'First tick on the left columns should not be visible.'
+        );
+        assert.ok(
+            chart.yAxis[0].grid.columns[0].ticks[0].mark,
+            'First tick mark on the left columns should exist.'
+        );
+        assert.strictEqual(
+            chart.yAxis[0].ticks[3].label.textStr,
+            'Task D',
+            'Last visible tick on the left columns should be Task D.'
+        );
+        assert.strictEqual(
+            chart.yAxis[0].grid.columns[0].ticks[3].mark.visibility,
+            'hidden',
+            'Tick marker with index 3 should not be visible.'
+        );
+        chart.yAxis[0].setExtremes(1, 3);
+
+        assert.strictEqual(
+            chart.yAxis[0].ticks[3].label.textStr,
+            'Task D',
+            'Last visible tick on the left columns should be Task D.'
+        );
+        chart.yAxis[0].setExtremes(1.4, 3.4);
+
+        assert.strictEqual(
+            chart.yAxis[0].grid.columns[0].ticks[3].label.visibility,
+            'inherit',
+            'Tick marker with index 3 should be visible again.'
+        );
     });
 
     QUnit.test(
-        'The ticks should be generated correctly during scrolling with the grid axis, #13072.',
-        assert => {
-            const chart = Highcharts.ganttChart('container', {
-                yAxis: {
-                    min: 0,
-                    max: 2,
-                    type: 'category',
-                    scrollbar: {
-                        enabled: true
-                    },
-                    grid: {
-                        enabled: true,
-                        columns: [
-                            {
-                                title: {
-                                    text: 'Project'
-                                },
-                                labels: {
-                                    format: '{point.name}'
-                                }
-                            },
-                            {
-                                title: {
-                                    text: 'Assignee'
-                                },
-                                labels: {
-                                    format: '{point.assignee}'
-                                }
-                            }
-                        ]
-                    }
-                },
-                series: [
-                    {
-                        name: 'Project 1',
-                        data: [
-                            {
-                                start: 1,
-                                end: 2,
-                                name: 'Task A',
-                                assignee: 'Person 1',
-                                y: 0
-                            },
-                            {
-                                start: 3,
-                                end: 4,
-                                name: 'Task B',
-                                assignee: 'Person 2',
-                                y: 1
-                            },
-                            {
-                                start: 5,
-                                end: 6,
-                                name: 'Task C',
-                                assignee: 'Person 3',
-                                y: 2
-                            },
-                            {
-                                start: 6,
-                                end: 9,
-                                name: 'Task D',
-                                assignee: 'Person 4',
-                                y: 3
-                            },
-                            {
-                                start: 4,
-                                end: 10,
-                                name: 'Task E',
-                                assignee: 'Person 5',
-                                y: 4
-                            }
-                        ]
-                    }
-                ]
-            });
-
-            assert.ok(
-                chart.yAxis[0].grid.columns[0].grid.axisLineExtra,
-                'The extra left line for grid should exist.'
-            );
-            assert.notOk(
-                chart.yAxis[0].grid.columns[0].grid.lowerBorder,
-                'The extra lower border for grid should not exist because the last tick mark exists.'
-            );
-            assert.notOk(
-                chart.yAxis[0].grid.columns[0].grid.upperBorder,
-                'The extra upper border for grid should not exist because the first tick mark exists.'
-            );
-
-            assert.strictEqual(
-                chart.yAxis[0].grid.columns[0].ticks[0].label.textStr,
-                'Task A',
-                'First tick on the left columns should be Task A.'
-            );
-            assert.strictEqual(
-                chart.yAxis[0].grid.columns[0].ticks[2].label.textStr,
-                'Task C',
-                'Third tick on the left columns should be Task C.'
-            );
-            chart.yAxis[0].setExtremes(0.4, 2.4);
-
-            assert.ok(
-                chart.yAxis[0].grid.columns[0].grid.lowerBorder,
-                'The extra lower border for grid should exist.'
-            );
-            assert.ok(
-                chart.yAxis[0].grid.columns[0].grid.upperBorder,
-                'The extra upper border for grid should exist.'
-            );
-            assert.strictEqual(
-                chart.yAxis[0].grid.columns[0].ticks[0].label.textStr,
-                'Task A',
-                'First tick on the left columns should be Task A.'
-            );
-            assert.strictEqual(
-                chart.yAxis[0].grid.columns[0].ticks[3].label.visibility,
-                'hidden',
-                'Fourth tick on the left columns should not be visible.'
-            );
-            chart.yAxis[0].setExtremes(0.8, 2.8);
-
-            assert.strictEqual(
-                chart.yAxis[0].grid.columns[0].ticks[0].label.visibility,
-                'hidden',
-                'First tick on the left columns should not be visible.'
-            );
-            assert.ok(
-                chart.yAxis[0].grid.columns[0].ticks[0].mark,
-                'First tick mark on the left columns should exist.'
-            );
-            assert.strictEqual(
-                chart.yAxis[0].grid.columns[0].ticks[3].label.textStr,
-                'Task D',
-                'Last visible tick on the left columns should be Task D.'
-            );
-            assert.strictEqual(
-                chart.yAxis[0].grid.columns[0].ticks[3].mark.visibility,
-                'hidden',
-                'Tick marker with index 3 should not be visible.'
-            );
-            chart.yAxis[0].setExtremes(1, 3);
-
-            assert.strictEqual(
-                chart.yAxis[0].grid.columns[0].ticks[3].label.textStr,
-                'Task D',
-                'Last visible tick on the left columns should be Task D.'
-            );
-            chart.yAxis[0].setExtremes(1.4, 3.4);
-
-            assert.strictEqual(
-                chart.yAxis[0].grid.columns[0].ticks[3].label.visibility,
-                'inherit',
-                'Tick marker with index 3 should be visible again.'
-            );
-        }
-    );
-
-    QUnit.test(
-        'When navigator enabled there should be no errors in the console caused by unsorted data, (#13376).',
+        'When navigator enabled there should be no errors in the console ' +
+        'caused by unsorted data, (#13376).',
         function (assert) {
             const chart = Highcharts.ganttChart('container', {
                 navigator: {
@@ -696,6 +783,110 @@
         }
     );
 
+    QUnit.test('Navigator and Gantt first render (#24855)', assert => {
+        const chart = Highcharts.ganttChart('container', {
+            navigator: {
+                enabled: true
+            },
+            series: [{
+                data: [{
+                    name: 'Category 1',
+                    start: Date.UTC(2026, 0, 1),
+                    end: Date.UTC(2026, 0, 4)
+                }, {
+                    name: 'Category 2',
+                    start: Date.UTC(2026, 0, 2),
+                    end: Date.UTC(2026, 0, 6)
+                }]
+            }]
+        });
+
+        const seriesColY = chart.series[0].dataTable.getColumn('y'),
+            navSeriesColY = chart.navigator.series[0].dataTable.getColumn('y');
+
+        assert.notStrictEqual(
+            navSeriesColY,
+            undefined,
+            'Column "y" should exist in navigator series data table'
+        );
+
+        navSeriesColY.forEach((_, i) => {
+            assert.strictEqual(
+                seriesColY[i],
+                navSeriesColY[i],
+                '"y" column values in Nav and Chart series should be identical'
+            );
+        });
+    });
+
+    QUnit.test('Navigator inherits axis uniqueNames (#24975)', assert => {
+        const chart = Highcharts.ganttChart('container', {
+                yAxis: {
+                    uniqueNames: true
+                },
+                navigator: {
+                    enabled: true,
+                    series: {
+                        type: 'gantt'
+                    },
+                    yAxis: {
+                        type: 'treegrid'
+                    }
+                },
+                series: [{
+                    name: 'Series 1',
+                    data: [{
+                        start: Date.UTC(2026, 2, 1),
+                        end: Date.UTC(2026, 6, 1),
+                        name: 'Development'
+                    }, {
+                        start: Date.UTC(2026, 6, 1),
+                        end: Date.UTC(2026, 7, 15),
+                        name: 'Testing'
+                    }, {
+                        start: Date.UTC(2026, 6, 15),
+                        end: Date.UTC(2026, 8, 30),
+                        name: 'Development'
+                    }, {
+                        start: Date.UTC(2026, 9, 1),
+                        end: Date.UTC(2026, 9, 20),
+                        name: 'Testing'
+                    }]
+                }]
+            }),
+            nav = chart.navigator,
+            series = chart.series[0],
+            navSeries = nav.series[0];
+
+        assert.strictEqual(
+            nav.yAxis.uniqueNames,
+            true,
+            'Navigator should inherit uniqueNames from the base series axis.'
+        );
+
+        navSeries.points.forEach((_, i) => {
+            assert.strictEqual(
+                navSeries.points[i].y,
+                series.points[i].y,
+                'Navigator and main series should use the same Y positions.'
+            );
+        });
+
+        chart.update({
+            navigator: {
+                yAxis: {
+                    uniqueNames: false
+                }
+            }
+        });
+
+        assert.strictEqual(
+            nav.yAxis.uniqueNames,
+            false,
+            'Explicit navigator uniqueNames should override the main axis.'
+        );
+    });
+
     QUnit.test('Gantt using the keys feature #13768', function (assert) {
         var chart = Highcharts.ganttChart('container', {
             series: [
@@ -707,53 +898,204 @@
         });
 
         assert.strictEqual(
-            chart.series[0].processedXData[0] !== undefined,
+            chart.series[0].getColumn('x', true)[0] !== undefined,
             true,
-            'The processedXData should be applied by using the keys feature #13768'
+            'The processedXData should be applied by using the keys feature ' +
+            '#13768'
         );
         assert.strictEqual(
-            chart.series[0].processedYData[0] !== undefined,
+            chart.series[0].getColumn('y', true)[0] !== undefined,
             true,
-            'The processedYData should be applied by using the keys feature #13768'
+            'The processedYData should be applied by using the keys feature ' +
+            '#13768'
         );
     });
 
-    QUnit.test('Gantt with scrollbar using uniqueNames, #14808.', function (assert) {
-        Highcharts.ganttChart('container', {
-            yAxis: {
-                min: 0,
-                max: 1,
-                uniqueNames: true,
-                scrollbar: {
-                    enabled: true
-                }
-            },
-            series: [{
-                type: 'gantt',
-                name: 's1',
-                data: [{
-                    name: 'Task 1',
-                    start: Date.UTC(2020, 5, 1),
-                    end: Date.UTC(2020, 5, 3)
+    QUnit.test(
+        'Gantt with scrollbar using uniqueNames, #14808.', function (assert) {
+            Highcharts.ganttChart('container', {
+                yAxis: {
+                    min: 0,
+                    max: 1,
+                    uniqueNames: true,
+                    scrollbar: {
+                        enabled: true
+                    }
+                },
+                series: [{
+                    type: 'gantt',
+                    name: 's1',
+                    data: [{
+                        name: 'Task 1',
+                        start: Date.UTC(2020, 5, 1),
+                        end: Date.UTC(2020, 5, 3)
+                    }, {
+                        name: 'Task 2',
+                        start: Date.UTC(2020, 5, 1),
+                        end: Date.UTC(2020, 5, 3)
+                    }]
                 }, {
-                    name: 'Task 2',
-                    start: Date.UTC(2020, 5, 1),
-                    end: Date.UTC(2020, 5, 3)
+                    type: 'gantt',
+                    name: 's2',
+                    data: [{
+                        name: 'Task 3',
+                        start: Date.UTC(2020, 5, 1),
+                        end: Date.UTC(2020, 5, 3)
+                    }]
                 }]
-            }, {
-                type: 'gantt',
-                name: 's2',
-                data: [{
-                    name: 'Task 3',
-                    start: Date.UTC(2020, 5, 1),
-                    end: Date.UTC(2020, 5, 3)
-                }]
-            }]
+            });
+
+            assert.ok(
+                true,
+                'There should be no errors in the console.'
+            );
         });
 
-        assert.ok(
-            true,
-            'There should be no errors in the console.'
-        );
-    });
+    QUnit.test(
+        'Gantt rangeSelector with scrollablePlotArea is fixed, #20940',
+        function (assert) {
+
+            const chart = Highcharts.ganttChart('container', {
+                chart: {
+                    scrollablePlotArea: {
+                        minHeight: 500
+                    }
+                },
+                rangeSelector: {
+                    enabled: true
+                },
+                series: [
+                    {
+                        data: [
+                            {
+                                name: 'Task 1',
+                                start: 2,
+                                end: 3
+                            },
+                            {
+                                name: 'Task 2',
+                                start: 3,
+                                end: 4
+                            },
+                            {
+                                name: 'Task 3',
+                                start: 1,
+                                end: 2
+                            }
+                        ]
+                    }
+                ]
+            });
+
+            assert.ok(
+                chart.rangeSelector.buttonGroup
+                    .element.closest('.highcharts-fixed'),
+                'rangeSelector is a part of fixed elements.'
+            );
+        });
+
+    QUnit.test(
+        'Gantt using array-based points, #17738',
+        function (assert) {
+            const chart = Highcharts.ganttChart('container', {
+                series: [
+                    {
+                        data: [
+                            [Date.UTC(2014, 10, 20), Date.UTC(2014, 10, 25)],
+                            [Date.UTC(2014, 10, 21), Date.UTC(2014, 10, 26)],
+                            [Date.UTC(2014, 10, 23), Date.UTC(2014, 10, 29)]
+                        ]
+                    }
+                ]
+            });
+
+            assert.strictEqual(
+                chart.series[0].yAxis.tickPositions.length,
+                3,
+                'Array-based points are loaded into the chart'
+            );
+        });
+
+    QUnit.test(
+        'labelIcon toggles on series visibility (#21666, #21532)',
+        function (assert) {
+            const chart = Highcharts.ganttChart('container', {
+                yAxis: {
+                    type: 'treegrid'
+                },
+                series: [
+                    {
+                        name: 'Project',
+                        data: [{
+                            id: 'project',
+                            name: 'Project',
+                            start: Date.UTC(2014, 10, 17),
+                            end: Date.UTC(2014, 10, 18),
+                            isParent: true,
+                            pointWidth: 0
+                        }]
+                    },
+                    {
+                        name: 'Task2',
+                        data: [{
+                            id: 'task001',
+                            name: 'Task2',
+                            start: Date.UTC(2014, 10, 17),
+                            end: Date.UTC(2014, 10, 18),
+                            y: 1,
+                            parent: 'project'
+                        }]
+                    }
+                ]
+            });
+
+            const tick = chart.yAxis[0].ticks[0];
+
+            assert.ok(
+                tick.treeGrid?.labelIcon && !tick.treeGrid.labelIcon.destroyed,
+                'Icon exists initially'
+            );
+
+            chart.series[1].hide();
+
+            assert.strictEqual(
+                tick.treeGrid.labelIcon,
+                undefined,
+                'Icon removed after hiding child series'
+            );
+
+            chart.series[1].show();
+
+            assert.ok(
+                tick.treeGrid.labelIcon && !tick.treeGrid.labelIcon.destroyed,
+                'Icon restored after showing series'
+            );
+        });
+
+    QUnit.test(
+        `Points without a start value should not affect the xAxis extremes
+        (#24849)`,
+        function (assert) {
+            const start = Date.UTC(2019, 5, 19),
+                end = Date.UTC(2019, 5, 26),
+                chart = Highcharts.ganttChart('container', {
+                    yAxis: {
+                        uniqueNames: true
+                    },
+                    series: [{
+                        data: [
+                            { name: 'Main' },
+                            { name: 'First', start, end },
+                            { name: 'Second', start, end }
+                        ]
+                    }]
+                });
+
+            assert.strictEqual(
+                chart.xAxis[0].dataMin,
+                start,
+                'A point without a start should not set dataMin to 0.'
+            );
+        }
+    );
 }());

@@ -1,12 +1,13 @@
 /* *
  *
- *  (c) 2010-2021 Highsoft AS
+ *  (c) 2010-2026 Highsoft AS
  *
  *  Author: Paweł Potaczek
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -26,22 +27,16 @@ import type Series from '../../Core/Series/Series';
 
 import BubbleLegendDefaults from './BubbleLegendDefaults.js';
 import BubbleLegendItem from './BubbleLegendItem.js';
-import D from '../../Core/DefaultOptions.js';
+import D from '../../Core/Defaults.js';
 const { setOptions } = D;
-import U from '../../Core/Utilities.js';
-const {
+import H from '../../Core/Globals.js';
+const { composed } = H;
+import {
     addEvent,
     objectEach,
+    pushUnique,
     wrap
-} = U;
-
-/* *
- *
- *  Constants
- *
- * */
-
-const composedClasses: Array<Function> = [];
+} from '../../Shared/Utilities.js';
 
 /* *
  *
@@ -52,6 +47,8 @@ const composedClasses: Array<Function> = [];
 /**
  * If ranges are not specified, determine ranges from rendered bubble series
  * and render legend again.
+ *
+ * @internal
  */
 function chartDrawChartBox(
     this: Chart,
@@ -63,7 +60,8 @@ function chartDrawChartBox(
         legend = chart.legend,
         bubbleSeries = getVisibleBubbleSeriesIndex(chart) >= 0;
     let bubbleLegendOptions: BubbleLegendItem.Options,
-        bubbleSizes;
+        bubbleSizes,
+        legendItem;
 
     if (
         legend && legend.options.enabled && legend.bubbleLegend &&
@@ -77,22 +75,22 @@ function chartDrawChartBox(
         if (!bubbleLegendOptions.placed) {
             legend.group.placed = false;
 
-            legend.allItems.forEach(function (item): void {
-                (item.legendGroup as any).translateY = null;
+            legend.allItems.forEach((item): void => {
+                legendItem = item.legendItem || {};
+                if (legendItem.group) {
+                    legendItem.group.translateY = void 0;
+                }
             });
         }
 
         // Create legend with bubbleLegend
         legend.render();
 
-        chart.getMargins();
+        // Calculate margins after first rendering the bubble legend
+        if (!bubbleLegendOptions.placed) {
+            chart.getMargins();
 
-        chart.axes.forEach(function (axis): void {
-            if (axis.visible) { // #11448
-                axis.render();
-            }
-
-            if (!bubbleLegendOptions.placed) {
+            chart.axes.forEach((axis): void => {
                 axis.setScale();
                 axis.updateNames();
                 // Disable axis animation on init
@@ -100,12 +98,12 @@ function chartDrawChartBox(
                     tick.isNew = true;
                     tick.isNewLabel = true;
                 });
-            }
-        });
-        bubbleLegendOptions.placed = true;
+            });
 
-        // After recalculate axes, calculate margins again.
-        chart.getMargins();
+            chart.getMargins();
+        }
+
+        bubbleLegendOptions.placed = true;
 
         // Call default 'drawChartBox' method.
         proceed.call(chart, options, callback);
@@ -113,41 +111,31 @@ function chartDrawChartBox(
         // Check bubble legend sizes and correct them if necessary.
         legend.bubbleLegend.correctSizes();
 
-        // Correct items positions with different dimensions in legend.
-        retranslateItems(legend, getLinesHeights(legend));
-
     } else {
         proceed.call(chart, options, callback);
         // Allow color change on static bubble legend after click on legend
         if (legend && legend.options.enabled && legend.bubbleLegend) {
             legend.render();
-            retranslateItems(legend, getLinesHeights(legend));
         }
     }
 }
 
 /**
  * Compose classes for use with Bubble series.
- * @private
  *
+ * @internal
  * @param {Highcharts.Chart} ChartClass
  * Core chart class to use with Bubble series.
  *
  * @param {Highcharts.Legend} LegendClass
  * Core legend class to use with Bubble series.
- *
- * @param {Highcharts.Series} SeriesClass
- * Core series class to use with Bubble series.
  */
 function compose(
     ChartClass: typeof Chart,
-    LegendClass: typeof Legend,
-    SeriesClass: typeof Series
+    LegendClass: typeof Legend
 ): void {
 
-    if (composedClasses.indexOf(ChartClass) === -1) {
-        composedClasses.push(ChartClass);
-
+    if (pushUnique(composed, 'Series.BubbleLegend')) {
         setOptions({
             // Set default bubble legend options
             legend: {
@@ -156,18 +144,10 @@ function compose(
         });
 
         wrap(ChartClass.prototype, 'drawChartBox', chartDrawChartBox);
-    }
-
-    if (composedClasses.indexOf(LegendClass) === -1) {
-        composedClasses.push(LegendClass);
 
         addEvent(LegendClass, 'afterGetAllItems', onLegendAfterGetAllItems);
-    }
-
-    if (composedClasses.indexOf(SeriesClass) === -1) {
-        composedClasses.push(SeriesClass);
-
-        addEvent(SeriesClass, 'legendItemClick', onSeriesLegendItemClick);
+        addEvent(LegendClass, 'afterRender', onLegendAfterRender);
+        addEvent(LegendClass, 'itemClick', onLegendItemClick);
     }
 
 }
@@ -175,7 +155,7 @@ function compose(
 /**
  * Check if there is at least one visible bubble series.
  *
- * @private
+ * @internal
  * @function getVisibleBubbleSeriesIndex
  * @param {Highcharts.Chart} chart
  * Chart to check.
@@ -191,7 +171,7 @@ function getVisibleBubbleSeriesIndex(chart: Chart): number {
             series[i] &&
             series[i].isBubble &&
             series[i].visible &&
-            (series[i] as any).zData.length
+            series[i].dataTable.rowCount
         ) {
             return i;
         }
@@ -203,14 +183,14 @@ function getVisibleBubbleSeriesIndex(chart: Chart): number {
 /**
  * Calculate height for each row in legend.
  *
- * @private
+ * @internal
  * @function getLinesHeights
  *
  * @param {Highcharts.Legend} legend
  * Legend to calculate from.
  *
  * @return {Array<Highcharts.Dictionary<number>>}
- * Informations about line height and items amount
+ * Information about line height and items amount
  */
 function getLinesHeights(
     legend: Legend
@@ -218,20 +198,23 @@ function getLinesHeights(
     const items = legend.allItems,
         lines = [] as Array<Record<string, number>>,
         length = items.length;
+
     let lastLine,
+        legendItem,
+        legendItem2,
         i = 0,
         j = 0;
 
     for (i = 0; i < length; i++) {
-        if (items[i].legendItemHeight) {
-            // for bubbleLegend
-            (items[i] as any).itemHeight = items[i].legendItemHeight;
+        legendItem = items[i].legendItem || {};
+        legendItem2 = (items[i + 1] || {}).legendItem || {};
+        if (legendItem.labelHeight) {
+            // For bubbleLegend
+            (items[i] as any).itemHeight = legendItem.labelHeight;
         }
         if ( // Line break
             items[i] === items[length - 1] ||
-            items[i + 1] &&
-            (items[i]._legendItemPos as any)[1] !==
-            (items[i + 1]._legendItemPos as any)[1]
+            legendItem.y !== legendItem2.y
         ) {
             lines.push({ height: 0 });
             lastLine = lines[lines.length - 1];
@@ -249,6 +232,8 @@ function getLinesHeights(
 
 /**
  * Start the bubble legend creation process.
+ *
+ * @internal
  */
 function onLegendAfterGetAllItems(
     this: Legend,
@@ -271,7 +256,8 @@ function onLegendAfterGetAllItems(
         legend.destroyItem(bubbleLegend);
     }
     // Create bubble legend
-    if (bubbleSeriesIndex >= 0 &&
+    if (
+        bubbleSeriesIndex >= 0 &&
             legendOptions.enabled &&
             (options as any).enabled
     ) {
@@ -282,13 +268,74 @@ function onLegendAfterGetAllItems(
 }
 
 /**
- * Toggle bubble legend depending on the visible status of bubble series.
+ * Retranslate the legend items after render
+ *
+ * @internal
  */
-function onSeriesLegendItemClick(this: Series): void {
-    const series = this,
-        chart = series.chart,
-        visible = series.visible,
-        legend = series.chart.legend;
+function onLegendAfterRender(this: Legend): void {
+
+    if (this.bubbleLegend) {
+        const items = this.allItems,
+            rtl = this.options.rtl,
+            lines = getLinesHeights(this);
+
+        let orgTranslateX,
+            orgTranslateY,
+            movementX,
+            legendItem,
+            actualLine = 0;
+
+        items.forEach((
+            item: (BubbleLegendItem|Series|Point),
+            index: number
+        ): void => {
+            legendItem = item.legendItem || {};
+
+            if (!legendItem.group) {
+                return;
+            }
+
+            orgTranslateX = legendItem.group.translateX || 0;
+            orgTranslateY = legendItem.y || 0;
+
+            movementX = (item as any).movementX;
+
+            if (movementX || (rtl && (item as any).ranges)) {
+                movementX = rtl ?
+                    orgTranslateX - (item as any).options.maxSize / 2 :
+                    orgTranslateX + movementX;
+
+                legendItem.group.attr({ translateX: movementX });
+            }
+            if (index > lines[actualLine].step) {
+                actualLine++;
+            }
+
+            legendItem.group.attr({
+                translateY: Math.round(
+                    orgTranslateY + lines[actualLine].height / 2
+                )
+            });
+            legendItem.y = orgTranslateY + lines[actualLine].height / 2;
+        });
+    }
+}
+
+/**
+ * Toggle bubble legend depending on the visible status of bubble series.
+ *
+ * @internal
+ */
+function onLegendItemClick(this: Legend, e: any): void | boolean {
+    // #14080 don't fire this code if click function is prevented
+    if (e.defaultPrevented) {
+        return false;
+    }
+
+    const legend = this,
+        series = e.legendItem,
+        chart = legend.chart,
+        visible = series.visible;
     let status;
 
     if (legend && legend.bubbleLegend) {
@@ -312,67 +359,16 @@ function onSeriesLegendItemClick(this: Series): void {
     }
 }
 
-/**
- * Correct legend items translation in case of different elements heights.
- *
- * @private
- * @function Highcharts.Legend#retranslateItems
- *
- * @param {Highcharts.Legend} legend
- * Legend to translate in.
- *
- * @param {Array<Highcharts.Dictionary<number>>} lines
- * Informations about line height and items amount
- */
-function retranslateItems(
-    legend: Legend,
-    lines: Array<Record<string, number>>
-): void {
-    const items = legend.allItems,
-        rtl = legend.options.rtl;
-    let orgTranslateX,
-        orgTranslateY,
-        movementX,
-        actualLine = 0;
-
-    items.forEach(function (
-        item: (BubbleLegendItem|Series|Point),
-        index: number
-    ): void {
-        orgTranslateX = (item.legendGroup as any).translateX;
-        orgTranslateY = (item._legendItemPos as any)[1];
-
-        movementX = (item as any).movementX;
-
-        if (movementX || (rtl && (item as any).ranges)) {
-            movementX = rtl ?
-                orgTranslateX - (item as any).options.maxSize / 2 :
-                orgTranslateX + movementX;
-
-            (item.legendGroup as any).attr({ translateX: movementX });
-        }
-        if (index > lines[actualLine].step) {
-            actualLine++;
-        }
-
-        (item.legendGroup as any).attr({
-            translateY: Math.round(
-                orgTranslateY + lines[actualLine].height / 2
-            )
-        });
-        (item._legendItemPos as any)[1] = orgTranslateY +
-            lines[actualLine].height / 2;
-    });
-}
-
 /* *
  *
  *  Default Export
  *
  * */
 
+/** @internal */
 const BubbleLegendComposition = {
     compose
 };
 
+/** @internal */
 export default BubbleLegendComposition;

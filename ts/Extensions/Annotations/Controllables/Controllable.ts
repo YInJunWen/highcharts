@@ -1,6 +1,5 @@
 /* *
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -14,24 +13,16 @@
 
 import type Annotation from '../Annotation';
 import type AnnotationChart from '../AnnotationChart';
-import type { AnnotationPointType } from '../AnnotationSeries';
-import type BBoxObject from '../../../Core/Renderer/BBoxObject';
-import type ControllableLike from './ControllableLike';
+import type { AnnotationPoint } from '../AnnotationSeries';
+import type Axis from '../../../Core/Axis/Axis';
+import type ControllableBase from './ControllableBase';
 import type ControllableOptions from './ControllableOptions';
-import type MockPointOptions from '../MockPointOptions';
+import type { DeepPartial } from '../../../Shared/Types';
 import type SVGAttributes from '../../../Core/Renderer/SVG/SVGAttributes';
 import type SVGElement from '../../../Core/Renderer/SVG/SVGElement';
 
-import ControlPoint from '../ControlPoint.js';
-import MockPoint from '../MockPoint.js';
-import Tooltip from '../../../Core/Tooltip.js';
-import U from '../../../Core/Utilities.js';
-const {
-    isObject,
-    isString,
-    merge,
-    splat
-} = U;
+import ControlTarget from '../ControlTarget.js';
+import { merge } from '../../../Shared/Utilities.js';
 
 /* *
  *
@@ -39,12 +30,8 @@ const {
  *
  * */
 
+/** @internal */
 export type AttrsMapObject = Record<keyof ControllableOptions, keyof SVGAttributes>;
-
-export interface ControllableAnchorObject {
-    absolutePosition: BBoxObject;
-    relativePosition: BBoxObject;
-}
 
 /* *
  *
@@ -52,12 +39,7 @@ export interface ControllableAnchorObject {
  *
  * */
 
-/**
- * It provides methods for handling points, control points
- * and points transformations.
- * @private
- */
-abstract class Controllable {
+abstract class Controllable implements ControlTarget {
 
     /* *
      *
@@ -65,6 +47,7 @@ abstract class Controllable {
      *
      * */
 
+    /** @internal */
     public constructor(
         annotation: Annotation,
         options: ControllableOptions,
@@ -74,9 +57,9 @@ abstract class Controllable {
         this.annotation = annotation;
         this.chart = annotation.chart;
         this.collection = (itemType === 'label' ? 'labels' : 'shapes');
+        this.controlPoints = [];
         this.options = options;
         this.points = [];
-        this.controlPoints = [];
         this.index = index;
         this.itemType = itemType;
         this.init(annotation, options, index);
@@ -88,15 +71,37 @@ abstract class Controllable {
      *
      * */
 
+    /**
+     * @name Highcharts.AnnotationControllable#annotation
+     * @type {Highcharts.Annotation}
+     */
     public annotation: Annotation;
+
+    /**
+     * @name Highcharts.AnnotationControllable#chart
+     * @type {Highcharts.Chart}
+     */
     public chart: AnnotationChart;
+
+    /**
+     * @name Highcharts.AnnotationControllable#collection
+     * @type {string}
+     */
     public collection: ('labels'|'shapes');
-    public controlPoints: Array<ControlPoint>;
-    public graphic: SVGElement = void 0 as any;
+
+    /** @internal */
+    public graphic!: SVGElement;
+
+    /** @internal */
     public index: number;
+
+    /** @internal */
     public itemType: ('label'|'shape');
+
+    /** @internal */
     public options: ControllableOptions;
-    public points: Array<AnnotationPointType>;
+
+    /** @internal */
     public tracker?: SVGElement;
 
     /* *
@@ -106,82 +111,20 @@ abstract class Controllable {
      * */
 
     /**
-     * Add control points to a controllable.
-     * @private
-     */
-    public addControlPoints(): void {
-        const controlPoints = this.controlPoints,
-            controlPointsOptions = this.options.controlPoints || [];
-
-        controlPointsOptions.forEach((controlPointOptions, i): void => {
-            const options = merge(
-                this.options.controlPointOptions,
-                controlPointOptions
-            );
-
-            if (!options.index) {
-                options.index = i;
-            }
-
-            controlPointsOptions[i] = options;
-
-            controlPoints.push(new ControlPoint(
-                this.chart,
-                this,
-                options
-            ));
-        });
-    }
-
-    /**
-     * Returns object which denotes anchor position - relative and absolute.
-     * @private
-     * @param {Highcharts.AnnotationPointType} point
-     *        A point like object.
-     * @return {Highcharts.AnnotationAnchorObject}
-     *         A controllable anchor
-     */
-    public anchor(
-        point: AnnotationPointType
-    ): ControllableAnchorObject {
-        const plotBox = point.series.getPlotBox(),
-            chart = point.series.chart,
-            box = point.mock ?
-                point.toAnchor() :
-                Tooltip.prototype.getAnchor.call({
-                    chart: point.series.chart
-                }, point),
-
-            anchor = {
-                x: box[0] + (this.options.x || 0),
-                y: box[1] + (this.options.y || 0),
-                height: box[2] || 0,
-                width: box[3] || 0
-            };
-
-        return {
-            relativePosition: anchor,
-            absolutePosition: merge(anchor, {
-                x: anchor.x + (
-                    point.mock ? plotBox.translateX : chart.plotLeft
-                ),
-                y: anchor.y + (point.mock ? plotBox.translateY : chart.plotTop)
-            })
-        };
-    }
-
-    /**
      * Redirect attr usage on the controllable graphic element.
-     * @private
+     * @internal
      */
-    public attr<T>(..._args: Array<T>): void {
+    public attr<T>(
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        ..._args: Array<T>
+    ): void {
         this.graphic.attr.apply(this.graphic, arguments);
     }
 
     /**
      * Utility function for mapping item's options
      * to element's attribute
-     * @private
+     * @internal
      * @param {Highcharts.AnnotationsLabelsOptions|Highcharts.AnnotationsShapesOptions} options
      * @return {Highcharts.SVGAttributes}
      *         Mapped options.
@@ -216,7 +159,7 @@ abstract class Controllable {
 
     /**
      * Destroy a controllable.
-     * @private
+     * @internal
      */
     public destroy(): void {
 
@@ -228,39 +171,24 @@ abstract class Controllable {
             this.tracker = this.tracker.destroy();
         }
 
-        this.controlPoints.forEach(
-            (controlPoint): void => controlPoint.destroy()
-        );
-
-        this.chart = null as any;
-        this.points = null as any;
-        this.controlPoints = null as any;
-        this.options = null as any;
-
-        if (this.annotation) {
-            this.annotation = null as any;
-        }
-
+        this.destroyControlTarget();
     }
-
     /**
-     * Get the controllable's points options.
-     * @private
-     * @return {Array<Highcharts.PointOptionsObject>}
-     *         An array of points' options.
+     * Get the pixel value from a start point to an end point on an axis.
+     * @internal
      */
-    public getPointsOptions(): Array<MockPointOptions> {
-        const options = this.options;
+    public calculateAnnotationSize(
+        startPoint: number, value: number, axis: Axis
+    ): number {
+        const startPixel = axis.toPixels(startPoint, true),
+            endPixel = axis.toPixels(startPoint + value, true);
 
-        return (
-            options.points ||
-            (options.point && splat(options.point))
-        ) as any;
+        return Math.abs(endPixel - startPixel);
     }
 
     /**
      * Init the controllable
-     * @private
+     * @internal
      */
     public init(
         annotation: Annotation,
@@ -279,109 +207,32 @@ abstract class Controllable {
     }
 
     /**
-     * Find point-like objects based on points options.
-     * @private
-     * @return {Array<Annotation.PointLike>}
-     *         An array of point-like objects.
-     */
-    public linkPoints(): (Array<AnnotationPointType>|undefined) {
-        const pointsOptions = this.getPointsOptions(),
-            points = this.points,
-            len = (pointsOptions && pointsOptions.length) || 0;
-
-        let i: number,
-            point: (AnnotationPointType|null);
-
-        for (i = 0; i < len; i++) {
-            point = this.point(pointsOptions[i], points[i]);
-
-            if (!point) {
-                points.length = 0;
-
-                return;
-            }
-
-            if (point.mock) {
-                point.refresh();
-            }
-
-            points[i] = point;
-        }
-
-        return points;
-    }
-
-    /**
-     * Map point's options to a point-like object.
-     * @private
-     * @param {string|Function|Highcharts.AnnotationMockPointOptionsObject|Highcharts.AnnotationPointType} pointOptions
-     *        Point's options.
-     * @param {Highcharts.AnnotationPointType} point
-     *        A point-like instance.
-     * @return {Highcharts.AnnotationPointType|null}
-     *         If the point is found/set returns this point, otherwise null
-     */
-    public point(
-        pointOptions: (string|Function|MockPoint|MockPointOptions),
-        point: (AnnotationPointType|null)
-    ): (AnnotationPointType|null) {
-        if (pointOptions && (pointOptions as MockPointOptions).series) {
-            return pointOptions as any;
-        }
-
-        if (!point || point.series === null) {
-            if (isObject(pointOptions)) {
-                point = new MockPoint(
-                    this.chart,
-                    this,
-                    pointOptions as MockPointOptions
-                );
-            } else if (isString(pointOptions)) {
-                point = (this.chart.get(pointOptions) as any) || null;
-            } else if (typeof pointOptions === 'function') {
-                const pointConfig: (MockPoint|MockPointOptions) =
-                    pointOptions.call(point, this);
-
-                point = pointConfig.series ?
-                    pointConfig :
-                    new MockPoint(
-                        this.chart,
-                        this,
-                        pointOptions
-                    );
-            }
-        }
-
-        return point;
-    }
-
-    /**
-     * Render a controllable.
-     * @private
-     */
-    public render(
-        _parentGroup?: SVGElement
-    ): void {
-        this.controlPoints.forEach(
-            (controlPoint): void => controlPoint.render()
-        );
-    }
-
-    /**
      * Redraw a controllable.
-     * @private
+     * @internal
      */
     public redraw(
         animation?: boolean
     ): void {
-        this.controlPoints.forEach(
-            (controlPoint): void => controlPoint.redraw(animation)
-        );
+        this.redrawControlPoints(animation);
+    }
+
+    /**
+     * Render a controllable.
+     * @internal
+     */
+    public render(
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        _parentGroup?: SVGElement
+    ): void {
+        if (this.options.className && this.graphic) {
+            this.graphic.addClass(this.options.className);
+        }
+        this.renderControlPoints();
     }
 
     /**
      * Rotate a controllable.
-     * @private
+     * @internal
      * @param {number} cx
      *        Origin x rotation
      * @param {number} cy
@@ -398,7 +249,7 @@ abstract class Controllable {
 
     /**
      * Scale a controllable.
-     * @private
+     * @internal
      * @param {number} cx
      *        Origin x rotation
      * @param {number} cy
@@ -419,7 +270,7 @@ abstract class Controllable {
 
     /**
      * Set control points' visibility.
-     * @private
+     * @internal
      */
     public setControlPointsVisibility(
         visible: boolean
@@ -431,7 +282,7 @@ abstract class Controllable {
 
     /**
      * Check if a controllable should be rendered/redrawn.
-     * @private
+     * @internal
      * @return {boolean}
      *         Whether a controllable should be drawn.
      */
@@ -440,110 +291,10 @@ abstract class Controllable {
     }
 
     /**
-     * Transform a controllable with a specific transformation.
-     * @private
-     * @param {string} transformation
-     *        A transformation name
-     * @param {number|null} cx
-     *        Origin x transformation
-     * @param {number|null} cy
-     *        Origin y transformation
-     * @param {number} p1
-     *        Param for the transformation
-     * @param {number} [p2]
-     *        Param for the transformation
-     */
-    public transform(
-        transformation: string,
-        cx: (number|null),
-        cy: (number|null),
-        p1: number,
-        p2?: number
-    ): void {
-        if (this.chart.inverted) {
-            const temp = cx;
-
-            cx = cy;
-            cy = temp;
-        }
-
-        this.points.forEach((_point, i): void => (
-            this.transformPoint(transformation, cx, cy, p1, p2, i)
-        ), this);
-    }
-
-    /**
-     * Transform a point with a specific transformation
-     * If a transformed point is a real point it is replaced with
-     * the mock point.
-     * @private
-     * @param {string} transformation
-     *        A transformation name
-     * @param {number|null} cx
-     *        Origin x transformation
-     * @param {number|null} cy
-     *        Origin y transformation
-     * @param {number} p1
-     *        Param for the transformation
-     * @param {number|undefined} p2
-     *        Param for the transformation
-     * @param {number} i
-     *        Index of the point
-     */
-    public transformPoint(
-        transformation: string,
-        cx: (number|null),
-        cy: (number|null),
-        p1: number,
-        p2: (number|undefined),
-        i: number
-    ): void {
-        let point = this.points[i];
-
-        if (!point.mock) {
-            point = this.points[i] = MockPoint.fromPoint(point);
-        }
-
-        (point as any)[transformation](cx, cy, p1, p2);
-    }
-
-    /**
-     * Translate a controllable.
-     * @private
-     * @param {number} dx
-     *        Translation for x coordinate
-     * @param {number} dy
-     *        Translation for y coordinate
-     **/
-    public translate(
-        dx: number,
-        dy: number
-    ): void {
-        this.transform('translate', null, null, dx, dy);
-    }
-
-    /**
-     * Translate a specific point within a controllable.
-     * @private
-     * @param {number} dx
-     *        Translation for x coordinate
-     * @param {number} dy
-     *        Translation for y coordinate
-     * @param {number} i
-     *        Index of the point
-     **/
-    public translatePoint(
-        dx: number,
-        dy: number,
-        i: number
-    ): void {
-        this.transformPoint('translate', null, null, dx, dy, i);
-    }
-
-    /**
      * Translate shape within controllable item.
      * Replaces `controllable.translate` method.
-     * @private
+     *
+     * @internal
      * @param {number} dx
      *        Translation for x coordinate
      * @param {number} dy
@@ -581,17 +332,25 @@ abstract class Controllable {
 
     /**
      * Update a controllable.
-     * @private
+     * @internal
      */
     public update(
         newOptions: DeepPartial<ControllableOptions>
     ): void {
         const annotation = this.annotation,
             options = merge(true, this.options, newOptions),
-            parentGroup = this.graphic.parentGroup;
+            parentGroup = this.graphic.parentGroup,
+            Constructor: any = this.constructor;
 
         this.destroy();
-        this.constructor(annotation, options, this.index, this.itemType);
+        const newControllable = new Constructor(
+            annotation,
+            options,
+            this.index,
+            this.itemType
+        );
+        merge(true, this as any, newControllable);
+
         this.render(parentGroup);
         this.redraw();
     }
@@ -604,9 +363,22 @@ abstract class Controllable {
  *
  * */
 
-interface Controllable extends ControllableLike {
-    // placeholder for additional class members
+
+/**
+ * It provides methods for handling points, control points and points
+ * transformations.
+ *
+ * @interface Highcharts.AnnotationControllable
+ */
+interface Controllable extends ControllableBase, ControlTarget {
+    /**
+     * @name Highcharts.AnnotationControllable#points
+     * @type {Array<Highcharts.Point>}
+     */
+    points: Array<AnnotationPoint>;
 }
+
+ControlTarget.compose(Controllable);
 
 /* *
  *
@@ -622,19 +394,22 @@ export default Controllable;
  *
  * */
 
-
 /**
- * An object which denots a controllable's anchor positions - relative and
+ * An object which denotes a controllable's anchor positions - relative and
  * absolute.
  *
- * @private
+ * @internal
  * @interface Highcharts.AnnotationAnchorObject
  *//**
- * Relative to the plot area position
+ * Relative to the plot area position.
+ *
+ * @internal
  * @name Highcharts.AnnotationAnchorObject#relativePosition
  * @type {Highcharts.BBoxObject}
  *//**
- * Absolute position
+ * Absolute position.
+ *
+ * @internal
  * @name Highcharts.AnnotationAnchorObject#absolutePosition
  * @type {Highcharts.BBoxObject}
  */
@@ -651,7 +426,7 @@ export default Controllable;
  * @name Highcharts.AnnotationControllable#collection
  * @type {string}
  *//**
- * @private
+ * @internal
  * @name Highcharts.AnnotationControllable#controlPoints
  * @type {Array<Highcharts.AnnotationControlPoint>}
  *//**
@@ -659,4 +434,4 @@ export default Controllable;
  * @type {Array<Highcharts.Point>}
  */
 
-(''); // keeps doclets above in JS file
+(''); // Keeps doclets above in JS file

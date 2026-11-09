@@ -1,0 +1,55 @@
+/* *
+ *
+ *  (c) 2009-2026 Highsoft AS
+ *
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
+ *
+ *
+ *  Authors:
+ *  - Dawid Draguła
+ *
+ * */
+
+'use strict';
+
+
+/* *
+ *
+ *  Imports
+ *
+ * */
+
+import type { PredefinedSyncConfig } from '../../Sync/Sync';
+import HighchartsExtremesSync from './HighchartsExtremesSync.js';
+import HighchartsHighlightSync from './HighchartsHighlightSync.js';
+import HighchartsVisibilitySync from './HighchartsVisibilitySync.js';
+
+
+/* *
+*
+*  Constants
+*
+* */
+
+const predefinedSyncConfig: PredefinedSyncConfig = {
+    defaultSyncPairs: {
+        extremes: HighchartsExtremesSync.syncPair,
+        highlight: HighchartsHighlightSync.syncPair,
+        visibility: HighchartsVisibilitySync.syncPair
+    },
+    defaultSyncOptions: {
+        extremes: HighchartsExtremesSync.defaultOptions,
+        highlight: HighchartsHighlightSync.defaultOptions,
+        visibility: HighchartsVisibilitySync.defaultOptions
+    }
+};
+
+
+/* *
+ *
+ *  Default export
+ *
+ * */
+export default predefinedSyncConfig;

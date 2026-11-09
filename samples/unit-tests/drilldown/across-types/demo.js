@@ -285,4 +285,109 @@ QUnit.test('Drilldown across types', function (assert) {
         1,
         'After drilldown treemap axes options should be reset (#12326).'
     );
+
+    chart.drillUp();
+    chart.update({
+        series: [{
+            type: 'column',
+            data: [{
+                name: 'A',
+                y: 50,
+                drilldown: 'A'
+            }]
+        }],
+        drilldown: {
+            series: [{
+                name: 'A',
+                id: 'A',
+                type: 'wordcloud',
+                data: [{
+                    name: 'Test',
+                    weight: 1
+                }]
+            }]
+        }
+    });
+    chart.series[0].points[0].doDrilldown();
+
+    chart.axes.forEach(axis => {
+        assert.strictEqual(
+            axis.axisLine,
+            void 0,
+            `After drilldown from cartesian series to non-cartesian ${axis.coll}
+            shouldn't be visible. (#19725).`
+        );
+    });
+
+    chart.drillUp();
+    chart.axes.forEach(axis => {
+        assert.notEqual(
+            axis.axisLine,
+            void 0,
+            `After drill up from non-cartesian series to cartesian ${axis.coll}
+            should be visible. (#19725).`
+        );
+    });
+});
+
+QUnit.test('Drilldown animations on labels', assert => {
+    const clock = TestUtilities.lolexInstall(),
+        done = assert.async();
+
+    try {
+        const chart = Highcharts.chart('container', {
+            series: [{
+                data: [{
+                    y: 1,
+                    drilldown: 'drilldown-series'
+                }],
+                type: 'line'
+            }],
+            xAxis: {
+                labels: {
+                    format: 'Probe'
+                }
+            },
+            drilldown: {
+                animation: {
+                    duration: 100
+                },
+                series: [{
+                    id: 'drilldown-series',
+                    data: [1, 2, 3, 4],
+                    type: 'pie'
+                }]
+            }
+        });
+
+        chart.series[0].points[0].doDrilldown();
+
+        setTimeout(function () {
+            assert.strictEqual(
+                chart.xAxis[0].ticks[0].label.element.getAttribute('opacity'),
+                '0',
+                'X axis label should be hidden after drilldown animation'
+            );
+
+            chart.drillUp();
+        }, 150);
+
+        setTimeout(function () {
+            assert.strictEqual(
+                chart.xAxis[0].ticks[0].label.element.getAttribute('opacity'),
+                '1',
+                'X axis label should be visible after drillup animation'
+            );
+
+            done();
+        }, 300);
+
+        TestUtilities.lolexRunAndUninstall(clock);
+    } catch (e) {
+        console.error('Test failed with error: ', e);
+        // Don't break the whole test suite
+        done();
+    } finally {
+        TestUtilities.lolexUninstall(clock);
+    }
 });

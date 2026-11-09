@@ -1,12 +1,13 @@
 /* *
  *
- *  (c) 2016-2021 Highsoft AS
+ *  (c) 2016-2026 Highsoft AS
  *
  *  Author: Lars A. V. Cabrera
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -22,20 +23,14 @@ import type {
     AxisOptions,
     YAxisOptions
 } from '../Axis/AxisOptions';
+import type { DeepPartial } from '../../Shared/Types';
 import type { HTMLDOMElement } from '../Renderer/DOMElementType';
 import type Options from '../Options';
 
 import Chart from './Chart.js';
-import D from '../DefaultOptions.js';
-const { getOptions } = D;
-import U from '../Utilities.js';
-const {
-    isArray,
-    merge,
-    splat
-} = U;
-
-import '../../Series/Gantt/GanttSeries.js';
+import D from '../Defaults.js';
+const { defaultOptions } = D;
+import { isArray, merge, splat } from '../../Shared/Utilities.js';
 
 /* *
  *
@@ -45,6 +40,8 @@ import '../../Series/Gantt/GanttSeries.js';
 
 declare module '../Options' {
     interface Options {
+
+        /** @internal */
         isGantt?: boolean;
     }
 }
@@ -65,6 +62,13 @@ declare module '../Options' {
  * @extends Highcharts.Chart
  */
 class GanttChart extends Chart {
+
+    /* *
+     *
+     *  Functions
+     *
+     * */
+
     /**
      * Initializes the chart. The constructor's arguments are passed on
      * directly.
@@ -74,9 +78,10 @@ class GanttChart extends Chart {
      * @param {Highcharts.Options} userOptions
      *        Custom options.
      *
-     * @param {Function} [callback]
-     *        Function to run when the chart has loaded and and all external
-     *        images are loaded.
+     * @param {Function|true} [callback]
+     *        Function to run when the chart has loaded and all external
+     *        images are loaded. Set to `true` to return a promise that
+     *        resolves when the chart is ready.
      *
      *
      * @emits Highcharts.GanttChart#event:init
@@ -84,10 +89,9 @@ class GanttChart extends Chart {
      */
     public init(
         userOptions: Partial<Options>,
-        callback?: Chart.CallbackFunction
+        callback?: Chart.CallbackFunction|true
     ): void {
-        const defaultOptions = getOptions(),
-            xAxisOptions = userOptions.xAxis,
+        const xAxisOptions = userOptions.xAxis,
             yAxisOptions = userOptions.yAxis;
 
         let defaultLinkedTo: number;
@@ -102,7 +106,7 @@ class GanttChart extends Chart {
                     type: 'gantt'
                 },
                 title: {
-                    text: null as any
+                    text: ''
                 },
                 legend: {
                     enabled: false
@@ -116,7 +120,7 @@ class GanttChart extends Chart {
                 }
             } as Options,
 
-            userOptions, // user's options
+            userOptions, // User's options
 
             // forced options
             {
@@ -127,66 +131,83 @@ class GanttChart extends Chart {
         userOptions.xAxis = xAxisOptions;
         userOptions.yAxis = yAxisOptions;
 
-        // apply X axis options to both single and multi x axes
-        // If user hasn't defined axes as array, make it into an array and add a
-        // second axis by default.
+        // Apply X axis options to both single and multi x axes If user hasn't
+        // defined axes as array, make it into an array and add a second axis by
+        // default.
         options.xAxis = (
             !isArray(userOptions.xAxis) ?
                 [userOptions.xAxis || {}, {}] :
                 userOptions.xAxis
-        ).map(function (
+        ).map((
             xAxisOptions,
             i
-        ): DeepPartial<AxisOptions> {
+        ): DeepPartial<AxisOptions> => {
             if (i === 1) { // Second xAxis
                 defaultLinkedTo = 0;
             }
             return merge(
-                defaultOptions.xAxis,
-                { // defaults
+                // Defaults
+                {
                     grid: {
                         enabled: true
                     },
-                    opposite: true,
+                    opposite: defaultOptions.xAxis?.opposite ??
+                        xAxisOptions.opposite ??
+                        true,
                     linkedTo: defaultLinkedTo
                 },
-                xAxisOptions, // user options
-                { // forced options
+                // User options
+                xAxisOptions,
+                // Forced options
+                {
                     type: 'datetime'
                 }
             );
         });
 
-        // apply Y axis options to both single and multi y axes
-        options.yAxis = (splat(userOptions.yAxis || {})).map(function (
-            yAxisOptions: YAxisOptions
-        ): YAxisOptions {
-            return merge(
-                defaultOptions.yAxis, // #3802
-                { // defaults
-                    grid: {
-                        enabled: true
-                    },
+        // Apply Y axis options to both single and multi y axes
+        options.yAxis = (splat(userOptions.yAxis || {})).map((
+            yAxisOptions
+        ): DeepPartial<YAxisOptions> => merge(
+            // Defaults
+            {
+                grid: {
+                    enabled: true
+                },
 
-                    staticScale: 50,
+                staticScale: 50,
 
-                    reversed: true,
+                reversed: true,
 
-                    // Set default type treegrid, but only if 'categories' is
-                    // undefined
-                    type: yAxisOptions.categories ?
-                        yAxisOptions.type : 'treegrid'
-                } as YAxisOptions,
-                yAxisOptions // user options
-            );
-        });
+                // Set default type treegrid, but only if 'categories' is
+                // undefined
+                type: yAxisOptions.categories ? yAxisOptions.type : 'treegrid'
+
+            },
+            // User options
+            yAxisOptions
+        ));
         super.init(options, callback);
     }
 }
 
-/* eslint-disable valid-jsdoc */
+/* *
+ *
+ *  Class Namespace
+ *
+ * */
 
+/** @internal */
 namespace GanttChart {
+
+    /* *
+     *
+     *  Functions
+     *
+     * */
+
+    /* eslint-disable jsdoc/check-param-names */
+
     /**
      * The factory function for creating new gantt charts. Creates a new {@link
      * Highcharts.GanttChart|GanttChart} object with different default options
@@ -211,11 +232,12 @@ namespace GanttChart {
      * @param {Highcharts.Options} options
      *        The chart options structure.
      *
-     * @param {Highcharts.ChartCallbackFunction} [callback]
-     *        Function to run when the chart has loaded and and all external
+     * @param {Highcharts.ChartCallbackFunction|true} [callback]
+     *        Function to run when the chart has loaded and all external
      *        images are loaded. Defining a
      *        [chart.events.load](https://api.highcharts.com/highcharts/chart.events.load)
-     *        handler is equivalent.
+     *        handler is equivalent. Set to `true` to return a promise that
+     *        resolves when the chart is ready.
      *
      * @return {Highcharts.GanttChart}
      *         Returns the Chart object.
@@ -223,10 +245,20 @@ namespace GanttChart {
     export function ganttChart(
         a: (string|HTMLDOMElement|Options),
         b?: (Chart.CallbackFunction|Options),
-        c?: Chart.CallbackFunction
-    ): GanttChart {
-        return new GanttChart(a as any, b as any, c);
+        c?: Chart.CallbackFunction|true
+    ): GanttChart|Promise<GanttChart> {
+        const chart = new GanttChart(a as any, b as any, c);
+        return chart.promise || chart;
     }
+
+    /* eslint-enable jsdoc/check-param-names */
+
 }
+
+/* *
+ *
+ *  Default Export
+ *
+ * */
 
 export default GanttChart;

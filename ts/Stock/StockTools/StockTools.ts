@@ -1,12 +1,14 @@
-/**
+/* *
  *
  *  Events generator for Stock tools
  *
- *  (c) 2009-2021 Paweł Fus
+ *  (c) 2009-2026 Highsoft AS
+ *  Author: Paweł Fus
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -20,11 +22,9 @@
 
 import type AxisType from '../../Core/Axis/AxisType';
 
-import D from '../../Core/DefaultOptions.js';
+import D from '../../Core/Defaults.js';
 const { setOptions } = D;
 import NavigationBindings from '../../Extensions/Annotations/NavigationBindings.js';
-import NBU from '../../Extensions/Annotations/NavigationBindingsUtilities.js';
-const { getAssignedAxis } = NBU;
 import Series from '../../Core/Series/Series.js';
 import StockToolsBindings from './StockToolsBindings.js';
 import StockToolsDefaults from './StockToolsDefaults.js';
@@ -33,13 +33,11 @@ const {
     isNotNavigatorYAxis,
     isPriceIndicatorEnabled
 } = STU;
-import U from '../../Core/Utilities.js';
-const {
+import {
     correctFloat,
     defined,
-    isNumber,
-    pick
-} = U;
+    isNumber
+} from '../../Shared/Utilities.js';
 
 /* *
  *
@@ -47,8 +45,9 @@ const {
  *
  * */
 
-declare module '../../Extensions/Annotations/NavigationBindingsLike' {
-    interface NavigationBindingsLike {
+/** @internal */
+declare module '../../Extensions/Annotations/NavigationBindingsBase' {
+    interface NavigationBindingsBase {
         /** @requires modules/stock-tools */
         utils: Partial<typeof STU>;
         /** @requires modules/stock-tools */
@@ -76,16 +75,19 @@ declare module '../../Extensions/Annotations/NavigationBindingsLike' {
     }
 }
 
+/** @internal */
 export interface AxisPositions {
     top: string;
     height: string;
 }
 
+/** @internal */
 export interface NavigationBindingsResizerObject {
-    controlledAxis?: Record<string, Array<number>>;
+    controlledAxis?: Record<string, Array<string|number>>;
     enabled: boolean;
 }
 
+/** @internal */
 export interface YAxisPositions {
     positions: Array<Record<string, number>>;
     allAxesHeight: number;
@@ -93,47 +95,29 @@ export interface YAxisPositions {
 
 /* *
  *
- *  Constants
- *
- * */
-
-const composedClasses: Array<Function> = [];
-
-/* *
- *
  *  Functions
  *
  * */
 
-/**
- * @private
- */
+/** @internal */
 function compose(
     NavigationBindingsClass: typeof NavigationBindings
 ): void {
+    const navigationProto = NavigationBindingsClass.prototype;
 
-    if (composedClasses.indexOf(NavigationBindingsClass) === -1) {
-        composedClasses.push(NavigationBindingsClass);
-
-        const navigationProto = NavigationBindingsClass.prototype;
-
+    if (!navigationProto.utils?.manageIndicators) {
         // Extends NavigationBindings to support indicators and resizers:
         navigationProto.getYAxisPositions = navigationGetYAxisPositions;
         navigationProto.getYAxisResizers = navigationGetYAxisResizers;
         navigationProto.recalculateYAxisPositions =
             navigationRecalculateYAxisPositions;
         navigationProto.resizeYAxes = navigationResizeYAxes;
-        navigationProto.utils = {
-            indicatorsWithAxes: STU.indicatorsWithAxes,
-            indicatorsWithVolume: STU.indicatorsWithVolume,
-            getAssignedAxis,
-            isPriceIndicatorEnabled,
-            manageIndicators: STU.manageIndicators
-        };
-    }
-
-    if (composedClasses.indexOf(setOptions) === -1) {
-        composedClasses.push(setOptions);
+        navigationProto.utils = navigationProto.utils || {};
+        navigationProto.utils.indicatorsWithAxes = STU.indicatorsWithAxes;
+        navigationProto.utils.indicatorsWithVolume = STU.indicatorsWithVolume;
+        navigationProto.utils.getAssignedAxis = STU.getAssignedAxis;
+        navigationProto.utils.isPriceIndicatorEnabled = isPriceIndicatorEnabled;
+        navigationProto.utils.manageIndicators = STU.manageIndicators;
 
         setOptions(StockToolsDefaults);
         setOptions({
@@ -148,7 +132,7 @@ function compose(
  * Get current positions for all yAxes. If new axis does not have position,
  * returned is default height and last available top place.
  *
- * @private
+ * @internal
  * @function Highcharts.NavigationBindings#getYAxisPositions
  *
  * @param {Array<Highcharts.Axis>} yAxes
@@ -178,7 +162,7 @@ function navigationGetYAxisPositions(
         previousAxisHeight: number,
         removedHeight: number,
         removedTop: number;
-    /** @private */
+    /** @internal */
     function isPercentage(prop: number | string | undefined): boolean {
         return defined(prop) && !isNumber(prop) && (prop.match('%') as any);
     }
@@ -193,12 +177,16 @@ function navigationGetYAxisPositions(
     }
 
     const positions = yAxes.map((yAxis, index): Record<string, number> => {
-        let height = correctFloat(isPercentage(yAxis.options.height) ?
-                parseFloat(yAxis.options.height as any) / 100 :
-                yAxis.height / plotHeight),
-            top = correctFloat(isPercentage(yAxis.options.top) ?
-                parseFloat(yAxis.options.top as any) / 100 :
-                (yAxis.top - yAxis.chart.plotTop) / plotHeight);
+        let height = correctFloat(
+                isPercentage(yAxis.options.height) ?
+                    parseFloat(String(yAxis.options.height)) / 100 :
+                    yAxis.height / plotHeight
+            ),
+            top = correctFloat(
+                isPercentage(yAxis.options.top) ?
+                    parseFloat(String(yAxis.options.top)) / 100 :
+                    (yAxis.top - yAxis.chart.plotTop) / plotHeight
+            );
 
         if (!removedHeight) {
             // New axis' height is NaN so we can check if
@@ -250,7 +238,7 @@ function navigationGetYAxisPositions(
  * axes in the navigator. Because indicator can be removed with it's yAxis
  * in the middle of yAxis array, we need to bind closest yAxes back.
  *
- * @private
+ * @internal
  * @function Highcharts.NavigationBindings#getYAxisResizers
  *
  * @param {Array<Highcharts.Axis>} yAxes
@@ -274,10 +262,7 @@ function navigationGetYAxisResizers(
                 enabled: true,
                 controlledAxis: {
                     next: [
-                        pick(
-                            nextYAxis.options.id,
-                            nextYAxis.options.index as any
-                        )
+                        (nextYAxis.options.id ?? nextYAxis.index)
                     ]
                 }
             };
@@ -296,7 +281,7 @@ function navigationGetYAxisResizers(
  * Utility to modify calculated positions according to the remaining/needed
  * space. Later, these positions are used in `yAxis.update({ top, height })`
  *
- * @private
+ * @internal
  * @function Highcharts.NavigationBindings#recalculateYAxisPositions
  * @param {Array<Highcharts.Dictionary<number>>} positions
  * Default positions of all yAxes.
@@ -341,16 +326,16 @@ function navigationRecalculateYAxisPositions(
  * axes it is placed there. If not, current plot area is scaled
  * to make room for new axis.
  *
- * If axis is removed, the current plot area streaches to fit into 100%
+ * If axis is removed, the current plot area stretches to fit into 100%
  * of the plot area.
  *
- * @private
+ * @internal
  */
 function navigationResizeYAxes(
     this: NavigationBindings,
     removedYAxisProps?: AxisPositions
 ): void {
-    // The height of the new axis before rescalling. In %, but as a number.
+    // The height of the new axis before rescaling. In %, but as a number.
     const defaultHeight = 20;
     const chart = this.chart,
         // Only non-navigator axes
@@ -365,7 +350,7 @@ function navigationResizeYAxes(
         ),
         resizers = this.getYAxisResizers(yAxes);
 
-    // check if the axis is being either added or removed and
+    // Check if the axis is being either added or removed and
     // if the new indicator axis will fit under existing axes.
     // if so, there is no need to scale them.
     if (
@@ -405,8 +390,10 @@ function navigationResizeYAxes(
  *
  * */
 
+/** @internal */
 const StockTools = {
     compose
 };
 
+/** @internal */
 export default StockTools;

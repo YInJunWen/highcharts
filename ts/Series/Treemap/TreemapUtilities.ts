@@ -1,25 +1,17 @@
 /* *
  *
- *  (c) 2014-2021 Highsoft AS
+ *  (c) 2014-2026 Highsoft AS
  *
- *  Authors: Jon Arild Nygard / Oystein Moseng
+ *  Authors: Jon Arild Nygård / Øystein Moseng
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
 'use strict';
-
-/* *
- *
- *  Imports
- *
- * */
-
-import U from '../../Core/Utilities.js';
-const { objectEach } = U;
 
 /* *
  *
@@ -29,51 +21,36 @@ const { objectEach } = U;
 
 namespace TreemapUtilities {
 
+    /* *
+     *
+     *  Declarations
+     *
+     * */
+
     interface TreemapRecursiveCallbackFunction<TContext = any, TItem = any> {
         (this: TContext, item: TItem): (boolean|TItem);
     }
 
-    export const AXIS_MAX = 100;
-
-    /* eslint-disable no-invalid-this, valid-jsdoc */
-
-    /**
-     * @todo Similar to eachObject, this function is likely redundant
-     */
-    export function isBoolean(x: unknown): x is boolean {
-        return typeof x === 'boolean';
-    }
-
-    /**
-     * @todo Similar to recursive, this function is likely redundant
-     */
-    export function eachObject(
-        this: any,
-        list: any,
-        func: U.ObjectEachCallback<any, unknown>,
-        context?: unknown
-    ): void {
-        context = context || this;
-        objectEach(list, function (val: unknown, key: string): void {
-            func.call(context, val, key, list);
-        });
-    }
+    /* *
+     *
+     *  Functions
+     *
+     * */
 
     /**
      * @todo find correct name for this function.
      * @todo Similar to reduce, this function is likely redundant
+     * @internal
      */
     export function recursive<TContext = any, TItem = any>(
         this: any,
         item: TItem,
         func: TreemapRecursiveCallbackFunction<TContext, TItem>,
-        context: TContext = this
+        context?: TContext
     ): void {
-        let next: any;
-
-        next = func.call(context as any, item);
+        const next = func.call(context || this, item);
         if (next !== false) {
-            recursive(next, func, context);
+            recursive(next, func as any, context);
         }
     }
 

@@ -30,8 +30,8 @@ QUnit.module('defaultOptions', function () {
          */
         assert.strictEqual(
             dataLabels.defer,
-            false,
-            'should have dataLabels.defer default to false.'
+            true,
+            'should have dataLabels.defer default to true.'
         );
 
         /**
@@ -58,34 +58,39 @@ QUnit.module('defaultOptions', function () {
         assert.strictEqual(
             formatter.call(),
             '',
-            'should have dataLabels.formatter return "" when context is undefined.'
+            'should have dataLabels.formatter return "" when context is ' +
+            'undefined.'
         );
 
         assert.strictEqual(
             formatter.call(ctx),
             '',
-            'should have dataLabels.formatter return "" when point is undefined.'
+            'should have dataLabels.formatter return "" when point is ' +
+            'undefined.'
         );
 
         ctx.point = {};
         assert.strictEqual(
             formatter.call(ctx),
             '',
-            'should have dataLabels.formatter return "" when point.name is undefined.'
+            'should have dataLabels.formatter return "" when point.name is ' +
+            'undefined.'
         );
 
         ctx.point.name = {};
         assert.strictEqual(
             formatter.call(ctx),
             '',
-            'should have dataLabels.formatter return "" when point.name is not a string.'
+            'should have dataLabels.formatter return "" when point.name is ' +
+            'not a string.'
         );
 
         ctx.point.name = 'My Name';
         assert.strictEqual(
             formatter.call(ctx),
             'My Name',
-            'should have dataLabels.formatter return point.name when it is a string.'
+            'should have dataLabels.formatter return point.name when it is a ' +
+            'string.'
         );
 
         /**

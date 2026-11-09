@@ -1,10 +1,12 @@
 /* *
  *
- *  (c) 2009-2021 Highsoft, Black Label
+ *  (c) 2009-2026 Highsoft AS
+ *  Author: Highsoft, Black Label
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -18,7 +20,11 @@
 
 import type AnimationOptions from '../../Core/Animation/AnimationOptions';
 import type { AnnotationPointType } from './AnnotationSeries';
-import type AnnotationOptions from './AnnotationOptions';
+import type {
+    AnnotationLabelOptions,
+    AnnotationOptions,
+    AnnotationShapeOptions
+} from './AnnotationOptions';
 import type { AnnotationTypeRegistry } from './Types/AnnotationType';
 import type AxisType from '../../Core/Axis/AxisType';
 import type BBoxObject from '../../Core/Renderer/BBoxObject';
@@ -32,15 +38,18 @@ import type {
     ControllableLabelOptions,
     ControllableShapeOptions
 } from './Controllables/ControllableOptions';
+import type {
+    AnnotationMockPointOptionsObject
+} from './AnnotationMockPointOptionsObject';
+import type NavigationBindings from './NavigationBindings.js';
 import type SVGElement from '../../Core/Renderer/SVG/SVGElement';
 import type SVGRenderer from '../../Core/Renderer/SVG/SVGRenderer';
 
-import A from '../../Core/Animation/AnimationUtilities.js';
-const { getDeferredAnimation } = A;
+import {
+    getDeferredAnimation
+} from '../../Core/Animation/AnimationUtilities.js';
 import AnnotationChart from './AnnotationChart.js';
 import AnnotationDefaults from './AnnotationDefaults.js';
-import Controllable from './Controllables/Controllable.js';
-const controllableProto = Controllable.prototype;
 import ControllableRect from './Controllables/ControllableRect.js';
 import ControllableCircle from './Controllables/ControllableCircle.js';
 import ControllableEllipse from './Controllables/ControllableEllipse.js';
@@ -48,24 +57,20 @@ import ControllablePath from './Controllables/ControllablePath.js';
 import ControllableImage from './Controllables/ControllableImage.js';
 import ControllableLabel from './Controllables/ControllableLabel.js';
 import ControlPoint from './ControlPoint.js';
+import ControlTarget from './ControlTarget.js';
+import D from '../../Core/Defaults.js';
+const { defaultOptions } = D;
 import EventEmitter from './EventEmitter.js';
 import MockPoint from './MockPoint.js';
-import NavigationBindings from './NavigationBindings.js';
 import Pointer from '../../Core/Pointer.js';
 import PopupComposition from './Popup/PopupComposition.js';
-import U from '../../Core/Utilities.js';
-const {
-    addEvent,
+import {
     destroyObjectProperties,
     erase,
-    extend,
-    find,
     fireEvent,
     merge,
-    pick,
-    splat,
-    wrap
-} = U;
+    splat
+} from '../../Shared/Utilities.js';
 
 /* *
  *
@@ -74,7 +79,38 @@ const {
  * */
 
 declare module '../../Core/Options'{
+    interface DefaultOptions {
+        annotations?: AnnotationOptions;
+    }
     interface Options {
+        /**
+         * A collection of annotations to add to the chart. The basic annotation
+         * allows adding custom labels or shapes. The items can be tied to
+         * points, axis coordinates or chart pixel coordinates.
+         *
+         * General options for all annotations can be set using the
+         * `Highcharts.setOptions` function. In this case only single objects
+         * are supported, because it alters the defaults for all items. For
+         * initialization in the chart constructors however, arrays of
+         * annotations are supported.
+         *
+         * See more in the [general docs](https://www.highcharts.com/docs/advanced-chart-features/annotations).
+         *
+         * @sample highcharts/annotations/basic/ Basic annotations
+         * @sample highcharts/demo/annotations/ Annotated chart
+         * @sample highcharts/css/annotations Styled mode
+         * @sample highcharts/annotations-advanced/controllable
+         *         Controllable items
+         * @sample {highstock} stock/annotations/fibonacci-retracements
+         *         Custom annotation, Fibonacci retracement
+         * @sample highcharts/annotations/shape/
+         *         Themed crooked line annotation
+         *
+         * @type         {Array<*>}
+         * @since        6.0.0
+         * @requires     modules/annotations
+         * @optionparent annotations
+         */
         annotations?: (AnnotationOptions|Array<AnnotationOptions>);
     }
 }
@@ -86,8 +122,8 @@ declare module '../../Core/Options'{
  * */
 
 /**
- * Hide or show annotaiton attached to points.
- * @private
+ * Hide or show annotation attached to points.
+ * @internal
  */
 function adjustVisibility(
     item: ControllableType
@@ -108,35 +144,29 @@ function adjustVisibility(
     }
 }
 
-/**
- * @private
- */
+/** @internal */
 function getLabelsAndShapesOptions(
     baseOptions: AnnotationOptions,
-    newOptions: DeepPartial<AnnotationOptions>
+    newOptions: AnnotationOptions
 ): AnnotationOptions {
     const mergedOptions = {} as AnnotationOptions;
 
-    (['labels', 'shapes'] as Array<('labels'|'shapes')>).forEach((
+    (['labels', 'shapes'] as const).forEach((
         name
     ): void => {
-        const someBaseOptions = baseOptions[name];
+        const someBaseOptions = baseOptions[name],
+            newOptionsValue = newOptions[name];
+
+        type ControllableOptions = (
+            AnnotationLabelOptions|
+            AnnotationShapeOptions
+        );
 
         if (someBaseOptions) {
-            if (newOptions[name]) {
-                mergedOptions[name] = splat(newOptions[name]).map(
-                    function (
-                        basicOptions: (
-                            ControllableLabelOptions|
-                            ControllableShapeOptions
-                        ),
-                        i: number
-                    ): (
-                        ControllableLabelOptions|
-                        ControllableShapeOptions
-                        ) {
-                        return merge(someBaseOptions[i], basicOptions);
-                    }
+            if (newOptionsValue) {
+                mergedOptions[name] = splat(newOptionsValue).map(
+                    (basicOptions, i): ControllableOptions =>
+                        merge(someBaseOptions[i], basicOptions)
                 ) as any;
             } else {
                 mergedOptions[name] = baseOptions[name] as any;
@@ -156,7 +186,9 @@ function getLabelsAndShapesOptions(
 /**
  * An annotation class which serves as a container for items like labels or
  * shapes. Created items are positioned on the chart either by linking them to
- * existing points or created mock points
+ * existing points or created mock points.
+ *
+ * @requires modules/annotations
  *
  * @class
  * @name Highcharts.Annotation
@@ -166,40 +198,31 @@ function getLabelsAndShapesOptions(
  * @param {Highcharts.AnnotationsOptions} userOptions
  *        The annotation options
  */
-class Annotation extends EventEmitter implements Controllable {
-
-    /* *
-     *
-     *  Static Properties
-     *
-     * */
-
-    /**
-     * @private
-     */
+class Annotation extends EventEmitter implements ControlTarget {
+    /** @internal */
     public static readonly ControlPoint = ControlPoint;
 
-    /**
-     * @private
-     */
+    /** @internal */
     public static readonly MockPoint = MockPoint;
 
     /**
      * An object uses for mapping between a shape type and a constructor.
      * To add a new shape type extend this object with type name as a key
      * and a constructor as its value.
+     *
+     * @internal
      */
-    public static readonly shapesMap: Record<string, Function> = {
-        'rect': ControllableRect,
-        'circle': ControllableCircle,
-        'ellipse': ControllableEllipse,
-        'path': ControllablePath,
-        'image': ControllableImage
-    };
+    public static readonly shapesMap: Record<
+        string, Class<ControllableShapeType>
+    > = {
+            'rect': ControllableRect,
+            'circle': ControllableCircle,
+            'ellipse': ControllableEllipse,
+            'path': ControllablePath,
+            'image': ControllableImage
+        };
 
-    /**
-     * @private
-     */
+    /** @internal */
     public static readonly types = {} as AnnotationTypeRegistry;
 
     /* *
@@ -208,19 +231,18 @@ class Annotation extends EventEmitter implements Controllable {
      *
      * */
 
-    /**
-     * @private
-     */
+    /** @internal */
     public static compose(
         ChartClass: typeof Chart,
+        NavigationBindingsClass: typeof NavigationBindings,
         PointerClass: typeof Pointer,
         SVGRendererClass: typeof SVGRenderer
     ): void {
         AnnotationChart.compose(Annotation, ChartClass, PointerClass);
         ControllableLabel.compose(SVGRendererClass);
         ControllablePath.compose(ChartClass, SVGRendererClass);
-        NavigationBindings.compose(Annotation, ChartClass);
-        PopupComposition.compose(NavigationBindings, PointerClass);
+        NavigationBindingsClass.compose(Annotation, ChartClass);
+        PopupComposition.compose(NavigationBindingsClass, PointerClass);
     }
 
     /* *
@@ -245,7 +267,7 @@ class Annotation extends EventEmitter implements Controllable {
 
         /**
          * The array of points which defines the annotation.
-         * @private
+         *
          * @name Highcharts.Annotation#points
          * @type {Array<Highcharts.Point>}
          */
@@ -253,7 +275,8 @@ class Annotation extends EventEmitter implements Controllable {
 
         /**
          * The array of control points.
-         * @private
+         *
+         * @internal
          * @name Highcharts.Annotation#controlPoints
          * @type {Array<Annotation.ControlPoint>}
          */
@@ -261,9 +284,12 @@ class Annotation extends EventEmitter implements Controllable {
 
         this.coll = 'annotations';
 
+        this.index = -1;
+
         /**
          * The array of labels which belong to the annotation.
-         * @private
+         *
+         * @internal
          * @name Highcharts.Annotation#labels
          * @type {Array<Highcharts.AnnotationLabelType>}
          */
@@ -271,7 +297,8 @@ class Annotation extends EventEmitter implements Controllable {
 
         /**
          * The array of shapes which belong to the annotation.
-         * @private
+         *
+         * @internal
          * @name Highcharts.Annotation#shapes
          * @type {Array<Highcharts.AnnotationShapeType>}
          */
@@ -283,7 +310,7 @@ class Annotation extends EventEmitter implements Controllable {
          * @name Highcharts.Annotation#options
          * @type {Highcharts.AnnotationsOptions}
          */
-        this.options = merge(this.defaultOptions, userOptions);
+        this.setOptions(userOptions);
 
         /**
          * The user options for the annotations.
@@ -303,9 +330,10 @@ class Annotation extends EventEmitter implements Controllable {
         this.options.shapes = labelsAndShapes.shapes;
 
         /**
-         * The callback that reports to the overlapping-labels module which
+         * The callback that reports to the overlapping labels logic which
          * labels it should account for.
-         * @private
+         *
+         * @internal
          * @name Highcharts.Annotation#labelCollector
          * @type {Function}
          */
@@ -340,25 +368,97 @@ class Annotation extends EventEmitter implements Controllable {
      *
      * */
 
-    public annotation: Controllable['annotation'] = void 0 as any;
+    /**
+     * The chart that the annotation belongs to.
+     *
+     * @name Highcharts.Annotation#chart
+     * @type {Highcharts.Chart}
+     */
     public chart: AnnotationChart;
+
+    /** @internal */
     public clipRect?: SVGElement;
+
+    /** @internal */
     public clipXAxis?: AxisType;
+
+    /** @internal */
     public clipYAxis?: AxisType;
-    public coll: 'annotations' = 'annotations';
-    public collection: Controllable['collection'] = void 0 as any;
-    public controlPoints: Array<ControlPoint>;
-    public animationConfig: Partial<AnimationOptions> = void 0 as any;
-    public graphic: SVGElement = void 0 as any;
-    public group: SVGElement = void 0 as any;
+
+    /** @internal */
+    public coll = 'annotations' as const;
+
+    /** @internal */
+    public animationConfig!: Partial<AnimationOptions>;
+
+    /** @internal */
+    public graphic!: SVGElement;
+
+    /**
+     * The group svg element.
+     *
+     * @name Highcharts.Annotation#group
+     * @type {Highcharts.SVGElement}
+     */
+    public group!: SVGElement;
+
+    /** @internal */
+    public index: number;
+
+    /** @internal */
     public isUpdating?: boolean;
-    public labelCollector: Chart.LabelCollectorFunction = void 0 as any;
+
+    /** @internal */
+    public labelCollector!: Chart.LabelCollectorFunction;
+
+    /** @internal */
     public labels: Array<ControllableLabelType>;
-    public labelsGroup: SVGElement = void 0 as any;
-    public options: AnnotationOptions;
+
+    /**
+     * The group svg element of the annotation's labels.
+     *
+     * @name Highcharts.Annotation#labelsGroup
+     * @type {Highcharts.SVGElement}
+     */
+    public labelsGroup!: SVGElement;
+
+    /**
+     * The options for the annotations.
+     *
+     * @name Highcharts.Annotation#options
+     * @type {Highcharts.AnnotationsOptions}
+     */
+    public options!: AnnotationOptions;
+
+    /**
+     * The array of points which defines the annotation.
+     *
+     * @internal
+     * @name Highcharts.Annotation#points
+     * @type {Array<Highcharts.AnnotationPointType>}
+     */
     public points: Array<AnnotationPointType>;
+
+    /**
+     * The array of shapes which belong to the annotation.
+     * @internal
+     */
     public shapes: Array<ControllableShapeType>;
-    public shapesGroup: SVGElement = void 0 as any;
+
+    /**
+     * The group svg element of the annotation's shapes.
+     *
+     * @name Highcharts.Annotation#shapesGroup
+     * @type {Highcharts.SVGElement}
+     */
+    public shapesGroup!: SVGElement;
+
+    /**
+     * The user options for the annotations.
+     *
+     * @name Highcharts.Annotation#userOptions
+     * @type {Highcharts.AnnotationsOptions}
+     */
     public userOptions: AnnotationOptions;
 
     /* *
@@ -367,9 +467,7 @@ class Annotation extends EventEmitter implements Controllable {
      *
      * */
 
-    /**
-     * @private
-     */
+    /** @internal */
     public addClipPaths(): void {
         this.setClipAxes();
 
@@ -384,22 +482,22 @@ class Annotation extends EventEmitter implements Controllable {
         }
     }
 
-    /**
-     * @private
-     */
+    /** @internal */
     public addLabels(): void {
         const labelsOptions = (this.options.labels || []);
 
         labelsOptions.forEach((labelOptions, i): void => {
             const label = this.initLabel(labelOptions, i);
 
-            merge(true, labelsOptions[i], label.options);
+            merge(
+                true,
+                labelsOptions[i],
+                label.options as AnnotationLabelOptions
+            );
         });
     }
 
-    /**
-     * @private
-     */
+    /** @internal */
     public addShapes(): void {
         const shapes = this.options.shapes || [];
         shapes.forEach((shapeOptions, i): void => {
@@ -414,45 +512,39 @@ class Annotation extends EventEmitter implements Controllable {
      * that the annotation belongs to (all annotations are kept in
      * the chart.annotations array) - it is recommended to use
      * {@link Highcharts.Chart#removeAnnotation} instead.
-     * @private
+     *
+     * @internal
      */
     public destroy(): void {
-        const chart = this.chart,
-            destroyItem = function (
-                item: ControllableType
-            ): void {
-                item.destroy();
-            };
+        const chart = this.chart;
 
-        this.labels.forEach(destroyItem);
-        this.shapes.forEach(destroyItem);
+        destroyObjectProperties(this.labels);
+        destroyObjectProperties(this.shapes);
 
-        this.clipXAxis = null as any;
-        this.clipYAxis = null as any;
+        delete this.clipXAxis;
+        delete this.clipYAxis;
 
         erase(chart.labelCollectors, this.labelCollector);
 
         super.destroy();
-        controllableProto.destroy.call(this);
+        this.destroyControlTarget();
 
         destroyObjectProperties(this, chart);
     }
 
     /**
      * Destroy a single item.
-     * @private
+     * @internal
      */
     public destroyItem(
         item: ControllableType
     ): void {
-        // erase from shapes or labels array
+        // Erase from shapes or labels array
         erase((this as any)[item.itemType + 's'], item);
         item.destroy();
     }
 
-    /**
-     * @private
-     */
+    /** @internal */
     public getClipBox(): (BBoxObject|void) {
         if (this.clipXAxis && this.clipYAxis) {
             return {
@@ -465,17 +557,44 @@ class Annotation extends EventEmitter implements Controllable {
     }
 
     /**
+     * Initialize the annotation properties.
+     * @internal
+     */
+    public initProperties(
+        chart: AnnotationChart,
+        userOptions: AnnotationOptions
+    ): void {
+        this.setOptions(userOptions);
+
+        const labelsAndShapes = getLabelsAndShapesOptions(
+            this.options,
+            userOptions
+        );
+        this.options.labels = labelsAndShapes.labels;
+        this.options.shapes = labelsAndShapes.shapes;
+
+        this.chart = chart;
+        this.points = [];
+        this.controlPoints = [];
+        this.coll = 'annotations';
+        this.userOptions = userOptions;
+        this.labels = [];
+        this.shapes = [];
+    }
+
+    /**
      * Initialize the annotation.
-     * @private
+     * @internal
      */
     public init(
         _annotationOrChart: (Annotation|AnnotationChart),
         _userOptions: AnnotationOptions,
-        _index?: number
+        index: number = this.index
     ): void {
         const chart = this.chart,
             animOptions = this.options.animation;
 
+        this.index = index;
         this.linkPoints();
         this.addControlPoints();
         this.addShapes();
@@ -485,14 +604,16 @@ class Annotation extends EventEmitter implements Controllable {
     }
 
     /**
-     * Initialisation of a single label
-     * @private
+     * Initialization of a single label.
+     * @internal
      */
     public initLabel(
-        labelOptions: Partial<ControllableLabelOptions>,
+        labelOptions: AnnotationLabelOptions | ControllableLabelOptions,
         index: number
     ): ControllableLabelType {
-        const options = merge<ControllableLabelOptions>(
+        this.options.labelOptions?.align;
+
+        const options = merge(
                 this.options.labelOptions,
                 {
                     controlPointOptions: this.options.controlPointOptions
@@ -513,16 +634,17 @@ class Annotation extends EventEmitter implements Controllable {
     }
 
     /**
-     * Initialisation of a single shape
-     * @private
+     * Initialization of a single shape.
+     *
+     * @internal
      * @param {Object} shapeOptions
-     * a confg object for a single shape
+     * a config object for a single shape
      * @param {number} index
      * annotation may have many shapes, this is the shape's index saved in
      * shapes.index.
      */
     public initShape(
-        shapeOptions: Partial<ControllableShapeOptions>,
+        shapeOptions: AnnotationShapeOptions | ControllableShapeOptions,
         index: number
     ): ControllableShapeType {
         const options = merge(
@@ -532,7 +654,7 @@ class Annotation extends EventEmitter implements Controllable {
                 },
                 shapeOptions
             ),
-            shape = new ((Annotation as any).shapesMap[options.type as any])(
+            shape = new Annotation.shapesMap[options.type || 'rect'](
                 this,
                 options,
                 index
@@ -545,9 +667,7 @@ class Annotation extends EventEmitter implements Controllable {
         return shape;
     }
 
-    /**
-     * @private
-     */
+    /** @internal */
     public redraw(
         animation?: boolean
     ): void {
@@ -564,13 +684,12 @@ class Annotation extends EventEmitter implements Controllable {
         this.redrawItems(this.shapes, animation);
         this.redrawItems(this.labels, animation);
 
-
-        controllableProto.redraw.call(this, animation);
+        this.redrawControlPoints(animation);
     }
 
     /**
      * Redraw a single item.
-     * @private
+     * @internal
      */
     public redrawItem(
         item: ControllableType,
@@ -586,7 +705,7 @@ class Annotation extends EventEmitter implements Controllable {
             }
 
             item.redraw(
-                pick(animation, true) && item.graphic.placed
+                (animation ?? true) && item.graphic.placed
             );
 
             if (item.points.length) {
@@ -595,18 +714,15 @@ class Annotation extends EventEmitter implements Controllable {
         }
     }
 
-    /**
-     * @private
-     */
+    /** @internal */
     public redrawItems(
         items: Array<ControllableType>,
         animation?: boolean
     ): void {
         let i = items.length;
 
-        // needs a backward loop
-        // labels/shapes array might be modified
-        // due to destruction of the item
+        // Needs a backward loop. Labels/shapes array might be modified due to
+        // destruction of the item
         while (i--) {
             this.redrawItem(items[i], animation);
         }
@@ -614,21 +730,20 @@ class Annotation extends EventEmitter implements Controllable {
 
     /**
      * See {@link Highcharts.Chart#removeAnnotation}.
-     * @private
+     * @internal
      */
     public remove(): void {
-        // Let chart.update() remove annoations on demand
+        // Let chart.update() remove annotations on demand
         return this.chart.removeAnnotation(this);
     }
 
-    /**
-     * @private
-     */
+    /** @internal */
     public render(): void {
         const renderer = this.chart.renderer;
 
         this.graphic = renderer
             .g('annotation')
+            .addClass(this.options.className || '')
             .attr({
                 opacity: 0,
                 zIndex: this.options.zIndex,
@@ -649,7 +764,7 @@ class Annotation extends EventEmitter implements Controllable {
         this.labelsGroup = renderer
             .g('annotation-labels')
             .attr({
-                // hideOverlappingLabels requires translation
+                // `hideOverlappingLabels` requires translation
                 translateX: 0,
                 translateY: 0
             })
@@ -667,12 +782,10 @@ class Annotation extends EventEmitter implements Controllable {
 
         this.addEvents();
 
-        controllableProto.render.call(this);
+        this.renderControlPoints();
     }
 
-    /**
-     * @private
-     */
+    /** @internal */
     public renderItem(item: ControllableType): void {
         item.render(
             item.itemType === 'label' ?
@@ -681,9 +794,7 @@ class Annotation extends EventEmitter implements Controllable {
         );
     }
 
-    /**
-     * @private
-     */
+    /** @internal */
     public renderItems(
         items: Array<ControllableType>
     ): void {
@@ -694,39 +805,37 @@ class Annotation extends EventEmitter implements Controllable {
         }
     }
 
-    /**
-     * @private
-     */
+    /** @internal */
     public setClipAxes(): void {
         const xAxes = this.chart.xAxis,
             yAxes = this.chart.yAxis,
-            linkedAxes: Array<AxisType> = ((
-                this.options.labels || []
-            ) as Array<(ControllableLabelOptions|ControllableShapeOptions)>)
-                .concat(this.options.shapes || [])
-                .reduce((
-                    axes: Array<AxisType>,
-                    labelOrShape
-                ): Array<AxisType> => {
-                    const point = labelOrShape &&
+            linkedAxes: Array<AxisType> = [
+                ...(this.options.labels ?? []),
+                ...(this.options.shapes ?? [])
+            ].reduce((
+                axes: Array<AxisType>,
+                labelOrShape
+            ): Array<AxisType> => {
+                const point = labelOrShape &&
+                    (
+                        labelOrShape.point ||
                         (
-                            labelOrShape.point ||
-                            (labelOrShape.points && labelOrShape.points[0])
-                        );
+                            ('points' in labelOrShape) &&
+                            labelOrShape.points?.[0]
+                        )
+                    );
 
-                    return [
-                        xAxes[point && (point as any).xAxis] || axes[0],
-                        yAxes[point && (point as any).yAxis] || axes[1]
-                    ];
-                }, []);
+                return [
+                    xAxes[point && (point as any).xAxis] || axes[0],
+                    yAxes[point && (point as any).yAxis] || axes[1]
+                ];
+            }, []);
 
         this.clipXAxis = linkedAxes[0];
         this.clipYAxis = linkedAxes[1];
     }
 
-    /**
-     * @private
-     */
+    /** @internal */
     public setControlPointsVisibility(visible: boolean): void {
         const setItemControlPointsVisibility = function (
             item: ControllableType
@@ -734,15 +843,15 @@ class Annotation extends EventEmitter implements Controllable {
             item.setControlPointsVisibility(visible);
         };
 
-        controllableProto.setControlPointsVisibility.call(this, visible);
+        this.controlPoints.forEach((controlPoint): void => {
+            controlPoint.setVisibility(visible);
+        });
 
         this.shapes.forEach(setItemControlPointsVisibility);
         this.labels.forEach(setItemControlPointsVisibility);
     }
 
-    /**
-     * @private
-     */
+    /** @internal */
     public setLabelCollector(): void {
         const annotation = this;
 
@@ -769,17 +878,31 @@ class Annotation extends EventEmitter implements Controllable {
 
     /**
      * Set an annotation options.
-     * @private
+     *
+     * @internal
      * @param {Highcharts.AnnotationsOptions} userOptions
      *        User options for an annotation
      */
     public setOptions(userOptions: AnnotationOptions): void {
-        this.options = merge(this.defaultOptions, userOptions);
+        this.options = merge(
+            // Shared for all annotation types
+            this.defaultOptions,
+            // The static typeOptions from the class
+            (
+                userOptions.type &&
+                this.defaultOptions.types?.[userOptions.type]
+            ) || {},
+            userOptions
+        );
+
+        // Safe access for `.typeOptions!`
+        this.options.typeOptions ||= {};
     }
 
     /**
      * Set the annotation's visibility.
-     * @private
+     *
+     * @internal
      * @param {boolean} [visible]
      * Whether to show or hide an annotation. If the param is omitted, the
      * annotation's visibility is toggled.
@@ -789,7 +912,7 @@ class Annotation extends EventEmitter implements Controllable {
     ): void {
         const options = this.options,
             navigation = this.chart.navigationBindings,
-            visibility = pick(visible, !options.visible);
+            visibility = (visible ?? !options.visible);
 
         this.graphic.attr(
             'visibility',
@@ -797,12 +920,19 @@ class Annotation extends EventEmitter implements Controllable {
         );
 
         if (!visibility) {
-            this.setControlPointsVisibility(false);
+            const setItemControlPointsVisibility = function (
+                item: ControllableType
+            ): void {
+                item.setControlPointsVisibility(visibility);
+            };
+
+            this.shapes.forEach(setItemControlPointsVisibility);
+            this.labels.forEach(setItemControlPointsVisibility);
 
             if (
                 navigation.activeAnnotation === this &&
                 navigation.popup &&
-                navigation.popup.formType === 'annotation-toolbar'
+                navigation.popup.type === 'annotation-toolbar'
             ) {
                 fireEvent(navigation, 'closePopup');
             }
@@ -816,12 +946,13 @@ class Annotation extends EventEmitter implements Controllable {
      *
      * @function Highcharts.Annotation#update
      *
-     * @param {Partial<Highcharts.AnnotationsOptions>} userOptions
+     * @param {Highcharts.AnnotationsOptions} userOptions
      *        New user options for the annotation.
-     *
+     * @param {boolean} [redraw]
+     *        Whether to redraw the chart's annotations.
      */
     public update(
-        userOptions: DeepPartial<AnnotationOptions>,
+        userOptions: AnnotationOptions,
         redraw? : boolean
     ): void {
         const chart = this.chart,
@@ -836,14 +967,14 @@ class Annotation extends EventEmitter implements Controllable {
         options.shapes = labelsAndShapes.shapes;
 
         this.destroy();
-        this.constructor(chart, options);
-
-        // Update options in chart options, used in exporting (#9767):
-        chart.options.annotations[userOptionsIndex] = options;
+        this.initProperties(chart, options);
+        this.init(chart, options);
+        // Update options in chart options, used in exporting (#9767, #21507):
+        chart.options.annotations[userOptionsIndex] = this.options;
 
         this.isUpdating = true;
-        if (pick(redraw, true)) {
-            chart.redraw();
+        if (redraw ?? true) {
+            chart.drawAnnotations();
         }
 
         fireEvent(this, 'afterUpdate');
@@ -858,33 +989,27 @@ class Annotation extends EventEmitter implements Controllable {
  *
  * */
 
-interface Annotation extends Controllable {
+/** @internal */
+interface Annotation extends ControlTarget {
     defaultOptions: AnnotationOptions;
     nonDOMEvents: Array<string>;
-    translate(dx: number, dy: number): void;
+    getPointsOptions(): Array<(string | AnnotationMockPointOptionsObject)>;
+    linkPoints(): (Array<AnnotationPointType>|undefined);
 }
 
-merge<Annotation>(
-    true,
-    Annotation.prototype,
-    Controllable.prototype as any,
-    // restore original Annotation implementation after mixin overwrite:
-    merge(
-        Annotation.prototype,
-        {
-            /**
-             * List of events for `annotation.options.events` that should not be
-             * added to `annotation.graphic` but to the `annotation`.
-             *
-             * @private
-             * @type {Array<string>}
-             */
-            nonDOMEvents: ['add', 'afterUpdate', 'drag', 'remove'],
+Annotation.prototype.defaultOptions = AnnotationDefaults;
+defaultOptions.annotations = AnnotationDefaults;
 
-            defaultOptions: AnnotationDefaults
-        }
-    )
-);
+/**
+ * List of events for `annotation.options.events` that should not be
+ * added to `annotation.graphic` but to the `annotation`.
+ *
+ * @internal
+ * @type {Array<string>}
+ */
+Annotation.prototype.nonDOMEvents = ['add', 'afterUpdate', 'drag', 'remove'];
+
+ControlTarget.compose(Annotation);
 
 /* *
  *
@@ -896,7 +1021,7 @@ export default Annotation;
 
 /* *
  *
- *  API Options
+ *  API Declarations
  *
  * */
 
@@ -909,7 +1034,7 @@ export default Annotation;
  */
 
 /**
- * @private
+ * @internal
  * @typedef {
  *          Highcharts.AnnotationControllableCircle|
  *          Highcharts.AnnotationControllableImage|
@@ -920,7 +1045,7 @@ export default Annotation;
  */
 
 /**
- * @private
+ * @internal
  * @typedef {
  *          Highcharts.AnnotationControllableLabel
  *     } Highcharts.AnnotationLabelType
@@ -929,21 +1054,26 @@ export default Annotation;
 
 /**
  * A point-like object, a mock point or a point used in series.
- * @private
+ * @internal
  * @typedef {
  *          Highcharts.AnnotationMockPoint|
  *          Highcharts.Point
  *     } Highcharts.AnnotationPointType
  * @requires modules/annotations
  */
+
 /**
- * Shape point as string, object or function.
+ * Annotation point, which can be:
+ * - a string: the ID of an existing series point,
+ * - an object: mock point options,
+ * - a function: returning either mock point options object or a point.
  *
+ * @requires modules/annotations
  * @typedef {
  *          string|
  *          Highcharts.AnnotationMockPointOptionsObject|
  *          Highcharts.AnnotationMockPointFunction
- *     } Highcharts.AnnotationShapePointOptions
+ *     } Highcharts.AnnotationMockPointOptions
  */
 
-(''); // keeps doclets above in JS file
+(''); // Keeps doclets above in JS file

@@ -7,7 +7,8 @@ QUnit.test('Wrong datalabel position (#3648)', function (assert) {
             inverted: true
         },
         accessibility: {
-            enabled: false // A11y module adds DOM elements => different childNodes in container
+            enabled: false // A11y module adds DOM elements => different
+            // childNodes in container
         },
         yAxis: [
             {
@@ -57,8 +58,8 @@ QUnit.test('Wrong datalabel position (#3648)', function (assert) {
         xPosForDataLabels.push(pointsFirstSeries[i].dataLabel.x);
     }
 
-    //Return false if a value of the first array is lower
-    //than the corresponding value of the second array
+    // Return false if a value of the first array is lower
+    // than the corresponding value of the second array
     function compareValuesOfTwoArrays(arr1, arr2) {
         for (var i = 0; i < arr1.length; i++) {
             if (arr1[i] < arr2[i]) {
@@ -139,7 +140,7 @@ QUnit.test('Wrong datalabel position (#3648)', function (assert) {
 
     assert.notOk(chart.tooltip.isHidden, 'Tooltip is hidden');
 
-    var tooltipXPos = chart.tooltip.now.x;
+    var tooltipXPos = chart.tooltip.label.x;
 
     assert.ok(
         firstSeriesColumnX < tooltipXPos && secondSeriesColumnX > tooltipXPos,
@@ -147,7 +148,7 @@ QUnit.test('Wrong datalabel position (#3648)', function (assert) {
     );
 
     controller.mouseOver(secondSeriesCenterX, seriesCenterY);
-    tooltipXPos = chart.tooltip.now.x;
+    tooltipXPos = chart.tooltip.label.x;
     assert.ok(
         secondSeriesColumnX < tooltipXPos,
         'The position of the tooltip is wrong'

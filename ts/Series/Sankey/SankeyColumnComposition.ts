@@ -1,11 +1,39 @@
+/* *
+ *
+ *  Sankey diagram module
+ *
+ *  (c) 2010-2026 Highsoft AS
+ *  Author: Torstein Hønsi
+ *
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
+ *
+ *
+ * */
+
+'use strict';
+
+/* *
+ *
+ *  Imports
+ *
+ * */
+
 import type SankeySeries from './SankeySeries';
 import type SankeyPoint from './SankeyPoint';
 
-import U from '../../Core/Utilities.js';
-const {
+import {
     defined,
+    getAlignFactor,
     relativeLength
-} = U;
+} from '../../Shared/Utilities.js';
+
+/* *
+ *
+ *  Composition
+ *
+ * */
 
 namespace SankeyColumnComposition {
 
@@ -18,6 +46,12 @@ namespace SankeyColumnComposition {
     export declare class ArrayComposition<T extends SankeyPoint = SankeyPoint> extends Array<T> {
         sankeyColumn: SankeyColumnAdditions;
     }
+
+    /* *
+     *
+     *  Functions
+     *
+     * */
 
     /**
      * SankeyColumn Composition
@@ -45,15 +79,28 @@ namespace SankeyColumnComposition {
      *  Classes
      *
      * */
+
     export class SankeyColumnAdditions {
 
-        constructor(
+        /* *
+         *
+         *  Constructor
+         *
+         * */
+
+        public constructor(
             points: ArrayComposition,
             series: SankeySeries
         ) {
             this.points = points;
             this.series = series;
         }
+
+        /* *
+         *
+         *  Properties
+         *
+         * */
 
         public points: ArrayComposition;
 
@@ -66,6 +113,12 @@ namespace SankeyColumnComposition {
         public additionalSpace?: number;
 
         public series: SankeySeries;
+
+        /* *
+         *
+         *  Functions
+         *
+         * */
 
         /**
          * Calculate translation factor used in column and nodes distribution
@@ -80,7 +133,6 @@ namespace SankeyColumnComposition {
         public getTranslationFactor(
             series: SankeySeries
         ): number {
-
             const column = this.points,
                 nodes = column.slice(),
                 chart = series.chart,
@@ -90,10 +142,14 @@ namespace SankeyColumnComposition {
                 factor = 0,
                 i: number,
                 remainingHeight = (
-                    (chart.plotSizeY || 0) -
+                    (series.flowHeight || chart.plotSizeY || 0) -
                     (series.options.borderWidth || 0) -
-                    (column.length - 1) * series.nodePadding
+                    (column.length - 1) * series.nodePadding -
+                    (series.useCircularLayout ?
+                        column.sankeyColumn.lapSum() :
+                        0)
                 );
+
             // Because the minLinkWidth option doesn't obey the direct
             // translation, we need to run translation iteratively, check
             // node heights, remove those nodes affected by minLinkWidth,
@@ -105,7 +161,8 @@ namespace SankeyColumnComposition {
                 while (i--) {
                     if (column[i].getSum() * factor < minLinkWidth) {
                         column.splice(i, 1);
-                        remainingHeight -= minLinkWidth;
+                        remainingHeight =
+                            Math.max(0, remainingHeight - minLinkWidth);
                         skipPoint = true;
                     }
                 }
@@ -116,12 +173,13 @@ namespace SankeyColumnComposition {
 
             // Re-insert original nodes
             column.length = 0;
-            nodes.forEach((node): void => {
+
+            for (const node of nodes) {
                 column.push(node);
-            });
+            }
+
             return factor;
         }
-
 
         /**
          * Get the top position of the column in pixels
@@ -133,26 +191,49 @@ namespace SankeyColumnComposition {
          * @return {number} top
          * The top position of the column
          */
-        public top(factor: number): number {
-            const series = this.series;
-            const nodePadding = series.nodePadding;
-            const height = this.points.reduce(function (
-                height: number,
-                node: SankeyPoint
-            ): number {
-                if (height > 0) {
-                    height += nodePadding;
-                }
-                const nodeHeight = Math.max(
-                    node.getSum() * factor,
-                    series.options.minLinkWidth || 0
+        public top(
+            factor: number
+        ): number {
+            const series = this.series,
+                nodePadding = series.nodePadding,
+                height = this.points.reduce((
+                    height: number,
+                    node: SankeyPoint
+                ): number => {
+                    if (height > 0) {
+                        height += nodePadding;
+                    }
+                    const nodeHeight = Math.max(
+                        node.getSum() * factor,
+                        series.options.minLinkWidth || 0
+                    );
+                    height += nodeHeight + (node.wrapLap || 0);
+                    return height;
+                }, 0);
+
+            // Node alignment option handling #19096. Circular geometry
+            // shrinks the extent aligned within. #8218
+            return (series.flowTop || 0) +
+                getAlignFactor(series.options.nodeAlignment || 'center') * (
+                    (series.flowHeight || (series.chart.plotSizeY || 0)) -
+                    height
                 );
-                height += nodeHeight;
-                return height;
-            }, 0);
-            return ((series.chart.plotSizeY || 0) - height) / 2;
         }
 
+
+        /**
+         * Flow-axis room this column's nodes reserve for self-link laps.
+         * #8218
+         * @private
+         */
+        public lapSum(): number {
+            return this.points.reduce((
+                sum: number,
+                node: SankeyPoint
+            ): number => (
+                sum + (node.wrapLap || 0)
+            ), 0);
+        }
 
         /**
          * Get the left position of the column in pixels
@@ -164,51 +245,48 @@ namespace SankeyColumnComposition {
          * @return {number} left
          * The left position of the column
          */
-        public left(factor: number): number {
+        public left(
+            factor: number
+        ): number {
             const series = this.series,
                 chart = series.chart,
-                equalNodes = (series.options as any).equalNodes;
-            const maxNodesLength = chart.inverted ?
-                    chart.plotHeight : chart.plotWidth,
-                nodePadding = series.nodePadding;
-            const width = this.points.reduce(function (
-                width: number,
-                node: SankeyPoint
-            ): number {
-                if (width > 0) {
-                    width += nodePadding;
-                }
-                const nodeWidth = equalNodes ?
-                    maxNodesLength / node.series.nodes.length - nodePadding :
-                    Math.max(
-                        node.getSum() * factor,
-                        series.options.minLinkWidth || 0
-                    );
-                width += nodeWidth;
-                return width;
-            }, 0);
+                equalNodes = (series.options as any).equalNodes,
+                maxNodesLength = (
+                    chart.inverted ? chart.plotHeight : chart.plotWidth
+                ),
+                nodePadding = series.nodePadding,
+                width = this.points.reduce((
+                    width: number,
+                    node: SankeyPoint
+                ): number => {
+                    if (width > 0) {
+                        width += nodePadding;
+                    }
+                    const nodeWidth = equalNodes ?
+                        maxNodesLength / node.series.nodes.length -
+                            nodePadding :
+                        Math.max(
+                            node.getSum() * factor,
+                            series.options.minLinkWidth || 0
+                        );
+                    width += nodeWidth;
+                    return width;
+                }, 0);
+
             return ((chart.plotSizeX || 0) - Math.round(width)) / 2;
         }
-
 
         /**
          * Calculate sum of all nodes inside specific column
          * @private
-         * @function Highcharts.SankeyColumn#sum
-         *
-         * @param {ArrayComposition} this
-         * Sankey Column Array
-         *
-         * @return {number} sum
-         * Sum of all nodes inside column
          */
-        public sum(this: SankeyColumnAdditions): number {
-            return this.points.reduce(function (
+        public sum(): number {
+            return this.points.reduce((
                 sum: number,
                 node: SankeyPoint
-            ): number {
-                return sum + node.getSum();
-            }, 0);
+            ): number => (
+                sum + node.getSum()
+            ), 0);
         }
 
         /**
@@ -251,7 +329,9 @@ namespace SankeyColumnComposition {
                             'offsetHorizontal' :
                             'offsetVertical'
                     ],
-                    optionOffset = node.options.offset || 0;
+                    optionOffset = node.options.offset || 0,
+                    // A self-link laps the flow-axis start of its node. #8218
+                    lap = column[i].wrapLap || 0;
 
                 if (sum) {
                     totalNodeOffset = height + nodePadding;
@@ -261,10 +341,10 @@ namespace SankeyColumnComposition {
                 }
                 if (column[i] === node) {
                     return {
-                        relativeTop: offset + (
+                        relativeTop: offset + lap + (
                             defined(directionOffset) ?
-                                // directionOffset is a percent
-                                // of the node height
+                                // `directionOffset` is a percent of the node
+                                // height
                                 relativeLength(directionOffset, height) :
                                 relativeLength(
                                     optionOffset,
@@ -273,10 +353,18 @@ namespace SankeyColumnComposition {
                         )
                     };
                 }
-                offset += totalNodeOffset;
+                offset += totalNodeOffset + lap;
             }
         }
+
     }
+
 }
+
+/* *
+ *
+ *  Default Export
+ *
+ * */
 
 export default SankeyColumnComposition;

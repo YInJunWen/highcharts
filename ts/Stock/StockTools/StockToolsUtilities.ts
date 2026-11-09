@@ -1,12 +1,14 @@
-/**
+/* *
  *
  *  Events generator for Stock tools
  *
- *  (c) 2009-2021 Paweł Fus
+ *  (c) 2009-2026 Highsoft AS
+ *  Author: Paweł Fus
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -31,7 +33,7 @@ import type Pointer from '../../Core/Pointer';
 import type PointerEvent from '../../Core/PointerEvent';
 import type SVGElement from '../../Core/Renderer/SVG/SVGElement';
 
-import D from '../../Core/DefaultOptions.js';
+import D from '../../Core/Defaults.js';
 const { getOptions } = D;
 import NBU from '../../Extensions/Annotations/NavigationBindingsUtilities.js';
 const {
@@ -39,13 +41,8 @@ const {
     getFieldType
 } = NBU;
 import Series from '../../Core/Series/Series.js';
-import U from '../../Core/Utilities.js';
-const {
-    defined,
-    fireEvent,
-    isNumber,
-    uniqueKey
-} = U;
+import { defined, fireEvent, isNumber } from '../../Shared/Utilities.js';
+import { uniqueKey } from '../../Core/Utilities.js';
 
 /* *
  *
@@ -72,9 +69,7 @@ interface StockToolsFieldsObject {
  *
  * */
 
-/**
- * @private
- */
+/** @internal */
 const indicatorsWithAxes = [
     'apo',
     'ad',
@@ -90,9 +85,9 @@ const indicatorsWithAxes = [
     'disparityindex',
     'dmi',
     'dpo',
-    'linearRegressionAngle',
-    'linearRegressionIntercept',
-    'linearRegressionSlope',
+    'linearregressionangle',
+    'linearregressionintercept',
+    'linearregressionslope',
     'klinger',
     'macd',
     'mfi',
@@ -109,9 +104,7 @@ const indicatorsWithAxes = [
     'williamsr'
 ];
 
-/**
- * @private
- */
+/** @internal */
 const indicatorsWithVolume = [
     'ad',
     'cmf',
@@ -136,7 +129,7 @@ const indicatorsWithVolume = [
  * Example: NavigationBindings.utils.addFlagFromForm('url(...)') - will
  * generate function that shows modal in GUI.
  *
- * @private
+ * @internal
  * @function bindingsUtils.addFlagFromForm
  *
  * @param {Highcharts.FlagsShapeValue} type
@@ -246,7 +239,7 @@ function addFlagFromForm(
                 ): void {
                     navigation.fieldsToOptions(
                         data.fields,
-                        (seriesOptions.data as any)[0]
+                        seriesOptions.data?.[0]
                     );
                     chart.addSeries(seriesOptions);
                 }
@@ -256,7 +249,7 @@ function addFlagFromForm(
 }
 
 /**
- * @private
+ * @internal
  * @todo
  * Consider using getHoverData(), but always kdTree (columns?)
  */
@@ -264,14 +257,14 @@ function attractToPoint(
     e: PointerEvent,
     chart: Chart
 ): NavigationBindingsAttractionObject | void {
-    const coords = chart.pointer.getCoordinates(e);
+    const coords = chart.pointer?.getCoordinates(e);
 
     let coordsX: (Pointer.AxisCoordinateObject|undefined),
         coordsY: (Pointer.AxisCoordinateObject|undefined),
         distX = Number.MAX_VALUE,
         closestPoint: (Point|undefined);
 
-    if (chart.navigationBindings) {
+    if (chart.navigationBindings && coords) {
         coordsX = getAssignedAxis(coords.xAxis);
         coordsY = getAssignedAxis(coords.yAxis);
     }
@@ -287,23 +280,22 @@ function attractToPoint(
     // Search by 'x' but only in yAxis' series.
     coordsY.axis.series.forEach((series): void => {
         if (series.points) {
-            series.points.forEach((point): void => {
-                if (point && distX > Math.abs((point.x as any) - x)) {
-                    distX = Math.abs((point.x as any) - x);
-                    closestPoint = point;
-                }
-            });
+            const point = series.searchPoint(e, true);
+            if (point && distX > Math.abs(point.x - x)) {
+                distX = Math.abs(point.x - x);
+                closestPoint = point;
+            }
         }
     });
 
-    if (closestPoint && closestPoint.x && closestPoint.y) {
+    if (closestPoint && isNumber(closestPoint.y)) {
         return {
             x: closestPoint.x,
             y: closestPoint.y,
             below: y < closestPoint.y,
             series: closestPoint.series,
-            xAxis: closestPoint.series.xAxis.options.index || 0,
-            yAxis: closestPoint.series.yAxis.options.index || 0
+            xAxis: closestPoint.series.xAxis.index || 0,
+            yAxis: closestPoint.series.yAxis.index || 0
         };
     }
 }
@@ -311,7 +303,7 @@ function attractToPoint(
 /**
  * Shorthand to check if given yAxis comes from navigator.
  *
- * @private
+ * @internal
  * @function bindingsUtils.isNotNavigatorYAxis
  *
  * @param {Highcharts.Axis} axis
@@ -328,7 +320,7 @@ function isNotNavigatorYAxis(
 
 /**
  * Check if any of the price indicators are enabled.
- * @private
+ * @internal
  * @function bindingsUtils.isLastPriceEnabled
  *
  * @param {Array} series
@@ -346,9 +338,7 @@ function isPriceIndicatorEnabled(
     );
 }
 
-/**
- * @private
- */
+/** @internal */
 function manageIndicators(
     this: NavigationBindings,
     data: StockToolsFieldsObject
@@ -467,7 +457,7 @@ function manageIndicators(
  * between last point in `typeOptions` and current position. It's a value,
  * not pixels height.
  *
- * @private
+ * @internal
  * @function bindingsUtils.updateHeight
  *
  * @param {Highcharts.PointerEventObject} e
@@ -481,14 +471,14 @@ function updateHeight(
     e: PointerEvent,
     annotation: Annotation
 ): void {
-    const options = annotation.options.typeOptions,
+    const options = annotation.options.typeOptions!,
         yAxis = isNumber(options.yAxis) && this.chart.yAxis[options.yAxis];
 
     if (yAxis && options.points) {
         annotation.update({
             typeOptions: {
                 height: yAxis.toValue(e[yAxis.horiz ? 'chartX' : 'chartY']) -
-                    (options.points[1].y || 0)
+                    ((options.points[1] as any).y || 0)
             }
         });
     }
@@ -502,11 +492,11 @@ function updateHeight(
  * Example: NavigationBindings.utils.updateNthPoint(1) - will generate
  * function that updates all consecutive points except point with index=0.
  *
- * @private
+ * @internal
  * @function bindingsUtils.updateNthPoint
  *
  * @param {number} startIndex
- *        Index from each point should udpated
+ *        Index from which point should update
  *
  * @return {Function}
  *         Callback to be used in steps array
@@ -519,7 +509,7 @@ function updateNthPoint(
         e: PointerEvent,
         annotation: Annotation
     ): void {
-        const options = annotation.options.typeOptions,
+        const options = annotation.options.typeOptions!,
             xAxis = isNumber(options.xAxis) && this.chart.xAxis[options.xAxis],
             yAxis = isNumber(options.yAxis) && this.chart.yAxis[options.yAxis];
 
@@ -551,7 +541,7 @@ function updateNthPoint(
  * Update size of background (rect) in some annotations: Measure, Simple
  * Rect.
  *
- * @private
+ * @internal
  * @function Highcharts.NavigationBindingsUtilsObject.updateRectSize
  *
  * @param {Highcharts.PointerEventObject} event
@@ -565,15 +555,15 @@ function updateRectSize(
     annotation: Annotation
 ): void {
     const chart = annotation.chart,
-        options = annotation.options.typeOptions,
+        options = annotation.options.typeOptions!,
         xAxis = isNumber(options.xAxis) && chart.xAxis[options.xAxis],
         yAxis = isNumber(options.yAxis) && chart.yAxis[options.yAxis];
 
     if (xAxis && yAxis) {
         const x = xAxis.toValue(event[xAxis.horiz ? 'chartX' : 'chartY']),
             y = yAxis.toValue(event[yAxis.horiz ? 'chartX' : 'chartY']),
-            width = x - options.point.x,
-            height = options.point.y - y;
+            width = x - (options.point as any).x,
+            height = (options.point as any).y - y;
 
         annotation.update({
             typeOptions: {
@@ -586,12 +576,42 @@ function updateRectSize(
     }
 }
 
+/**
+ * Compares two arrays of strings, checking their length and if corresponding
+ * elements are equal.
+ *
+ * @param {string[]} a
+ *        The first array to compare.
+ * @param {string[]} b
+ *        The second array to compare.
+ * @return {boolean}
+ *          Return `true` if the arrays are equal, otherwise `false`.
+ */
+function shallowArraysEqual(
+    a: Array<string> | undefined,
+    b: Array<string> | undefined
+): boolean {
+    if (!defined(a) || !defined(b)) {
+        return false;
+    }
+    if (a.length !== b.length) {
+        return false;
+    }
+    for (let i = 0; i < a.length; i++) {
+        if (a[i] !== b[i]) {
+            return false;
+        }
+    }
+    return true;
+}
+
 /* *
  *
  *  Default Export
  *
  * */
 
+/** @internal */
 const StockToolsUtilities = {
     indicatorsWithAxes,
     indicatorsWithVolume,
@@ -601,9 +621,11 @@ const StockToolsUtilities = {
     isNotNavigatorYAxis,
     isPriceIndicatorEnabled,
     manageIndicators,
+    shallowArraysEqual,
     updateHeight,
     updateNthPoint,
     updateRectSize
 };
 
+/** @internal */
 export default StockToolsUtilities;

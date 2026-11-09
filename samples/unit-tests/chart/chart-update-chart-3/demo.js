@@ -32,8 +32,8 @@ QUnit.test('Option chart.type update', function (assert) {
 
     assert.strictEqual(chart.series[0].type, 'column', 'Initially column');
     assert.strictEqual(
-        chart.series[0].points[0].graphic.element.nodeName,
-        'rect',
+        chart.series[0].points[0].graphic.symbolName,
+        'roundedRect',
         'Initially column'
     );
 
@@ -109,7 +109,8 @@ QUnit.test('Chart.update with style', function (assert) {
                 chart: {
                     type: 'column',
                     animation: false,
-                    height: 300
+                    height: 300,
+                    plotBorderWidth: 1
                 },
 
                 plotOptions: {
@@ -147,10 +148,13 @@ QUnit.test('Chart.update with style', function (assert) {
         'Initial font family'
     );
 
+    const borderTop = chart.container.querySelector('.highcharts-plot-border')
+        .getAttribute('y');
     chart.update({
         chart: {
             style: {
-                fontFamily: 'monospace'
+                fontFamily: 'monospace',
+                fontSize: '3em'
             }
         }
     });
@@ -161,6 +165,13 @@ QUnit.test('Chart.update with style', function (assert) {
             .getPropertyValue('font-family'),
         'monospace',
         'Updated font family'
+    );
+
+    assert.notEqual(
+        chart.container.querySelector('.highcharts-plot-border')
+            .getAttribute('y'),
+        borderTop,
+        'Plot top should be updated after font size change (#25011)'
     );
 });
 

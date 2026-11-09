@@ -2,11 +2,13 @@
  *
  *  Networkgraph series
  *
- *  (c) 2010-2021 Paweł Fus
+ *  (c) 2010-2026 Highsoft AS
+ *  Author: Paweł Fus
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -21,8 +23,8 @@
 import type Chart from '../../Core/Chart/Chart';
 import type { GraphIntegrationObject } from '../GraphLayoutComposition';
 import type NetworkgraphPoint from './NetworkgraphPoint';
-import type NetworkgraphSeries from './NetworkgraphSeries';
 import type Point from '../../Core/Series/Point';
+import type Series from '../../Core/Series/Series';
 
 import EulerIntegration from './EulerIntegration.js';
 import H from '../../Core/Globals.js';
@@ -30,14 +32,13 @@ const { win } = H;
 import GraphLayout from '../GraphLayoutComposition.js';
 import QuadTree from './QuadTree.js';
 import QuadTreeNode from './QuadTreeNode.js';
-import U from '../../Core/Utilities.js';
-const {
+import VerletIntegration from './VerletIntegration.js';
+import {
     clamp,
     defined,
-    isFunction,
-    pick
-} = U;
-import VerletIntegration from './VerletIntegration.js';
+    fireEvent,
+    isFunction
+} from '../../Shared/Utilities.js';
 
 /* *
  *
@@ -75,7 +76,7 @@ class ReingoldFruchtermanLayout {
      * */
 
     public approximation?: string;
-    public attractiveForce: Function = void 0 as any;
+    public attractiveForce!: Function;
     public barycenter?: Record<string, number>;
     public box: Record<string, number> = {};
     public currentStep: number = 0;
@@ -85,16 +86,16 @@ class ReingoldFruchtermanLayout {
     public forces?: Array<string>;
     public chart?: Chart;
     public initialRendering: boolean = true;
-    public integration: GraphIntegrationObject = void 0 as any;
+    public integration!: GraphIntegrationObject;
     public k?: number;
     public links: Array<Point> = [];
     public maxIterations?: number;
     public nodes: Array<Point> = [];
-    public options: ReingoldFruchtermanLayout.Options = void 0 as any;
+    public options!: ReingoldFruchtermanLayout.Options;
     public prevSystemTemperature?: number;
-    public quadTree: QuadTree = void 0 as any;
-    public repulsiveForce: Function = void 0 as any;
-    public series: Array<NetworkgraphSeries> = [];
+    public quadTree!: QuadTree;
+    public repulsiveForce!: Function;
+    public series: Array<Series> = [];
     public simulation: (false|number) = false;
     public startTemperature?: number;
     public systemTemperature?: number;
@@ -130,15 +131,13 @@ class ReingoldFruchtermanLayout {
 
         this.enableSimulation = options.enableSimulation;
 
-        this.attractiveForce = pick(
-            options.attractiveForce,
-            this.integration.attractiveForceFunction
-        );
+        this.attractiveForce =
+            options.attractiveForce ??
+            this.integration.attractiveForceFunction;
 
-        this.repulsiveForce = pick(
-            options.repulsiveForce,
-            this.integration.repulsiveForceFunction
-        );
+        this.repulsiveForce =
+            options.repulsiveForce ??
+            this.integration.repulsiveForceFunction;
 
         this.approximation = options.approximation;
     }
@@ -146,7 +145,7 @@ class ReingoldFruchtermanLayout {
     public updateSimulation(
         enable?: boolean
     ): void {
-        this.enableSimulation = pick(enable, this.options.enableSimulation);
+        this.enableSimulation = (enable ?? this.options.enableSimulation);
     }
 
     public start(): void {
@@ -227,6 +226,9 @@ class ReingoldFruchtermanLayout {
                 );
             } else {
                 this.simulation = false;
+                this.series.forEach((s): void => {
+                    fireEvent(s, 'afterSimulation');
+                });
             }
         }
     }
@@ -321,10 +323,7 @@ class ReingoldFruchtermanLayout {
     public setMaxIterations(
         maxIterations?: number
     ): void {
-        this.maxIterations = pick(
-            maxIterations,
-            this.options.maxIterations
-        );
+        this.maxIterations = (maxIterations ?? this.options.maxIterations);
     }
 
     public setTemperature(): void {
@@ -389,11 +388,11 @@ class ReingoldFruchtermanLayout {
             visitedNodes = {} as Record<string, boolean>,
             radius = this.options.initialPositionRadius,
             addToNodes = (node: Point): void => {
-                for (const link of node.linksFrom || []) {
-                    if (!visitedNodes[(link.toNode as any).id]) {
-                        visitedNodes[(link.toNode as any).id] = true;
-                        sortedNodes.push(link.toNode as any);
-                        addToNodes(link.toNode as any);
+                for (const { toNode } of node.linksFrom || []) {
+                    if (toNode && !visitedNodes[toNode.id]) {
+                        visitedNodes[toNode.id] = true;
+                        sortedNodes.push(toNode);
+                        addToNodes(toNode);
                     }
                 }
             };
@@ -402,7 +401,7 @@ class ReingoldFruchtermanLayout {
 
         // Start with identified root nodes an sort the nodes by their
         // hierarchy. In trees, this ensures that branches don't cross
-        // eachother.
+        // each other.
         for (const rootNode of rootNodes) {
             sortedNodes.push(rootNode);
             addToNodes(rootNode);
@@ -427,14 +426,12 @@ class ReingoldFruchtermanLayout {
         // as a cluster in the middle
         for (let i = 0, iEnd = sortedNodes.length; i < iEnd; ++i) {
             node = sortedNodes[i];
-            node.plotX = node.prevX = pick(
-                node.plotX,
-                box.width / 2 + (radius as any) * Math.cos(i * angle)
-            );
-            node.plotY = node.prevY = pick(
-                node.plotY,
-                box.height / 2 + (radius as any) * Math.sin(i * angle)
-            );
+            node.plotX = node.prevX =
+                node.plotX ??
+                box.width / 2 + (radius as any) * Math.cos(i * angle);
+            node.plotY = node.prevY =
+                node.plotY ??
+                box.height / 2 + (radius as any) * Math.sin(i * angle);
 
             node.dispX = 0;
             node.dispY = 0;
@@ -462,14 +459,9 @@ class ReingoldFruchtermanLayout {
         // Initial positions:
         for (let i = 0, iEnd = nodes.length; i < iEnd; ++i) {
             node = nodes[i];
-            node.plotX = node.prevX = pick(
-                node.plotX,
-                box.width * unrandom(i)
-            );
-            node.plotY = node.prevY = pick(
-                node.plotY,
-                box.height * unrandom(nodesLength + i)
-            );
+            node.plotX = node.prevX = (node.plotX ?? box.width * unrandom(i));
+            node.plotY = node.prevY =
+                node.plotY ?? box.height * unrandom(nodesLength + i);
 
             node.dispX = 0;
             node.dispY = 0;
@@ -641,7 +633,7 @@ class ReingoldFruchtermanLayout {
 
         for (const node of nodes) {
             if (node.fixedPosition) {
-                return;
+                continue;
             }
 
             this.integration.integrate(this, node);
@@ -660,10 +652,10 @@ class ReingoldFruchtermanLayout {
      * @private
      */
     public applyLimitBox(
-        node: NetworkgraphPoint,
+        node: Point,
         box: Record<string, number>
     ): void {
-        const radius = node.radius;
+        const radius = (node as NetworkgraphPoint).radius;
         /*
         TO DO: Consider elastic collision instead of stopping.
         o' means end position when hitting plotting area edge:
@@ -791,21 +783,200 @@ class ReingoldFruchtermanLayout {
 
 namespace ReingoldFruchtermanLayout {
 
+    /**
+     * @optionparent series.networkgraph.layoutAlgorithm
+     */
     export interface Options {
-        approximation?: string;
+
+        /**
+         * Approximation used to calculate repulsive forces affecting nodes.
+         * By default, when calculating net force, nodes are compared
+         * against each other, which gives O(N^2) complexity. Using
+         * Barnes-Hut approximation, we decrease this to O(N log N), but the
+         * resulting graph will have different layout. Barnes-Hut
+         * approximation divides space into rectangles via quad tree, where
+         * forces exerted on nodes are calculated directly for nearby cells,
+         * and for all others, cells are treated as a separate node with
+         * center of mass.
+         *
+         * @see [layoutAlgorithm.theta](#series.networkgraph.layoutAlgorithm.theta)
+         *
+         * @sample highcharts/series-networkgraph/barnes-hut-approximation/
+         *         A graph with Barnes-Hut approximation
+         *
+         * @since 7.1.0
+         */
+        approximation?: ('barnes-hut'|'none');
+
+        /**
+         * Attraction force applied on a node which is connected to another
+         * node by a link. Passed are two arguments:
+         * - `d` - which is current distance between two nodes
+         * - `k` - which is desired distance between two nodes
+         *
+         * In `verlet` integration, defaults to:
+         * `function (d, k) { return (k - d) / d; }`
+         *
+         * @see [layoutAlgorithm.integration](#series.networkgraph.layoutAlgorithm.integration)
+         *
+         * @sample highcharts/series-networkgraph/forces/
+         *         Custom forces with Euler integration
+         *
+         * @sample highcharts/series-networkgraph/cuboids/
+         *         Custom forces with Verlet integration
+         *
+         * @default function (d, k) { return k * k / d; }
+         */
         attractiveForce?: Function;
+
+        /**
+         * Experimental. Enables live simulation of the algorithm
+         * implementation. All nodes are animated as the forces applies on
+         * them.
+         *
+         * @sample highcharts/demo/network-graph/
+         *         Live simulation enabled
+         */
         enableSimulation?: boolean;
+
+        /**
+         * Friction applied on forces to prevent nodes rushing to fast to
+         * the desired positions.
+         */
         friction?: number;
+
+        /**
+         * Gravitational const used in the barycenter force of the
+         * algorithm.
+         *
+         * @sample highcharts/series-networkgraph/forces/
+         *         Custom forces with Euler integration
+         */
         gravitationalConstant?: number;
+
+        /**
+         * When `initialPositions` are set to 'circle',
+         * `initialPositionRadius` is a distance from the center of circle,
+         * in which nodes are created.
+         *
+         * @default 1
+         *
+         * @since 7.1.0
+         */
         initialPositionRadius?: number;
-        initialPositions?: (string|Function);
+
+        /**
+         * Initial layout algorithm for positioning nodes. Can be one of
+         * built-in options ("circle", "random") or a function where
+         * positions should be set on each node (`this.nodes`) as
+         * `node.plotX` and `node.plotY`
+         *
+         * @sample highcharts/series-networkgraph/initial-positions/
+         *         Initial positions with callback
+         */
+        initialPositions?: ('circle'|'random'|Function);
+
+        /**
+         * Integration type. Available options are `'euler'` and `'verlet'`.
+         * Integration determines how forces are applied on particles. In
+         * Euler integration, force is applied direct as
+         * `newPosition += velocity;`.
+         * In Verlet integration, new position is based on a previous
+         * position without velocity:
+         * `newPosition += previousPosition - newPosition`.
+         *
+         * Note that different integrations give different results as forces
+         * are different.
+         *
+         * In Highcharts v7.0.x only `'euler'` integration was supported.
+         *
+         * @sample highcharts/series-networkgraph/integration-comparison/
+         *         Comparison of Verlet and Euler integrations
+         *
+         * @validvalue ["euler","verlet"]
+         *
+         * @since 7.1.0
+         */
         integration?: string;
+
+        /**
+         * Ideal length (px) of the link between two nodes. When not
+         * defined, length is calculated as:
+         * `Math.pow(availableWidth * availableHeight / nodesLength, 0.4);`
+         *
+         * Note: Because of the algorithm specification, length of each link
+         * might be not exactly as specified.
+         *
+         * @sample highcharts/series-networkgraph/styled-links/
+         *         Numerical values
+         */
         linkLength?: number;
+
+        /**
+         * Max number of iterations before algorithm will stop. In general,
+         * algorithm should find positions sooner, but when rendering huge
+         * number of nodes, it is recommended to increase this value as
+         * finding perfect graph positions can require more time.
+         */
         maxIterations?: number;
+
+        /**
+         * Verlet integration only.
+         * Max speed that node can get in one iteration. In terms of
+         * simulation, it's a maximum translation (in pixels) that node can
+         * move (in both, x and y, dimensions). While `friction` is applied
+         * on all nodes, max speed is applied only for nodes that move very
+         * fast, for example small or disconnected ones.
+         *
+         * @see [layoutAlgorithm.integration](#series.networkgraph.layoutAlgorithm.integration)
+         *
+         * @see [layoutAlgorithm.friction](#series.networkgraph.layoutAlgorithm.friction)
+         *
+         * @since 7.1.0
+         */
         maxSpeed?: number;
+
+        /**
+         * Repulsive force applied on a node. Passed are two arguments:
+         * - `d` - which is current distance between two nodes
+         * - `k` - which is desired distance between two nodes
+         *
+         * In `verlet` integration, defaults to:
+         * `function (d, k) { return (k - d) / d * (k > d ? 1 : 0) }`
+         *
+         * @see [layoutAlgorithm.integration](#series.networkgraph.layoutAlgorithm.integration)
+         *
+         * @sample highcharts/series-networkgraph/forces/
+         *         Custom forces with Euler integration
+         *
+         * @sample highcharts/series-networkgraph/cuboids/
+         *         Custom forces with Verlet integration
+         *
+         * @default function (d, k) { return k * k / d; }
+         */
         repulsiveForce?: Function;
+
+        /**
+         * Barnes-Hut approximation only.
+         * Determines when distance between cell and node is small enough
+         * to calculate forces. Value of `theta` is compared directly with
+         * quotient `s / d`, where `s` is the size of the cell, and `d` is
+         * distance between center of cell's mass and currently compared
+         * node.
+         *
+         * @see [layoutAlgorithm.approximation](#series.networkgraph.layoutAlgorithm.approximation)
+         *
+         * @since 7.1.0
+         */
         theta?: number;
+
+        /**
+         * Type of the algorithm used when positioning nodes.
+         *
+         * @validvalue ["reingold-fruchterman"]
+         */
         type?: string;
+
     }
 
 }

@@ -2,13 +2,14 @@
  *
  *  This module implements sunburst charts in Highcharts.
  *
- *  (c) 2016-2021 Highsoft AS
+ *  (c) 2016-2026 Highsoft AS
  *
- *  Authors: Jon Arild Nygard
+ *  Authors: Jon Arild Nygård
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -24,25 +25,19 @@ import type SunburstPointOptions from './SunburstPointOptions';
 import type SunburstSeries from './SunburstSeries';
 import type SVGElement from '../../Core/Renderer/SVG/SVGElement';
 
-import SeriesRegistry from '../../Core/Series/SeriesRegistry.js';
-const {
-    series: {
-        prototype: {
-            pointClass: Point
-        }
-    },
-    seriesTypes: {
-        treemap: {
-            prototype: {
-                pointClass: TreemapPoint
-            }
-        }
-    }
-} = SeriesRegistry;
-import U from '../../Core/Utilities.js';
+import Series from '../../Core/Series/Series.js';
+import TreemapSeries from '../Treemap/TreemapSeries.js';
 import SunburstNode from './SunburstNode';
-const { correctFloat, extend } = U;
+import { correctFloat, extend, pInt } from '../../Shared/Utilities.js';
 
+/* *
+ *
+ *  Constants
+ *
+ * */
+
+const Point = Series.prototype.pointClass;
+const TreemapPoint = TreemapSeries.prototype.pointClass;
 
 /* *
  *
@@ -58,41 +53,54 @@ class SunburstPoint extends TreemapPoint {
      *
      * */
 
+    /** @internal */
     public dataLabelPath?: SVGElement;
 
+    /** @internal */
     public innerArcLength?: number;
 
+    /** @internal */
     public outerArcLength?: number;
 
-    public node: SunburstNode = void 0 as any;
+    /** @internal */
+    public node!: SunburstNode;
 
-    public options: SunburstPointOptions = void 0 as any;
+    public options!: SunburstPointOptions;
 
-    public series: SunburstSeries = void 0 as any;
+    /** @internal */
+    public series!: SunburstSeries;
 
-    public shapeExisting: SunburstNode.NodeValuesObject = void 0 as any;
+    /** @internal */
+    public shapeExisting!: SunburstNode.NodeValuesObject;
 
+    /** @internal */
     public sliced?: boolean;
 
-    public shapeType: 'arc'|'circle'|'path'|'rect'|'text' = void 0 as any;
+    /** @internal */
+    public shapeType!: ('arc'|'circle'|'path'|'rect'|'text');
+
     /* *
      *
      *  Functions
      *
      * */
 
-    /* eslint-disable valid-jsdoc */
-
-    public getDataLabelPath(label: SVGElement): SVGElement {
-        let renderer = this.series.chart.renderer,
+    /** @internal */
+    public getDataLabelPath(
+        label: SVGElement
+    ): SVGElement {
+        const renderer = this.series.chart.renderer,
             shapeArgs = this.shapeExisting,
-            start = shapeArgs.start,
-            end = shapeArgs.end,
-            angle = start + (end - start) / 2, // arc middle value
-            upperHalf = angle < 0 &&
+            r = shapeArgs.r + pInt(label.options?.distance || 0);
+
+        let start = shapeArgs.start,
+            end = shapeArgs.end;
+
+        const angle = start + (end - start) / 2; // Arc middle value
+
+        let upperHalf = angle < 0 &&
                 angle > -Math.PI ||
                 angle > Math.PI,
-            r = (shapeArgs.r + (label.options.distance || 0)),
             moreThanHalf;
 
         // Check if point is a full circle
@@ -104,11 +112,17 @@ class SunburstPoint extends TreemapPoint {
             end = -Math.PI / 360;
             upperHalf = true;
         }
-        // Check if dataLabels should be render in the
-        // upper half of the circle
+        // Check if dataLabels should be render in the upper half of the circle
         if (end - start > Math.PI) {
             upperHalf = false;
             moreThanHalf = true;
+
+            // Close to the full circle, add some padding so that the SVG
+            // renderer treats it as separate points (#18884).
+            if ((end - start) > 2 * Math.PI - 0.01) {
+                start += 0.01;
+                end -= 0.01;
+            }
         }
 
         if (this.dataLabelPath) {
@@ -135,11 +149,10 @@ class SunburstPoint extends TreemapPoint {
         return this.dataLabelPath;
     }
 
+    /** @internal */
     public isValid(): boolean {
         return true;
     }
-
-    /* eslint-enable valid-jsdoc */
 
 }
 
@@ -150,7 +163,9 @@ class SunburstPoint extends TreemapPoint {
  * */
 
 interface SunburstPoint {
+    /** @internal */
     setState: typeof Point.prototype.setState;
+    /** @internal */
     setVisible: typeof TreemapPoint.prototype.setVisible;
 }
 
@@ -162,7 +177,7 @@ extend(SunburstPoint.prototype, {
 
 /* *
  *
- *  Defaul Export
+ *  Default Export
  *
  * */
 

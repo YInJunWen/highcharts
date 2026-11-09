@@ -19,26 +19,51 @@ const SOURCE_GLOB = './**/*.ts';
  * */
 
 /**
- * Lint test of TypeScript code.
+ * Lint test of TypeScript code (.ts).
+ *
+ * @param  {object} argv
+ *         Command line arguments
  *
  * @return {Promise<string>}
  *         Promise to keep with console output
  */
-function task() {
+function lintTS(argv) {
+    const logLib = require('../libs/log');
+    const processLib = require('../libs/process');
+    const utils = require('./utils');
 
-    const logLib = require('./lib/log');
-    const processLib = require('./lib/process');
+    const product = argv.product || 'Highcharts';
+    let productTSFolder = './ts';
+
+    if (!utils.validateProduct(product)) {
+        return Promise.resolve();
+    }
 
     return new Promise((resolve, reject) => {
+        if (product === 'Dashboards') {
+            productTSFolder = './ts/Dashboards';
+        } else if (product === 'Grid') {
+            productTSFolder = './ts/Grid';
+        }
 
-        logLib.message('Linting [', SOURCE_GLOB, ']...');
+        logLib.message(`Linting TS files (.ts) for ${product} ...`);
 
         processLib
-            .exec('cd ts && npx eslint --quiet "' + SOURCE_GLOB + '"')
+            .exec('npx eslint --quiet "' + SOURCE_GLOB + '"', {
+                cwd: productTSFolder
+            })
             .then(() => logLib.success('Finished linting'))
             .then(resolve)
             .catch(reject);
     });
 }
 
-gulp.task('lint-ts', task);
+lintTS.description = 'Run eslint on TypeScript files (.ts) in the ts folder';
+lintTS.flags = {
+    '--product': 'Lint project Typescript files only: Highcharts (default), Grid, Dashboards'
+};
+gulp.task('lint-ts', () => lintTS(require('yargs').argv));
+
+module.exports = {
+    lintTS
+};

@@ -1,12 +1,14 @@
 /* *
  *
- *  (c) 2009-2021 Øystein Moseng
+ *  (c) 2009-2026 Highsoft AS
+ *  Author: Øystein Moseng
  *
  *  Handle forcing series markers.
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -25,12 +27,9 @@ import type {
 } from '../../../Core/Series/PointOptions';
 import type Series from '../../../Core/Series/Series.js';
 import type SeriesOptions from '../../../Core/Series/SeriesOptions';
-
-import U from '../../../Core/Utilities.js';
-const {
-    addEvent,
-    merge
-} = U;
+import H from '../../../Core/Globals.js';
+const { composed } = H;
+import { addEvent, merge, pushUnique } from '../../../Shared/Utilities.js';
 
 /* *
  *
@@ -38,6 +37,7 @@ const {
  *
  * */
 
+/** @internal */
 namespace ForcedMarkersComposition {
 
     /* *
@@ -46,11 +46,20 @@ namespace ForcedMarkersComposition {
      *
      * */
 
+    /**
+     * @internal
+     */
+    type SeriesWithLowMarker = SeriesOptions & {
+        lowMarker?: PointMarkerOptions;
+    };
+
+    /** @internal */
     export declare class PointComposition extends Accessibility.PointComposition {
         hasForcedA11yMarker?: boolean;
     }
 
 
+    /** @internal */
     export declare class SeriesComposition extends Accessibility.SeriesComposition {
         a11yMarkersForced?: boolean;
         points: Array<PointComposition>;
@@ -60,32 +69,17 @@ namespace ForcedMarkersComposition {
 
     /* *
      *
-     *  Compositions
-     *
-     * */
-
-    const composedClasses: Array<Function> = [];
-
-
-    /* *
-     *
      *  Functions
      *
      * */
 
-    /* eslint-disable valid-jsdoc */
 
-
-    /**
-     * @private
-     */
+    /** @internal */
     export function compose<T extends typeof Series>(
         SeriesClass: T
     ): void {
 
-        if (composedClasses.indexOf(SeriesClass) === -1) {
-            composedClasses.push(SeriesClass);
-
+        if (pushUnique(composed, 'A11y.FM')) {
             addEvent(
                 SeriesClass as typeof SeriesComposition,
                 'afterSetOptions',
@@ -96,20 +90,22 @@ namespace ForcedMarkersComposition {
                 'render',
                 seriesOnRender
             );
-
             addEvent(
                 SeriesClass as typeof SeriesComposition,
                 'afterRender',
                 seriesOnAfterRender
+            );
+            addEvent(
+                SeriesClass as typeof SeriesComposition,
+                'renderCanvas',
+                seriesOnRenderCanvas
             );
         }
 
     }
 
 
-    /**
-     * @private
-     */
+    /** @internal */
     function forceZeroOpacityMarkerOptions(
         options: (PointOptions|SeriesOptions)
     ): void {
@@ -127,8 +123,32 @@ namespace ForcedMarkersComposition {
 
 
     /**
-     * @private
+     * The normal state opacity of lowMarker on Arearange-like series is
+     * handled if zero opacity was forced on the main marker(#25279).
+     * @internal
      */
+    function restoreLowMarkerOpacity(series: SeriesComposition): void {
+        const lowMarker = (
+            series.options as SeriesWithLowMarker
+        ).lowMarker;
+
+        if (
+            lowMarker && lowMarker?.enabled === true &&
+            typeof lowMarker.states?.normal?.opacity !== 'number'
+        ) {
+            merge(true, lowMarker, {
+                states: {
+                    normal: {
+                        opacity: series.resetA11yMarkerOptions?.states
+                            ?.normal?.opacity
+                    }
+                }
+            });
+        }
+    }
+
+
+    /** @internal */
     function getPointMarkerOpacity(
         pointOptions: PointOptions
     ): number|undefined {
@@ -138,9 +158,7 @@ namespace ForcedMarkersComposition {
     }
 
 
-    /**
-     * @private
-     */
+    /** @internal */
     function handleForcePointMarkers(series: SeriesComposition): void {
         let i = series.points.length;
 
@@ -166,9 +184,7 @@ namespace ForcedMarkersComposition {
     }
 
 
-    /**
-     * @private
-     */
+    /** @internal */
     function hasIndividualPointMarkerOptions(series: Series): boolean {
         return !!(
             series._hasPointMarkers &&
@@ -178,9 +194,7 @@ namespace ForcedMarkersComposition {
     }
 
 
-    /**
-     * @private
-     */
+    /** @internal */
     function isWithinDescriptionThreshold(
         series: Accessibility.SeriesComposition
     ): boolean {
@@ -195,7 +209,8 @@ namespace ForcedMarkersComposition {
 
     /**
      * Process marker graphics after render
-     * @private
+     *
+     * @internal
      */
     function seriesOnAfterRender(
         this: SeriesComposition
@@ -209,6 +224,25 @@ namespace ForcedMarkersComposition {
                 series.markerGroup[
                     series.a11yMarkersForced ? 'addClass' : 'removeClass'
                 ]('highcharts-a11y-markers-hidden');
+            }
+
+            // Unforce lowMarker zero opacity if enabled
+            // in styled mode (#25279).
+            const lowMarker = (
+                series.options as SeriesWithLowMarker
+            ).lowMarker;
+            if (lowMarker) {
+                const lowMarkerVisible = !!series.a11yMarkersForced &&
+                    lowMarker.enabled === true;
+
+                series.points.forEach((point): void => {
+                    const lowGraphic = point.graphics?.[0];
+                    if (lowGraphic) {
+                        lowGraphic[
+                            lowMarkerVisible ? 'addClass' : 'removeClass'
+                        ]('highcharts-a11y-marker-visible');
+                    }
+                });
             }
 
             // Do we need to handle individual points?
@@ -233,7 +267,8 @@ namespace ForcedMarkersComposition {
 
     /**
      * Keep track of options to reset markers to if no longer forced.
-     * @private
+     *
+     * @internal
      */
     function seriesOnAfterSetOptions(
         this: SeriesComposition,
@@ -247,7 +282,8 @@ namespace ForcedMarkersComposition {
 
     /**
      * Keep track of forcing markers.
-     * @private
+     *
+     * @internal
      */
     function seriesOnRender(
         this: SeriesComposition
@@ -256,9 +292,10 @@ namespace ForcedMarkersComposition {
             options = series.options;
 
         if (shouldForceMarkers(series)) {
-            if (options.marker && options.marker.enabled === false) {
+            if (options.marker?.enabled === false) {
                 series.a11yMarkersForced = true;
                 forceZeroOpacityMarkerOptions(series.options);
+                restoreLowMarkerOpacity(series);
             }
 
             if (hasIndividualPointMarkerOptions(series)) {
@@ -267,15 +304,25 @@ namespace ForcedMarkersComposition {
 
         } else if (series.a11yMarkersForced) {
             delete series.a11yMarkersForced;
+            // Mark series dirty to ensure marker graphics are cleaned up
+            series.isDirty = true;
             unforceSeriesMarkerOptions(series);
-            delete series.resetA11yMarkerOptions;
+            if (options.marker?.enabled === false) { // #23329
+                delete series.resetA11yMarkerOptions; // #16624
+            }
+        } else if (
+            series.chart.styledMode &&
+            options.marker?.enabled === false &&
+            !hasIndividualPointMarkerOptions(series)
+        ) {
+            // `a11yMarkersForced` can be reset during `Series.update`.
+            // Clean up stale marker graphics that may still exist (#24164).
+            destroyPointMarkerGraphics(series);
         }
     }
 
 
-    /**
-     * @private
-     */
+    /** @internal */
     function shouldForceMarkers(
         series: Accessibility.SeriesComposition
     ): boolean {
@@ -292,9 +339,7 @@ namespace ForcedMarkersComposition {
     }
 
 
-    /**
-     * @private
-     */
+    /** @internal */
     function unforcePointMarkerOptions(pointOptions: PointOptions): void {
         merge(true, pointOptions.marker, {
             states: {
@@ -306,24 +351,65 @@ namespace ForcedMarkersComposition {
     }
 
 
+    /** @internal */
+    function destroyPointMarkerGraphics(series: SeriesComposition): void {
+        series.points?.forEach((point): void => {
+            if (point.graphic) {
+                point.graphic = point.graphic.destroy();
+            }
+        });
+    }
+
+
     /**
      * Reset markers to normal
-     * @private
+     *
+     * @internal
      */
     function unforceSeriesMarkerOptions(series: SeriesComposition): void {
         const resetMarkerOptions = series.resetA11yMarkerOptions;
         if (resetMarkerOptions) {
-            const originalOpactiy = resetMarkerOptions.states &&
+            const originalOpacity = resetMarkerOptions.states &&
                 resetMarkerOptions.states.normal &&
                 resetMarkerOptions.states.normal.opacity;
+
+            // Prevent ghost markers when zooming out (#23878).
+            if (
+                series.chart.styledMode &&
+                resetMarkerOptions.enabled === false
+            ) {
+                destroyPointMarkerGraphics(series);
+            }
+
+            // Temporarily set the old marker options to enabled in order to
+            // trigger destruction of the markers in Series.update.
+            if (series.userOptions && series.userOptions.marker) {
+                series.userOptions.marker.enabled = true;
+            }
             series.update({
                 marker: {
                     enabled: resetMarkerOptions.enabled,
                     states: {
-                        normal: { opacity: originalOpactiy }
+                        normal: { opacity: originalOpacity }
                     }
                 }
             });
+        }
+    }
+
+    /**
+     * Reset markers if series is boosted and had forced markers (#17320).
+     *
+     * @internal
+     */
+    function seriesOnRenderCanvas(this: SeriesComposition): void {
+        if (this.boosted && this.a11yMarkersForced) {
+            merge(true, this.options, {
+                marker: {
+                    enabled: false
+                }
+            });
+            delete this.a11yMarkersForced;
         }
     }
 
@@ -335,4 +421,5 @@ namespace ForcedMarkersComposition {
  *
  * */
 
+/** @internal */
 export default ForcedMarkersComposition;

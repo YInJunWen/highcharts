@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: LicenseRef-Highcharts
 /**
  * @license Highcharts JS v@product.version@ (@product.date@)
  * @module highcharts/modules/funnel
@@ -5,10 +6,16 @@
  *
  * Highcharts funnel module
  *
- * (c) 2010-2021 Torstein Honsi
+ * (c) 2010-2026 Highsoft AS
+ * Author: Torstein Hønsi
  *
- * License: www.highcharts.com/license
+ * A commercial license may be required depending on use,
+ * see www.highcharts.com/license
  */
 'use strict';
-import '../../Series/Funnel/FunnelSeries.js';
+import Highcharts from '../../Core/Globals.js';
+import FunnelSeries from '../../Series/Funnel/FunnelSeries.js';
 import '../../Series/Pyramid/PyramidSeries.js';
+const G: AnyRecord = Highcharts;
+FunnelSeries.compose(G.Chart);
+export default Highcharts;

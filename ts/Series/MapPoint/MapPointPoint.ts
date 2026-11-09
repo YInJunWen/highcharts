@@ -1,10 +1,12 @@
 /* *
  *
- *  (c) 2010-2021 Torstein Honsi
+ *  (c) 2010-2026 Highsoft AS
+ *  Author: Torstein Hønsi
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -20,14 +22,9 @@ import type MapPointPointOptions from './MapPointPointOptions';
 import type MapPointSeries from './MapPointSeries';
 import type { MapBounds } from '../../Maps/MapViewOptions';
 import type ScatterPoint from './../Scatter/ScatterPoint';
-import SeriesRegistry from '../../Core/Series/SeriesRegistry.js';
-const {
-    seriesTypes: {
-        scatter: ScatterSeries
-    }
-} = SeriesRegistry;
-import U from '../../Core/Utilities.js';
-const { isNumber } = U;
+
+import ScatterSeries from '../Scatter/ScatterSeries.js';
+import { isNumber } from '../../Shared/Utilities.js';
 
 /* *
  *
@@ -43,9 +40,16 @@ class MapPointPoint extends ScatterSeries.prototype.pointClass {
      *
      * */
 
-    public options: MapPointPointOptions = void 0 as any;
+    /** @internal */
+    public insetIndex?: number;
 
-    public series: MapPointSeries = void 0 as any;
+    public options!: MapPointPointOptions;
+
+    /** @internal */
+    public properties?: AnyRecord;
+
+    /** @internal */
+    public series!: MapPointSeries;
 
     /* *
      *
@@ -53,8 +57,7 @@ class MapPointPoint extends ScatterSeries.prototype.pointClass {
      *
      * */
 
-    /* eslint-disable valid-jsdoc */
-
+    /** @internal */
     public isValid(): boolean {
         return Boolean(
             this.options.geometry ||
@@ -62,8 +65,6 @@ class MapPointPoint extends ScatterSeries.prototype.pointClass {
             (isNumber(this.options.lon) && isNumber(this.options.lat))
         );
     }
-
-    /* eslint-enable valid-jsdoc */
 
 }
 
@@ -74,6 +75,7 @@ class MapPointPoint extends ScatterSeries.prototype.pointClass {
  * */
 
 interface MapPointPoint extends ScatterPoint {
+    /** @internal */
     bounds?: MapBounds;
 }
 

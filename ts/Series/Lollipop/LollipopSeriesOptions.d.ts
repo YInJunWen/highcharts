@@ -1,10 +1,12 @@
 /* *
  *
- *  (c) 2010-2021 Torstein Honsi
+ *  (c) 2010-2026 Highsoft AS
+ *  Author: Torstein Hønsi
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -14,9 +16,10 @@
  *
  * */
 
-import type LollipopSeries from './LollipopSeries';
-import type DumbbellSeriesOptions from '../Dumbbell/DumbbellSeriesOptions';
+import type ScatterSeriesOptions from '../Scatter/ScatterSeriesOptions';
 import type { SeriesStatesOptions } from '../../Core/Series/SeriesOptions';
+import type ColorString from '../../Core/Color/ColorString';
+import type ColorType from '../../Core/Color/ColorType';
 
 /* *
  *
@@ -24,9 +27,14 @@ import type { SeriesStatesOptions } from '../../Core/Series/SeriesOptions';
  *
  * */
 
-export interface LollipopSeriesOptions extends DumbbellSeriesOptions {
-    lowColor?: undefined;
-    states?: SeriesStatesOptions<LollipopSeries>;
+export interface LollipopSeriesOptions extends ScatterSeriesOptions {
+    connectorColor?: ColorString;
+    connectorWidth?: number;
+    groupPadding?: number;
+    /** @deprecated */
+    lowColor?: ColorType;
+    pointPadding?: number;
+    states?: SeriesStatesOptions<LollipopSeriesOptions>;
 }
 
 /* *

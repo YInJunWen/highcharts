@@ -28,12 +28,12 @@ const WATCH_GLOBS = [
  */
 function jsDocWatch() {
 
-    const log = require('./lib/log');
+    const log = require('../libs/log');
 
     return new Promise(resolve => {
 
         require('./jsdoc.js');
-        require('./jsdoc-server');
+        require('./api-server');
 
         const watchProcess = gulp.watch(WATCH_GLOBS, { delay: 5000 }, gulp.task('jsdoc'));
 

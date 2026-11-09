@@ -4,18 +4,23 @@ QUnit.test('Multiple data labels general tests.', function (assert) {
             xAxis: {
                 type: 'datetime'
             },
+            plotOptions: {
+                series: {
+                    dataLabels: {
+                        enabled: true
+                    }
+                }
+            },
             series: [
                 {
                     type: 'xrange',
                     name: 'Project 1',
                     dataLabels: [
                         {
-                            enabled: true,
                             format: 'Left label',
                             align: 'left'
                         },
                         {
-                            enabled: true,
                             format: 'Right label',
                             align: 'right'
                         }
@@ -72,7 +77,13 @@ QUnit.test('Multiple data labels general tests.', function (assert) {
     assert.strictEqual(
         correct,
         true,
-        "Appropriate tooltip appears when hovering both point's data labels."
+        'Appropriate tooltip appears when hovering both point\'s data labels.'
+    );
+
+    assert.ok(
+        point.dataLabels[0] && point.dataLabels[0].element &&
+            point.dataLabels[1] && point.dataLabels[1].element,
+        'Both data labels should be rendered when enabled in plotOptions.'
     );
 
     assert.strictEqual(
@@ -111,7 +122,6 @@ QUnit.test('Multiple data labels general tests.', function (assert) {
             inverted: false
         },
         yAxis: {
-            xreversed: undefined,
             reversed: false
         },
         series: [
@@ -168,13 +178,15 @@ QUnit.test('Multiple data labels general tests.', function (assert) {
     result = checkLabelsVisibility(chart, 'hide');
     assert.ok(
         result,
-        'All data labels should be hidden when chart is inverted and yAxis is reversed (#12370).'
+        'All data labels should be hidden when chart is inverted and yAxis ' +
+        'is reversed (#12370).'
     );
 
     result = checkLabelsVisibility(chart, 'show');
     assert.ok(
         result,
-        'All data labels should be visible when chart is inverted and yAxis is reversed (#12370).'
+        'All data labels should be visible when chart is inverted and yAxis ' +
+        'is reversed (#12370).'
     );
 
     chart.yAxis[0].update({
@@ -191,5 +203,121 @@ QUnit.test('Multiple data labels general tests.', function (assert) {
     assert.ok(
         result,
         'All data labels should be visible when chart is inverted (#12370).'
+    );
+
+    chart.series[0].update({
+        dataLabels: [{
+            enabled: true
+        }, {
+            enabled: false
+        }]
+    });
+
+    assert.ok(
+        true,
+        'There shouldn\'t be any error in the browser console (#17589).'
+    );
+
+    assert.strictEqual(
+        chart.series[0].points[0].dataLabels[1],
+        void 0,
+        'Second data label should be disabled (#17589}.'
+    );
+
+    chart.series[0].update({
+        dataLabels: [{
+            enabled: false
+        }, {
+            enabled: true
+        }]
+    });
+
+    assert.ok(
+        true,
+        'There shouldn\'t be any error in the browser console (#19457).'
+    );
+
+    assert.strictEqual(
+        chart.options.series[0].dataLabels.filter(({ enabled }) =>
+            enabled
+        ).length,
+        chart.series[0].points[0].dataLabels.length,
+        'Only the second point\'s data label should be rendered (#19457).'
+    );
+});
+
+QUnit.test('Multiple data labels and update', function (assert) {
+    const chart = Highcharts.chart('container', {
+        title: {
+            text: 'Data label update'
+        },
+        chart: {
+            type: 'column',
+            width: 400,
+            height: 250
+        },
+        series: [
+            {
+                dataLabels: {
+                    enabled: true,
+                    format: 'Initial'
+                },
+                data: [1]
+            }
+        ]
+    });
+
+    assert.strictEqual(
+        chart.series[0].points[0].dataLabel.text.textStr,
+        'Initial',
+        'Initial value should be set'
+    );
+
+    chart.series[0].update({
+        dataLabels: {
+            format: 'Single to single'
+        }
+    });
+
+    assert.strictEqual(
+        chart.series[0].points[0].dataLabel.text.textStr,
+        'Single to single',
+        'Updating single to single, updated value should be set'
+    );
+
+    chart.series[0].update({
+        dataLabels: [{
+            format: 'Single to array'
+        }]
+    });
+
+    assert.strictEqual(
+        chart.series[0].points[0].dataLabels[0].text.textStr,
+        'Single to array',
+        'Updating single to array, updated value should be set'
+    );
+
+    chart.series[0].update({
+        dataLabels: [{
+            format: 'Array to array'
+        }]
+    });
+
+    assert.strictEqual(
+        chart.series[0].points[0].dataLabels[0].text.textStr,
+        'Array to array',
+        'Updating array to array, updated value should be set'
+    );
+
+    chart.series[0].update({
+        dataLabels: [{
+            format: 'Array to single'
+        }]
+    });
+
+    assert.strictEqual(
+        chart.series[0].points[0].dataLabels[0].text.textStr,
+        'Array to single',
+        'Updating array to single, updated value should be set'
     );
 });

@@ -1,10 +1,12 @@
 /* *
  *
- *  (c) 2010-2021 Torstein Honsi
+ *  (c) 2010-2026 Highsoft AS
+ *  Author: Torstein Hønsi
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -19,24 +21,24 @@
 import type Axis from '../Axis';
 import type Chart from '../../Chart/Chart';
 import type ColorAxis from './ColorAxis';
+import type ColorAxisOptions from './ColorAxisOptions';
 import type ColorType from '../../Color/ColorType';
 import type Fx from '../../Animation/Fx';
 import type Legend from '../../Legend/Legend';
 import type Point from '../../Series/Point';
 import type Series from '../../Series/Series';
 import type SeriesOptions from '../../Series/SeriesOptions';
+import type SVGElement from '../../Renderer/SVG/SVGElement';
 import type TreemapSeries from '../../../Series/Treemap/TreemapSeries';
 
 import Color from '../../Color/Color.js';
 const { parse: color } = Color;
-import U from '../../Utilities.js';
-const {
+import {
     addEvent,
     extend,
     merge,
-    pick,
     splat
-} = U;
+} from '../../../Shared/Utilities.js';
 
 /* *
  *
@@ -44,15 +46,15 @@ const {
  *
  * */
 
-declare module '../../Series/PointLike' {
-    interface PointLike {
+declare module '../../Series/PointBase' {
+    interface PointBase {
         /** @requires ColorSeriesMixin */
         setVisible(vis?: boolean): void;
     }
 }
 
-declare module '../../Series/SeriesLike' {
-    interface SeriesLike {
+declare module '../../Series/SeriesBase' {
+    interface SeriesBase {
         /** @requires ColorSeriesMixin */
         translateColors(): void;
     }
@@ -64,7 +66,7 @@ declare module '../../Series/SeriesLike' {
  *
  * */
 
-namespace ColorAxisComposition {
+export namespace ColorAxisComposition {
 
     /* *
      *
@@ -93,19 +95,11 @@ namespace ColorAxisComposition {
 
     /* *
      *
-     *  Constants
-     *
-     * */
-
-    const composedClasses: Array<Function> = [];
-
-    /* *
-     *
      *  Variables
      *
      * */
 
-    let ColorAxisClass: typeof ColorAxis;
+    let ColorAxisConstructor: typeof ColorAxis;
 
     /* *
      *
@@ -113,45 +107,32 @@ namespace ColorAxisComposition {
      *
      * */
 
-    /* eslint-disable valid-jsdoc */
-
-    /**
-     * @private
-     */
+    /** @internal */
     export function compose(
-        ColorAxisType: typeof ColorAxis,
+        ColorAxisClass: typeof ColorAxis,
         ChartClass: typeof Chart,
         FxClass: typeof Fx,
         LegendClass: typeof Legend,
         SeriesClass: typeof Series
     ): void {
-        if (!ColorAxisClass) {
-            ColorAxisClass = ColorAxisType;
-        }
-        if (composedClasses.indexOf(ChartClass) === -1) {
-            composedClasses.push(ChartClass);
+        const chartProto = ChartClass.prototype,
+            fxProto = FxClass.prototype,
+            seriesProto = SeriesClass.prototype;
 
-            const chartProto = ChartClass.prototype;
+        if (!chartProto.collectionsWithUpdate.includes('colorAxis')) {
+            ColorAxisConstructor = ColorAxisClass;
 
             chartProto.collectionsWithUpdate.push('colorAxis');
             chartProto.collectionsWithInit.colorAxis = [
                 chartProto.addColorAxis
             ];
 
-            addEvent(ChartClass, 'afterGetAxes', onChartAfterGetAxes);
+            addEvent(ChartClass, 'afterCreateAxes', onChartAfterCreateAxes);
 
             wrapChartCreateAxis(ChartClass);
-        }
-        if (composedClasses.indexOf(FxClass) === -1) {
-            composedClasses.push(FxClass);
-
-            const fxProto = FxClass.prototype;
 
             fxProto.fillSetter = wrapFxFillSetter;
             fxProto.strokeSetter = wrapFxStrokeSetter;
-        }
-        if (composedClasses.indexOf(LegendClass) === -1) {
-            composedClasses.push(LegendClass);
 
             addEvent(LegendClass, 'afterGetAllItems', onLegendAfterGetAllItems);
             addEvent(
@@ -160,53 +141,60 @@ namespace ColorAxisComposition {
                 onLegendAfterColorizeItem
             );
             addEvent(LegendClass, 'afterUpdate', onLegendAfterUpdate);
-        }
-        if (composedClasses.indexOf(SeriesClass) === -1) {
-            composedClasses.push(SeriesClass);
 
             extend(
-                SeriesClass.prototype,
+                seriesProto,
                 {
                     optionalAxis: 'colorAxis',
                     translateColors: seriesTranslateColors
                 }
             );
             extend(
-                SeriesClass.prototype.pointClass.prototype,
+                seriesProto.pointClass.prototype,
                 {
                     setVisible: pointSetVisible
                 }
             );
 
-            addEvent(SeriesClass, 'afterTranslate', onSeriesAfterTranslate);
+            addEvent(
+                SeriesClass,
+                'afterTranslate',
+                onSeriesAfterTranslate,
+                { order: 1 }
+            );
             addEvent(SeriesClass, 'bindAxes', onSeriesBindAxes);
         }
+
     }
 
     /**
-     * Extend the chart getAxes method to also get the color axis.
-     * @private
+     * Extend the chart createAxes method to also make the color axis.
+     * @internal
      */
-    function onChartAfterGetAxes(
+    function onChartAfterCreateAxes(
         this: Chart
     ): void {
-        const options = this.options;
+        const { userOptions } = this;
 
         this.colorAxis = [];
 
-        if (options.colorAxis) {
-            options.colorAxis = splat(options.colorAxis);
-            options.colorAxis.forEach((axisOptions, i): void => {
-                axisOptions.index = i;
-                new ColorAxisClass(this, axisOptions); // eslint-disable-line no-new
-            });
+        // If a `colorAxis` config is present in the user options (not in a
+        // theme), instantiate it.
+        if (userOptions.colorAxis) {
+            userOptions.colorAxis = splat(userOptions.colorAxis);
+            userOptions.colorAxis.map((axisOptions): ColorAxis => (
+                new ColorAxisConstructor(
+                    this,
+                    axisOptions as Partial<ColorAxisOptions>
+                )
+            ));
         }
     }
 
     /**
      * Add the color axis. This also removes the axis' own series to prevent
      * them from showing up individually.
-     * @private
+     * @internal
      */
     function onLegendAfterGetAllItems(
         this: Legend,
@@ -225,13 +213,13 @@ namespace ColorAxisComposition {
             };
 
         let colorAxisItems = [] as Array<(ColorAxis|ColorAxis.LegendItemObject)>,
-            options: ColorAxis.Options,
+            options: ColorAxisOptions,
             i;
 
         colorAxes.forEach(function (colorAxis: ColorAxis): void {
             options = colorAxis.options;
 
-            if (options && options.showInLegend) {
+            if (options?.showInLegend) {
                 // Data classes
                 if (options.dataClasses && options.visible) {
                     colorAxisItems = colorAxisItems.concat(
@@ -258,6 +246,8 @@ namespace ColorAxisComposition {
                         }
                     }
                 });
+            } else {
+                colorAxis.destroyItems();
             }
         });
 
@@ -267,9 +257,7 @@ namespace ColorAxisComposition {
         }
     }
 
-    /**
-     * @private
-     */
+    /** @internal */
     function onLegendAfterColorizeItem(
         this: Legend,
         e: {
@@ -278,7 +266,7 @@ namespace ColorAxisComposition {
         }
     ): void {
         if (e.visible && e.item.legendColor) {
-            (e.item.legendSymbol as any).attr({
+            (e.item.legendItem as any).symbol.attr({
                 fill: e.item.legendColor
             });
         }
@@ -286,28 +274,26 @@ namespace ColorAxisComposition {
 
     /**
      * Updates in the legend need to be reflected in the color axis. (#6888)
-     * @private
+     * @internal
      */
-    function onLegendAfterUpdate(this: Legend): void {
-        const colorAxes = this.chart.colorAxis;
-
-        if (colorAxes) {
-            colorAxes.forEach(function (colorAxis): void {
-                colorAxis.update({}, arguments[2]);
-            });
-        }
+    function onLegendAfterUpdate(
+        this: Legend,
+        e: { redraw: boolean|undefined }
+    ): void {
+        this.chart.colorAxis?.forEach((colorAxis): void => {
+            colorAxis.update({}, e.redraw);
+        });
     }
 
     /**
      * Calculate and set colors for points.
-     * @private
+     * @internal
      */
     function onSeriesAfterTranslate(
         this: Series
     ): void {
         if (
-            this.chart.colorAxis &&
-            this.chart.colorAxis.length ||
+            this.chart.colorAxis?.length ||
             (this as TreemapSeries).colorAttribs
         ) {
             this.translateColors();
@@ -316,7 +302,7 @@ namespace ColorAxisComposition {
 
     /**
      * Add colorAxis to series axisTypes.
-     * @private
+     * @internal
      */
     function onSeriesBindAxes(
         this: Series
@@ -333,18 +319,18 @@ namespace ColorAxisComposition {
 
     /**
      * Set the visibility of a single point
-     * @private
+     * @internal
      * @function Highcharts.colorPointMixin.setVisible
      * @param {boolean} visible
      */
     export function pointSetVisible(
         this: PointComposition,
-        vis?: boolean
+        visible?: boolean
     ): void {
         const point = this,
-            method = vis ? 'show' : 'hide';
+            method = visible ? 'show' : 'hide';
 
-        point.visible = point.options.visible = Boolean(vis);
+        point.visible = point.options.visible = Boolean(visible);
 
         // Show and hide associated elements
         ['graphic', 'dataLabel'].forEach(function (key: string): void {
@@ -352,18 +338,18 @@ namespace ColorAxisComposition {
                 (point as any)[key][method]();
             }
         });
-        this.series.buildKDTree(); // rebuild kdtree #13195
+        this.series.buildKDTree(); // Rebuild kdtree #13195
     }
 
     /**
      * In choropleth maps, the color is a result of the value, so this needs
      * translation too
-     * @private
+     * @internal
      * @function Highcharts.colorSeriesMixin.translateColors
      */
     function seriesTranslateColors(this: SeriesComposition): void {
         const series = this,
-            points = this.data.length ? this.data : this.points,
+            points = this.getPointsCollection() as PointComposition[], // #17945
             nullColor = this.options.nullColor,
             colorAxis = this.colorAxis,
             colorKey = this.colorKey;
@@ -378,19 +364,44 @@ namespace ColorAxisComposition {
                             point.color || series.color
                 );
 
+            // Points created while their data class is toggled off in the
+            // legend must inherit its hidden state (#25083)
+            const item = colorAxis?.legendItem?.labels?.[
+                    point.dataClass as number
+                ] as ColorAxis.LegendItemObject|undefined,
+                hidden = item?.visible === false,
+                // Only take back the points that were hidden this way
+                visible = !hidden &&
+                    !!(point.visible || point.hiddenInDataClass);
+
+            if (item) {
+                item.isDirtyPoints = hidden;
+            }
+
+            if (point.visible !== visible) {
+                point.hiddenInDataClass = hidden;
+                point.visible = point.options.visible = visible;
+                if (visible) {
+                    // Hidden by a legend click, drawPoints won't show it
+                    point.graphic?.show();
+                }
+            }
+
             if (color && point.color !== color) {
                 point.color = color;
 
-                if (series.options.legendType === 'point' && point.legendItem) {
+                if (
+                    series.options.legendType === 'point' &&
+                    point.legendItem &&
+                    point.legendItem.label
+                ) {
                     series.chart.legend.colorizeItem(point, point.visible);
                 }
             }
         });
     }
 
-    /**
-     * @private
-     */
+    /** @internal */
     function wrapChartCreateAxis(
         ChartClass: typeof Chart
     ): void {
@@ -400,29 +411,37 @@ namespace ColorAxisComposition {
             type: string,
             options: Chart.CreateAxisOptionsObject
         ): (Axis|ColorAxis) {
+            const chart = this;
+
             if (type !== 'colorAxis') {
-                return superCreateAxis.apply(this, arguments);
+                return superCreateAxis.apply(chart, arguments);
             }
 
-            const axis = new ColorAxisClass(this, merge(options.axis, {
-                index: (this as AnyRecord)[type].length,
-                isX: false
-            }));
+            const axis = new ColorAxisConstructor(
+                chart,
+                merge(
+                    options.axis as Partial<ColorAxisOptions>,
+                    {
+                        index: (chart as AnyRecord)[type].length,
+                        isX: false
+                    }
+                )
+            );
 
-            this.isDirtyLegend = true;
+            chart.isDirtyLegend = true;
 
             // Clear before 'bindAxes' (#11924)
-            this.axes.forEach(function (axis): void {
+            chart.axes.forEach((axis): void => {
                 axis.series = [];
             });
 
-            this.series.forEach(function (series): void {
+            chart.series.forEach((series): void => {
                 series.bindAxes();
                 series.isDirtyData = true;
             });
 
-            if (pick(options.redraw, true)) {
-                this.redraw(options.animation);
+            if (options.redraw ?? true) {
+                chart.redraw(options.animation);
             }
 
             return axis;
@@ -431,12 +450,12 @@ namespace ColorAxisComposition {
 
     /**
      * Handle animation of the color attributes directly.
-     * @private
+     * @internal
      */
     function wrapFxFillSetter(
         this: Fx
     ): void {
-        this.elem.attr(
+        ((this.elem as SVGElement).attr)(
             'fill',
             color(this.start as any).tweenTo(
                 color(this.end as any),
@@ -449,12 +468,12 @@ namespace ColorAxisComposition {
 
     /**
      * Handle animation of the color attributes directly.
-     * @private
+     * @internal
      */
     function wrapFxStrokeSetter(
         this: Fx
     ): void {
-        this.elem.attr(
+        (this.elem as SVGElement).attr(
             'stroke',
             color(this.start as any).tweenTo(
                 color(this.end as any),

@@ -1,3 +1,10 @@
+---
+description: >-
+  Configure Gantt axis grids to display date intervals and task details,
+  control horizontal tick intervals and labels, and map task rows to vertical
+  table cells with point.y values.
+---
+
 Gantt axis grid
 ===
 
@@ -16,31 +23,32 @@ If the min and maximum width of the chart is set, there is more control over the
 
 _See example below for setting tickIntervals per Axis grid._
 
-    
-    xAxis: [{
-        labels: {
-          format: '{value:%w}' // day of the week
-        },
-        grid: { // default setting
-          enabled: true 
-        }
-        tickInterval: 1000 * 60 * 60 * 24, // Day
-      }, {
-        labels: {
-          format: '{value:%W}'
-        },
-        tickInterval: 1000 * 60 * 60 * 24 * 7 // week
-      }], 
+```js
+xAxis: [{
+    labels: {
+      format: '{value:%w}' // day of the week
+    },
+    grid: { // default setting
+      enabled: true
+    }
+    tickInterval: 1000 * 60 * 60 * 24, // Day
+  }, {
+    labels: {
+      format: '{value:%W}'
+    },
+    tickInterval: 1000 * 60 * 60 * 24 * 7 // week
+  }],
+```
 
 _See live code example for setting tickInterval per Axis grid_
 
-<iframe src="https://jsfiddle.net/acdqskyb/embedded/result,js/?username=gvaartjes" id="JSFEMB_18012" width="100%" height="450" frameborder="0" sandbox="allow-modals allow-forms allow-scripts allow-same-origin allow-popups allow-top-navigation-by-user-activation" allow="camera *; encrypted-media *;"></iframe>
+<iframe src="https://www.highcharts.com/samples/embed/gantt/grid-axis/with-tickinterval" id="JSFEMB_18012" width="100%" height="450" frameborder="0" sandbox="allow-modals allow-forms allow-scripts allow-same-origin allow-popups allow-top-navigation-by-user-activation" allow="camera *; encrypted-media *;"></iframe>
 
 Vertical Axis
 -------------
 
-In a Gantt chart it is common to display a table on the left side of the chart to display task information, like task name, assignee and duration. Creating the table along the vertical axis, needs a `category` [`axis.type`](https://api.highcharts.com/gantt/yAxis.type). The tasks will be lined up and mapped to the table after setting the [`point.y`](https://api.highcharts.com/gantt/series.gantt.data.y) value for each data point (task).
+In a Gantt chart it is common to display a table on the left side of the chart to display task information, like task name, assignee and duration. The tasks will be lined up and mapped to the table after setting the [`point.y`](https://api.highcharts.com/gantt/series.gantt.data.y) value for each data point (task).
 
 _Example of defining a table along the vertical axis with Axis.grid option_
 
-<iframe src="https://jsfiddle.net/4g7ekw65/embedded/result,js/?username=gvaartjes" id="JSFEMB_18012" width="100%" height="450" frameborder="0" sandbox="allow-modals allow-forms allow-scripts allow-same-origin allow-popups allow-top-navigation-by-user-activation" allow="camera *; encrypted-media *;"></iframe>
+<iframe src="https://www.highcharts.com/samples/embed/gantt/grid-axis/vertical" id="JSFEMB_18012" width="100%" height="450" frameborder="0" sandbox="allow-modals allow-forms allow-scripts allow-same-origin allow-popups allow-top-navigation-by-user-activation" allow="camera *; encrypted-media *;"></iframe>

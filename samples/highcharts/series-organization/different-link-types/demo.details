@@ -1,9 +1,6 @@
 ---
 name: Organization chart
 authors:
-  - Pawel Lysy
+  - Paweł Lysy
 js_wrap: b
-new_until: 2022-04-31
-tags:
-  - Highcharts demo
 ...

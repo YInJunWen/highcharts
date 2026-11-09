@@ -2,11 +2,13 @@
  *
  *  Popup generator for Stock tools
  *
- *  (c) 2009-2021 Sebastian Bochan
+ *  (c) 2009-2026 Highsoft AS
+ *  Author: Sebastian Bochan
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -27,12 +29,10 @@ import type {
 import type NavigationBindings from '../NavigationBindings';
 import type Pointer from '../../../Core/Pointer';
 
+import H from '../../../Core/Globals.js';
+const { composed } = H;
 import Popup from './Popup.js';
-import U from '../../../Core/Utilities.js';
-const {
-    addEvent,
-    wrap
-} = U;
+import { addEvent, pushUnique, wrap } from '../../../Shared/Utilities.js';
 
 /* *
  *
@@ -40,6 +40,7 @@ const {
  *
  * */
 
+/** @internal */
 interface PopupConfigObject {
     annotation: Annotation;
     formType: string;
@@ -49,44 +50,27 @@ interface PopupConfigObject {
 
 /* *
  *
- *  Constants
- *
- * */
-
-const composedClasses: Array<Function> = [];
-
-/* *
- *
  *  Functions
  *
  * */
 
-/**
- * @private
- */
+/** @internal */
 function compose(
-    NagivationBindingsClass: typeof NavigationBindings,
+    NavigationBindingsClass: typeof NavigationBindings,
     PointerClass: typeof Pointer
 ): void {
 
-    if (composedClasses.indexOf(NagivationBindingsClass) === -1) {
-        composedClasses.push(NagivationBindingsClass);
-
-
+    if (pushUnique(composed, 'Popup')) {
         addEvent(
-            NagivationBindingsClass,
+            NavigationBindingsClass,
             'closePopup',
             onNavigationBindingsClosePopup
         );
         addEvent(
-            NagivationBindingsClass,
+            NavigationBindingsClass,
             'showPopup',
             onNavigationBindingsShowPopup
         );
-    }
-
-    if (composedClasses.indexOf(PointerClass) === -1) {
-        composedClasses.push(PointerClass);
 
         wrap(
             PointerClass.prototype,
@@ -94,20 +78,17 @@ function compose(
             wrapPointerOnContainerMouserDown
         );
     }
+
 }
 
-/**
- * @private
- */
+/** @internal */
 function onNavigationBindingsClosePopup(this: NavigationBindings): void {
     if (this.popup) {
         this.popup.closePopup();
     }
 }
 
-/**
- * @private
- */
+/** @internal */
 function onNavigationBindingsShowPopup(
     this: NavigationBindings,
     config: PopupConfigObject
@@ -121,7 +102,7 @@ function onNavigationBindingsShowPopup(
                     this.chart.options.stockTools &&
                     this.chart.options.stockTools.gui.iconsURL
                 ) ||
-                'https://code.highcharts.com/@product.version@/gfx/stock-icons/'
+                'renderer'
             ), this.chart
         );
     }
@@ -135,16 +116,16 @@ function onNavigationBindingsShowPopup(
 }
 
 /**
- * onContainerMouseDown blocks internal popup events, due to e.preventDefault.
+ * `onContainerMouseDown` blocks internal popup events, due to e.preventDefault.
  * Related issue #4606
- * @private
+ * @internal
  */
 function wrapPointerOnContainerMouserDown(
     this: Pointer,
     proceed: Function,
     e: MouseEvent
 ): void {
-    // elements is not in popup
+    // Elements is not in popup
     if (!this.inClass(
         e.target as (HTMLDOMElement|SVGDOMElement),
         'highcharts-popup'
@@ -159,8 +140,10 @@ function wrapPointerOnContainerMouserDown(
  *
  * */
 
+/** @internal */
 const PopupComposition = {
     compose
 };
 
+/** @internal */
 export default PopupComposition;

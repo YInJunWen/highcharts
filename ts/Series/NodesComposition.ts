@@ -1,6 +1,5 @@
 /* *
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -12,32 +11,21 @@
  *
  * */
 
-import type Point from '../Core/Series/Point';
 import type AnimationOptions from '../Core/Animation/AnimationOptions';
 import type { PointOptions, PointShortOptions } from '../Core/Series/PointOptions';
-import type Series from '../Core/Series/Series';
 import type SeriesOptions from '../Core/Series/SeriesOptions';
 import type { StatesOptionsKey } from '../Core/Series/StatesOptions';
 
-import SeriesRegistry from '../Core/Series/SeriesRegistry.js';
-const {
-    series: {
-        prototype: seriesProto,
-        prototype: {
-            pointClass: {
-                prototype: pointProto
-            }
-        }
-    }
-} = SeriesRegistry;
-import U from '../Core/Utilities.js';
-const {
+import Point from '../Core/Series/Point.js';
+import Series from '../Core/Series/Series.js';
+import {
+    addEvent,
     defined,
     extend,
     find,
-    merge,
-    pick
-} = U;
+    merge
+} from '../Shared/Utilities.js';
+
 
 /* *
  *
@@ -45,14 +33,14 @@ const {
  *
  * */
 
-declare module '../Core/Series/PointLike' {
-    interface PointLike {
+declare module '../Core/Series/PointBase' {
+    interface PointBase {
         name?: string;
     }
 }
 
-declare module '../Core/Series/SeriesLike' {
-    interface SeriesLike {
+declare module '../Core/Series/SeriesBase' {
+    interface SeriesBase {
         nodes?: Array<NodesComposition.PointComposition>;
     }
 }
@@ -129,14 +117,6 @@ namespace NodesComposition {
 
     /* *
      *
-     *  Constants
-     *
-     * */
-
-    const composedClasses: Array<Function> = [];
-
-    /* *
-     *
      *  Functions
      *
      * */
@@ -148,27 +128,31 @@ namespace NodesComposition {
         PointClass: typeof Point,
         SeriesClass: T
     ): (T&typeof SeriesComposition) {
+        const pointProto = PointClass.prototype as PointComposition,
+            seriesProto = SeriesClass.prototype as SeriesComposition;
 
-        if (composedClasses.indexOf(PointClass) === -1) {
-            composedClasses.push(PointClass);
+        pointProto.setNodeState = setNodeState;
+        pointProto.setState = setNodeState;
+        pointProto.update = updateNode;
 
-            const pointProto = PointClass.prototype as PointComposition;
+        seriesProto.destroy = destroy;
+        seriesProto.setData = setData;
 
-            pointProto.setNodeState = setNodeState;
-            pointProto.setState = setNodeState;
-            pointProto.update = updateNode;
-        }
-
-        if (composedClasses.indexOf(SeriesClass) === -1) {
-            composedClasses.push(SeriesClass);
-
-            const seriesProto = SeriesClass.prototype as SeriesComposition;
-
-            seriesProto.destroy = destroy;
-            seriesProto.setData = setData;
-        }
+        addEvent(SeriesClass, 'afterUpdate', afterUpdate);
 
         return SeriesClass as (T&typeof SeriesComposition);
+    }
+
+    /**
+     * Destroy data labels on nodes.
+     * @private
+     */
+    function afterUpdate(this: Series): void {
+        if (!this.hasDataLabels?.() && this.nodes) { // #23385
+            for (const node of this.nodes) {
+                node.destroyElements({ dataLabel: 1 });
+            }
+        }
     }
 
     /**
@@ -195,7 +179,7 @@ namespace NodesComposition {
 
         if (!node) {
             options = this.options.nodes && findById(this.options.nodes, id);
-            const newNode = (new PointClass()).init(
+            const newNode = new PointClass(
                 this,
                 extend({
                     className: 'highcharts-node',
@@ -262,23 +246,20 @@ namespace NodesComposition {
         }
 
         node.formatPrefix = 'node';
-        // for use in formats
+        // For use in formats
         node.name = node.name || node.options.id || '';
         // Mass is used in networkgraph:
-        node.mass = pick(
-            // Node:
-            node.options.mass,
-            node.options.marker && node.options.marker.radius,
-            // Series:
-            this.options.marker && this.options.marker.radius,
-            // Default:
+        node.mass = (
+            node.options.mass ??
+            (node.options.marker && node.options.marker.radius) ??
+            (this.options.marker && this.options.marker.radius) ??
             4
         );
         return node;
     }
 
     /**
-     * Destroy alll nodes and links.
+     * Destroy all nodes and links.
      * @private
      */
     export function destroy(
@@ -288,7 +269,7 @@ namespace NodesComposition {
         this.data = ([] as Array<PointComposition>)
             .concat(this.points || [], this.nodes);
 
-        return seriesProto.destroy.apply(this, arguments);
+        return Series.prototype.destroy.apply(this, arguments);
     }
 
     /**
@@ -302,7 +283,7 @@ namespace NodesComposition {
         const chart = this.chart,
             nodeLookup = {} as Record<string, PointComposition>;
 
-        seriesProto.generatePoints.call(this);
+        Series.prototype.generatePoints.call(this);
 
         if (!this.nodes) {
             this.nodes = []; // List of Point-like node items
@@ -327,10 +308,9 @@ namespace NodesComposition {
 
                 // Point color defaults to the fromNode's color
                 if (chart.styledMode) {
-                    point.colorIndex = pick(
-                        point.options.colorIndex,
-                        nodeLookup[point.from].colorIndex
-                    );
+                    point.colorIndex =
+                        point.options.colorIndex ??
+                        nodeLookup[point.from].colorIndex;
                 } else {
                     point.color =
                         point.options.color || nodeLookup[point.from].color;
@@ -345,7 +325,7 @@ namespace NodesComposition {
                 point.toNode = nodeLookup[point.to];
             }
 
-            point.name = point.name || point.id; // for use in formats
+            point.name = point.name || point.id; // For use in formats
         }, this);
 
         // Store lookup table for later use
@@ -365,7 +345,7 @@ namespace NodesComposition {
             });
             this.nodes.length = 0;
         }
-        seriesProto.setData.apply(this, arguments);
+        Series.prototype.setData.apply(this, arguments);
     }
 
     /**
@@ -383,17 +363,17 @@ namespace NodesComposition {
         if (state !== 'select') {
             others.forEach((linkOrNode): void => {
                 if (linkOrNode && linkOrNode.series) {
-                    pointProto.setState.apply(linkOrNode, args);
+                    Point.prototype.setState.apply(linkOrNode, args);
 
                     if (!linkOrNode.isNode) {
                         if (linkOrNode.fromNode.graphic) {
-                            pointProto.setState.apply(
+                            Point.prototype.setState.apply(
                                 linkOrNode.fromNode,
                                 args
                             );
                         }
                         if (linkOrNode.toNode && linkOrNode.toNode.graphic) {
-                            pointProto.setState.apply(
+                            Point.prototype.setState.apply(
                                 linkOrNode.toNode,
                                 args
                             );
@@ -403,7 +383,7 @@ namespace NodesComposition {
             });
         }
 
-        pointProto.setState.apply(this, args);
+        Point.prototype.setState.apply(this, args);
     }
 
     /**
@@ -420,10 +400,10 @@ namespace NodesComposition {
     ): void {
         const nodes = this.series.options.nodes,
             data = this.series.options.data,
-            dataLength = data && data.length || 0,
-            linkConfig = data && data[this.index];
+            dataLength = data?.length || 0,
+            linkConfig = data?.[this.index];
 
-        pointProto.update.call(
+        Point.prototype.update.call(
             this,
             options,
             this.isNode ? false : redraw, // Hold the redraw for nodes
@@ -432,7 +412,7 @@ namespace NodesComposition {
         );
 
         if (this.isNode) {
-            // this.index refers to `series.nodes`, not `options.nodes` array
+            // `this.index` refers to `series.nodes`, not `options.nodes` array
             const nodeIndex = (nodes || [])
                     .reduce( // Array.findIndex needs a polyfill
                         (prevIndex, n, index): number =>
@@ -443,7 +423,7 @@ namespace NodesComposition {
                 // options.data, because of default logic in point.update()
                 nodeConfig = merge(
                     nodes && nodes[nodeIndex] || {},
-                    data && data[this.index] || {}
+                    data?.[this.index] || {}
                 );
 
             // Restore link config
@@ -467,7 +447,7 @@ namespace NodesComposition {
                 this.series.options.nodes = [nodeConfig];
             }
 
-            if (pick(redraw, true)) {
+            if (redraw ?? true) {
                 this.series.chart.redraw(animation);
             }
         }

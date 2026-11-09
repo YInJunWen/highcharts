@@ -1,10 +1,12 @@
 /* *
  *
- *  (c) 2010-2021 Torstein Honsi
+ *  (c) 2010-2026 Highsoft AS
+ *  Author: Torstein Hønsi
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -22,22 +24,10 @@ import type PointerEvent from '../../Core/PointerEvent';
 
 import BubbleSeries from '../Bubble/BubbleSeries.js';
 import MapBubblePoint from './MapBubblePoint.js';
+import MapPointSeries from '../MapPoint/MapPointSeries.js';
+import MapSeries from '../Map/MapSeries.js';
 import SeriesRegistry from '../../Core/Series/SeriesRegistry.js';
-const {
-    seriesTypes: {
-        map: {
-            prototype: mapProto
-        },
-        mappoint: {
-            prototype: mapPointProto
-        }
-    }
-} = SeriesRegistry;
-import U from '../../Core/Utilities.js';
-const {
-    extend,
-    merge
-} = U;
+import { extend, merge } from '../../Shared/Utilities.js';
 
 /* *
  *
@@ -84,7 +74,7 @@ class MapBubbleSeries extends BubbleSeries {
          * @sample {highmaps} maps/plotoptions/mapbubble-color/
          *         Pink bubbles
          *
-         * @type      {Highcharts.ColorString|Highcharts.GradientColorObject|Highcharts.PatternObject}
+         * @type      {Highcharts.ColorType}
          * @apioption plotOptions.mapbubble.color
          */
 
@@ -116,7 +106,7 @@ class MapBubbleSeries extends BubbleSeries {
          * @sample {highmaps} maps/plotoptions/spider-map-line-color/
          *         Different line color
          *
-         * @type      {Highcharts.ColorString|Highcharts.GradientColorObject|Highcharts.PatternObject}
+         * @type      {Highcharts.ColorType}
          * @apioption plotOptions.mapbubble.lineColor
          */
 
@@ -169,7 +159,7 @@ class MapBubbleSeries extends BubbleSeries {
          * @sample {highmaps} maps/plotoptions/mapbubble-negativecolor/
          *         Negative color below a threshold
          *
-         * @type      {Highcharts.ColorString|Highcharts.GradientColorObject|Highcharts.PatternObject}
+         * @type      {Highcharts.ColorType}
          * @apioption plotOptions.mapbubble.negativeColor
          */
 
@@ -200,10 +190,10 @@ class MapBubbleSeries extends BubbleSeries {
          */
 
         /**
-         * The minimum for the Z value range. Defaults to the highest Z
-         * value in the data.
+         * The maximum for the Z value range. Defaults to the highest Z value in
+         * the data.
          *
-         * @see [zMax](#plotOptions.mapbubble.zMin)
+         * @see [zMin](#plotOptions.mapbubble.zMin)
          *
          * @sample {highmaps} highcharts/plotoptions/bubble-zmin-zmax/
          *         Z has a possible range of 0-100
@@ -253,7 +243,8 @@ class MapBubbleSeries extends BubbleSeries {
         joinBy: 'hc-key',
         tooltip: {
             pointFormat: '{point.name}: {point.z}'
-        }
+        },
+        stickyTracking: true
     } as MapBubbleSeriesOptions);
 
     /* *
@@ -262,27 +253,32 @@ class MapBubbleSeries extends BubbleSeries {
      *
      * */
 
-    public data: Array<MapBubblePoint> = void 0 as any;
+    public data!: Array<MapBubblePoint>;
 
-    public options: MapBubbleSeriesOptions = void 0 as any;
+    public options!: MapBubbleSeriesOptions;
 
-    public points: Array<MapBubblePoint> = void 0 as any;
+    public points!: Array<MapBubblePoint>;
 
+    public clearBounds = MapSeries.prototype.clearBounds;
+
+    /** @internal */
     public searchPoint(
         e: PointerEvent,
         compareX?: boolean
     ): (Point|undefined) {
         return this.searchKDTree({
-            clientX: e.chartX - this.chart.plotLeft,
+            plotX: e.chartX - this.chart.plotLeft,
             plotY: e.chartY - this.chart.plotTop
         }, compareX, e);
     }
 
+    /** @internal */
     translate(): void {
-        mapPointProto.translate.call(this);
+        MapPointSeries.prototype.translate.call(this);
         this.getRadii();
         this.translateBubble();
     }
+
 }
 
 /* *
@@ -292,15 +288,23 @@ class MapBubbleSeries extends BubbleSeries {
  * */
 
 interface MapBubbleSeries {
+    /** @internal */
     type: string;
-    getProjectedBounds: typeof mapProto.getProjectedBounds;
+    /** @internal */
+    getProjectedBounds: typeof MapSeries.prototype.getProjectedBounds;
+    /** @internal */
     pointArrayMap: Array<string>;
+    /** @internal */
     pointClass: typeof MapBubblePoint;
-    setData: typeof mapProto.setData;
-    processData: typeof mapProto.processData;
-    projectPoint: typeof mapPointProto.projectPoint;
-    setOptions: typeof mapProto.setOptions;
-    updateData: typeof mapProto.updateData;
+    /** @internal */
+    setData: typeof MapSeries.prototype.setData;
+    /** @internal */
+    processData: typeof MapSeries.prototype.processData;
+    /** @internal */
+    projectPoint: typeof MapPointSeries.prototype.projectPoint;
+    /** @internal */
+    setOptions: typeof MapSeries.prototype.setOptions;
+    /** @internal */
     xyFromShape: boolean;
 }
 extend(MapBubbleSeries.prototype, {
@@ -308,7 +312,7 @@ extend(MapBubbleSeries.prototype, {
 
     axisTypes: ['colorAxis'],
 
-    getProjectedBounds: mapProto.getProjectedBounds,
+    getProjectedBounds: MapSeries.prototype.getProjectedBounds,
 
     isCartesian: false,
 
@@ -317,15 +321,15 @@ extend(MapBubbleSeries.prototype, {
 
     pointClass: MapBubblePoint,
 
-    processData: mapProto.processData,
+    processData: MapSeries.prototype.processData,
 
-    projectPoint: mapPointProto.projectPoint,
+    projectPoint: MapPointSeries.prototype.projectPoint,
 
-    setData: mapProto.setData,
+    kdAxisArray: ['plotX', 'plotY'],
 
-    setOptions: mapProto.setOptions,
+    setData: MapSeries.prototype.setData,
 
-    updateData: mapProto.updateData,
+    setOptions: MapSeries.prototype.setOptions,
 
     useMapGeometry: true,
 
@@ -364,7 +368,6 @@ export default MapBubbleSeries;
  * is not specified, it is inherited from [chart.type](#chart.type).
  *
  * @extends   series,plotOptions.mapbubble
- * @excluding dataParser, dataURL
  * @product   highmaps
  * @apioption series.mapbubble
  */
@@ -398,6 +401,7 @@ export default MapBubbleSeries;
  *        }]
  *    ```
  *
+ * @basic
  * @type      {Array<number|null|*>}
  * @extends   series.mappoint.data
  * @excluding labelrank, middleX, middleY, path, value, x, y, lat, lon
@@ -420,7 +424,9 @@ export default MapBubbleSeries;
 
 /**
  * @excluding enabled, enabledThreshold, height, radius, width
+ * @sample {highmaps} maps/plotoptions/mapbubble-symbol
+ *         Map bubble with mapmarker symbol
  * @apioption series.mapbubble.marker
  */
 
-''; // adds doclets above to transpiled file
+''; // Adds doclets above to transpiled file

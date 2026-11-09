@@ -1,6 +1,5 @@
 /* *
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -16,9 +15,9 @@ import type { AlignObject } from '../../../Core/Renderer/AlignObject';
 import type Annotation from '../Annotation';
 import type AnnotationChart from '../AnnotationChart';
 import type { AnnotationPointType } from '../AnnotationSeries';
-import type { ControllableAnchorObject } from './Controllable';
 import type BBoxObject from '../../../Core/Renderer/BBoxObject';
 import type { ControllableLabelOptions } from './ControllableOptions';
+import type ControlTarget from '../ControlTarget';
 import type PositionObject from '../../../Core/Renderer/PositionObject';
 import type SVGAttributes from '../../../Core/Renderer/SVG/SVGAttributes';
 import type SVGElement from '../../../Core/Renderer/SVG/SVGElement';
@@ -27,16 +26,14 @@ import type SVGRenderer from '../../../Core/Renderer/SVG/SVGRenderer';
 import type SymbolOptions from '../../../Core/Renderer/SVG/SymbolOptions';
 
 import Controllable from './Controllable.js';
-import F from '../../../Core/FormatUtilities.js';
+import F from '../../../Core/Templating.js';
 const { format } = F;
 import MockPoint from '../MockPoint.js';
-import Tooltip from '../../../Core/Tooltip.js';
-import U from '../../../Core/Utilities.js';
-const {
+import {
     extend,
-    isNumber,
-    pick
-} = U;
+    getAlignFactor,
+    isNumber
+} from '../../../Shared/Utilities.js';
 
 /* *
  *
@@ -44,25 +41,20 @@ const {
  *
  * */
 
+/** @internal */
 declare module '../../../Core/Renderer/SVG/SymbolType' {
+    /** @internal */
     interface SymbolTypeRegistry {
         /** @requires Extensions/ControllableLabel */
         connector: SymbolFunction;
     }
 }
 
+/** @internal */
 interface ControllableAlignObject extends AlignObject {
     height?: number;
     width?: number;
 }
-
-/* *
- *
- *  Constants
- *
- * */
-
-const composedClasses: Array<Function> = [];
 
 /* *
  *
@@ -71,8 +63,8 @@ const composedClasses: Array<Function> = [];
  * */
 
 /**
- * General symbol definition for labels with connector
- * @private
+ * General symbol definition for labels with connector.
+ * @internal
  */
 function symbolConnector(
     x: number,
@@ -131,9 +123,9 @@ function symbolConnector(
 /**
  * A controllable label class.
  *
+ * @internal
  * @requires modules/annotations
  *
- * @private
  * @class
  * @name Highcharts.AnnotationControllableLabel
  *
@@ -196,35 +188,17 @@ class ControllableLabel extends Controllable {
         alignOptions: ControllableAlignObject,
         box: BBoxObject
     ): PositionObject {
-        const align = alignOptions.align,
-            vAlign = alignOptions.verticalAlign;
-
-        let x = (box.x || 0) + (alignOptions.x || 0),
-            y = (box.y || 0) + (alignOptions.y || 0),
-            alignFactor,
-            vAlignFactor;
-
-        if (align === 'right') {
-            alignFactor = 1;
-        } else if (align === 'center') {
-            alignFactor = 2;
-        }
-        if (alignFactor) {
-            x += (box.width - (alignOptions.width || 0)) / alignFactor;
-        }
-
-        if (vAlign === 'bottom') {
-            vAlignFactor = 1;
-        } else if (vAlign === 'middle') {
-            vAlignFactor = 2;
-        }
-        if (vAlignFactor) {
-            y += (box.height - (alignOptions.height || 0)) / vAlignFactor;
-        }
-
         return {
-            x: Math.round(x),
-            y: Math.round(y)
+            x: Math.round(
+                (box.x || 0) + (alignOptions.x || 0) +
+                (box.width - (alignOptions.width || 0)) *
+                getAlignFactor(alignOptions.align)
+            ),
+            y: Math.round(
+                (box.y || 0) + (alignOptions.y || 0) +
+                (box.height - (alignOptions.height || 0)) *
+                getAlignFactor(alignOptions.verticalAlign)
+            )
         };
     }
 
@@ -232,13 +206,8 @@ class ControllableLabel extends Controllable {
         SVGRendererClass: typeof SVGRenderer
     ): void {
 
-        if (composedClasses.indexOf(SVGRendererClass) === -1) {
-            composedClasses.push(SVGRendererClass);
-
-            const svgRendererProto = SVGRendererClass.prototype;
-
-            svgRendererProto.symbols.connector = symbolConnector;
-        }
+        const symbols = SVGRendererClass.prototype.symbols;
+        symbols.connector = symbolConnector;
 
     }
 
@@ -377,6 +346,8 @@ class ControllableLabel extends Controllable {
         }
 
         // Local options:
+        this.options.x ||= 0;
+        this.options.y ||= 0;
         this.options.x += dx;
         this.options.y += dy;
 
@@ -391,7 +362,10 @@ class ControllableLabel extends Controllable {
     public render(parent: SVGElement): void {
         const options = this.options,
             attrs = this.attrsFromOptions(options),
-            style = options.style;
+            style = options.style,
+            optionsChart = this.annotation.chart.options.chart,
+            chartBackground = optionsChart.plotBackgroundColor ||
+                optionsChart.backgroundColor;
 
         this.graphic = this.annotation.chart.renderer
             .label(
@@ -399,30 +373,37 @@ class ControllableLabel extends Controllable {
                 0,
                 -9999, // #10055
                 options.shape,
-                null as any,
-                null as any,
+                void 0,
+                void 0,
                 options.useHTML,
-                null as any,
+                void 0,
                 'annotation-label'
             )
             .attr(attrs)
             .add(parent);
 
         if (!this.annotation.chart.styledMode) {
-            if (style.color === 'contrast') {
+            if (style?.color === 'contrast') {
+                const background = (
+                    (
+                        !options.shape ||
+                        ControllableLabel.shapesWithoutBackground.indexOf(
+                            options.shape
+                        ) > -1
+                    ) || options.backgroundColor === 'none'
+                ) ?
+                    chartBackground :
+                    options.backgroundColor;
+
                 style.color = this.annotation.chart.renderer.getContrast(
-                    ControllableLabel.shapesWithoutBackground.indexOf(
-                        options.shape
-                    ) > -1 ? '#FFFFFF' : options.backgroundColor as any
+                    typeof background === 'string' ? background :
+                        typeof chartBackground === 'string' ? chartBackground :
+                            '#ffffff'
                 );
             }
             this.graphic
-                .css(options.style)
+                .css(options.style || {})
                 .shadow(options.shadow);
-        }
-
-        if (options.className) {
-            this.graphic.addClass(options.className);
         }
 
         this.graphic.labelrank = (options as any).labelrank;
@@ -443,12 +424,8 @@ class ControllableLabel extends Controllable {
 
         label.attr({
             text: text ?
-                format(
-                    String(text),
-                    point.getLabelConfig(),
-                    this.annotation.chart
-                ) :
-                (options.formatter as any).call(point, this)
+                format(String(text), point, this.annotation.chart) :
+                options.formatter!.call(point, point)
         });
 
         const anchor = this.anchor(point);
@@ -479,8 +456,9 @@ class ControllableLabel extends Controllable {
      * options.
      */
     public anchor(
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         _point: AnnotationPointType
-    ): ControllableAnchorObject {
+    ): ControlTarget.Anchor {
         const anchor = super.anchor.apply(this, arguments),
             x = this.options.x || 0,
             y = this.options.y || 0;
@@ -498,10 +476,11 @@ class ControllableLabel extends Controllable {
      * Returns the label position relative to its anchor.
      */
     public position(
-        anchor: ControllableAnchorObject
+        anchor: ControlTarget.Anchor
     ): (PositionObject|null|undefined) {
         const item = this.graphic,
             chart = this.annotation.chart,
+            tooltip = chart.tooltip,
             point = this.points[0],
             itemOptions = this.options,
             anchorAbsolutePosition = anchor.absolutePosition,
@@ -519,11 +498,13 @@ class ControllableLabel extends Controllable {
         if (item && showItem) {
             const { width = 0, height = 0 } = item;
 
-            if (itemOptions.distance) {
-                itemPosition = Tooltip.prototype.getPosition.call(
+            if (itemOptions.distance && tooltip) {
+                itemPosition = tooltip.getPosition.call(
                     {
-                        chart: chart,
-                        distance: pick(itemOptions.distance, 16)
+                        chart,
+                        distance: (itemOptions.distance ?? 16),
+                        getPlayingField: tooltip.getPlayingField,
+                        pointer: tooltip.pointer
                     },
                     width,
                     height,
@@ -539,7 +520,10 @@ class ControllableLabel extends Controllable {
                     } as any
                 );
             } else if ((itemOptions as any).positioner) {
-                itemPosition = (itemOptions as any).positioner.call(this);
+                itemPosition = (itemOptions as any).positioner.call(
+                    this,
+                    this
+                );
             } else {
                 alignTo = {
                     x: anchorAbsolutePosition.x,
@@ -598,6 +582,7 @@ class ControllableLabel extends Controllable {
  *
  * */
 
+/** @internal */
 interface ControllableLabel {
     collection: 'labels';
     itemType: 'label';
@@ -610,6 +595,7 @@ interface ControllableLabel {
  *
  * */
 
+/** @internal */
 declare module './ControllableType' {
     interface ControllableLabelTypeRegistry {
         label: typeof ControllableLabel;
@@ -622,4 +608,5 @@ declare module './ControllableType' {
  *
  * */
 
+/** @internal */
 export default ControllableLabel;

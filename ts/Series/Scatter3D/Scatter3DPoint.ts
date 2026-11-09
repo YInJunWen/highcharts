@@ -1,12 +1,14 @@
 /* *
  *
- *  (c) 2010-2021 Torstein Honsi
+ *  (c) 2010-2026 Highsoft AS
+ *  Author: Torstein Hønsi
  *
  *  Scatter 3D series.
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -20,11 +22,10 @@
 
 import type Scatter3DPointOptions from './Scatter3DPointOptions';
 import type Scatter3DSeries from './Scatter3DSeries';
+
 import ScatterSeries from '../Scatter/ScatterSeries.js';
-import U from '../../Core/Utilities.js';
-const {
-    defined
-} = U;
+import { defined } from '../../Shared/Utilities.js';
+const { pointClass: ScatterPoint } = ScatterSeries.prototype;
 
 /* *
  *
@@ -32,7 +33,7 @@ const {
  *
  * */
 
-class Scatter3DPoint extends ScatterSeries.prototype.pointClass {
+class Scatter3DPoint extends ScatterPoint {
 
     /* *
      *
@@ -40,9 +41,10 @@ class Scatter3DPoint extends ScatterSeries.prototype.pointClass {
      *
      * */
 
-    public options: Scatter3DPointOptions = void 0 as any;
+    public options!: Scatter3DPointOptions;
 
-    public series: Scatter3DSeries = void 0 as any;
+    /** @internal */
+    public series!: Scatter3DSeries;
 
     /* *
      *
@@ -50,8 +52,10 @@ class Scatter3DPoint extends ScatterSeries.prototype.pointClass {
      *
      * */
 
+    /** @internal */
     public applyOptions(): Scatter3DPoint {
         super.applyOptions.apply(this, arguments);
+
         if (!defined(this.z)) {
             this.z = 0;
         }

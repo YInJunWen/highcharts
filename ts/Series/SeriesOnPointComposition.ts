@@ -1,10 +1,12 @@
 /* *
  *
- *  (c) 2010-2022 Rafal Sebestjanski, Piotr Madej
+ *  (c) 2010-2026 Highsoft AS
+ *  Author: Rafał Sebestjański, Piotr Madej
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -18,22 +20,22 @@
 
 import type SVGAttributes from '../Core/Renderer/SVG/SVGAttributes';
 
+import BubbleSeries from './Bubble/BubbleSeries.js';
+import Chart from '../Core/Chart/Chart.js';
+import DataTableCore from '../Data/DataTableCore.js';
+import H from '../Core/Globals.js';
+const { composed } = H;
 import Point from '../Core/Series/Point.js';
 import Series from '../Core/Series/Series.js';
-import SeriesRegistry from '../Core/Series/SeriesRegistry.js';
 import SVGRenderer from '../Core/Renderer/SVG/SVGRenderer.js';
 import SVGElement from '../Core/Renderer/SVG/SVGElement.js';
-
-const { bubble, pie, sunburst } = SeriesRegistry.seriesTypes;
-
-import U from '../Core/Utilities.js';
-import Chart from '../Core/Chart/Chart';
-const {
+import {
     addEvent,
     defined,
     find,
-    isNumber
-} = U;
+    isNumber,
+    pushUnique
+} from '../Shared/Utilities.js';
 
 /* *
  *
@@ -44,8 +46,9 @@ const {
 type CenterObject = { positions: Array<number> };
 type zData = Array<number|null>;
 
-declare module '../Core/Series/SeriesLike' {
-    interface SeriesLike {
+/** @internal */
+declare module '../Core/Series/SeriesBase' {
+    interface SeriesBase {
         onPoint?: SeriesOnPointComposition.Additions;
         onPointSupported?: boolean;
     }
@@ -58,16 +61,68 @@ declare module '../Core/Series/SeriesOptions' {
 }
 
 interface OnPoint {
+
+    /**
+     * Options for the connector in the _Series on point_ feature.
+     *
+     * In styled mode, the connector can be styled with the
+     * `.highcharts-connector-seriesonpoint` class name.
+     *
+     * @since 10.2.0
+     */
     connectorOptions?: SVGAttributes;
+
+    /**
+     * The `id` of the point that we connect the series to. Only points with a
+     * given `plotX` and `plotY` values and map points are valid.
+     *
+     * @since 10.2.0
+     */
     id: string;
+
+    /**
+     * Options allowing to set a position and an offset of the series in the
+     * _Series on point_ feature.
+     *
+     * @since 10.2.0
+     */
     position?: Position;
+
     z?: number;
 }
 
 interface Position {
+
+    /**
+     * X position of the series center. By default, the series is displayed on
+     * the point that it is connected to.
+     *
+     * @since 10.2.0
+     */
     x?: number
+
+    /**
+     * Y position of the series center. By default, the series is displayed on
+     * the point that it is connected to.
+     *
+     * @since 10.2.0
+     */
     y?: number;
+
+    /**
+     * Series center offset from the original x position. If defined, the
+     * connector line is drawn connecting original position with new position.
+     *
+     * @since 10.2.0
+     */
     offsetX?: number;
+
+    /**
+     * Series center offset from the original y position. If defined, the
+     * connector line is drawn from original position to a new position.
+     *
+     * @since 10.2.0
+     */
     offsetY?: number;
 }
 
@@ -85,17 +140,10 @@ namespace SeriesOnPointComposition {
      *
      * */
 
+    /** @internal */
     export declare class SeriesComposition extends Series {
         onPoint: Additions;
     }
-
-    /* *
-     *
-     *  Constants
-     *
-     * */
-
-    const composedClasses: Array<Function> = [];
 
     /* *
      *
@@ -103,54 +151,41 @@ namespace SeriesOnPointComposition {
      *
      * */
 
-    /* eslint-disable valid-jsdoc */
-
     /**
      * Extends the series with a small addition.
      *
-     * @private
-     *
-     * @param SeriesClass
-     * Series class to use.
-     *
-     * @param ChartClass
-     * Chart class to use.
+     * @internal
      */
     export function compose<T extends typeof Series>(
         SeriesClass: T,
         ChartClass: typeof Chart
     ): (typeof SeriesComposition&T) {
-        const {
-            chartGetZData,
-            seriesAfterInit,
-            seriesAfterRender,
-            seriesGetCenter,
-            seriesShowOrHide,
-            seriesTranslate
-        } = Additions.prototype;
 
-        // We can mark support for pie series here because it's in the core.
-        // But all other series outside the core should be marked in its module.
-        // This is crucial when loading series-on-point before loading a
-        // module, e.g. sunburst.
-        // Supported series types:
-        // - pie
-        // - sunburst
-        pie.prototype.onPointSupported = true;
+        if (pushUnique(composed, 'SeriesOnPoint')) {
+            const {
+                chartGetZData,
+                seriesAfterInit,
+                seriesAfterRender,
+                seriesGetCenter,
+                seriesShowOrHide,
+                seriesTranslate
+            } = Additions.prototype;
 
-        if (composedClasses.indexOf(SeriesClass) === -1) {
-            composedClasses.push(SeriesClass);
+            // We can mark support for pie series here because it's in the core.
+            // But all other series outside the core should be marked in its
+            // module. This is crucial when loading series-on-point before
+            // loading a module, e.g. sunburst.
+            // Supported series types:
+            // - pie
+            // - sunburst
+            SeriesClass.types.pie.prototype.onPointSupported = true;
 
-            addEvent(Series, 'afterInit', seriesAfterInit);
-            addEvent(Series, 'afterRender', seriesAfterRender);
-            addEvent(Series, 'afterGetCenter', seriesGetCenter);
-            addEvent(Series, 'hide', seriesShowOrHide);
-            addEvent(Series, 'show', seriesShowOrHide);
-            addEvent(Series, 'translate', seriesTranslate);
-        }
-
-        if (composedClasses.indexOf(ChartClass) === -1) {
-            composedClasses.push(ChartClass);
+            addEvent(SeriesClass, 'afterInit', seriesAfterInit);
+            addEvent(SeriesClass, 'afterRender', seriesAfterRender);
+            addEvent(SeriesClass, 'afterGetCenter', seriesGetCenter);
+            addEvent(SeriesClass, 'hide', seriesShowOrHide);
+            addEvent(SeriesClass, 'show', seriesShowOrHide);
+            addEvent(SeriesClass, 'translate', seriesTranslate);
 
             addEvent(ChartClass, 'beforeRender', chartGetZData);
             addEvent(ChartClass, 'beforeRedraw', chartGetZData);
@@ -166,7 +201,7 @@ namespace SeriesOnPointComposition {
      * */
 
     /**
-     * @private
+     * @internal
      */
     export class Additions {
 
@@ -177,7 +212,7 @@ namespace SeriesOnPointComposition {
          * */
 
         /**
-         * @private
+         * @internal
          */
         public constructor(series: SeriesComposition) {
             this.chart = series.chart;
@@ -195,38 +230,43 @@ namespace SeriesOnPointComposition {
 
         public connector?: SVGElement;
 
+        public dataTable?: DataTableCore;
+
         public options?: OnPoint;
 
         public radii?: Array<number>;
 
         public series: SeriesComposition;
 
-        public zData?: zData;
+        /**
+         * @ignore
+         */
+        public getColumn = BubbleSeries.prototype.getColumn;
 
         /**
          * @ignore
          */
-        public getRadii = bubble.prototype.getRadii;
+        public getRadii = BubbleSeries.prototype.getRadii;
 
         /**
          * @ignore
          */
-        public getRadius = bubble.prototype.getRadius;
+        public getRadius = BubbleSeries.prototype.getRadius;
 
         /**
          * @ignore
          */
-        public getPxExtremes = bubble.prototype.getPxExtremes;
+        public getPxExtremes = BubbleSeries.prototype.getPxExtremes;
 
         /**
          * @ignore
          */
-        public getZExtremes = bubble.prototype.getZExtremes;
+        public getZExtremes = BubbleSeries.prototype.getZExtremes;
 
         /**
          * Draw connector line that starts from the initial point's position
          * and ends in the center of the series.
-         * @private
+         * @internal
          */
         public drawConnector(): void {
             if (!this.connector) {
@@ -246,7 +286,7 @@ namespace SeriesOnPointComposition {
         /**
          * Get connector line path and styles that connects series and point.
          *
-         * @private
+         * @internal
          *
          * @return {Highcharts.SVGAttributes} attribs - the path and styles.
          */
@@ -286,7 +326,7 @@ namespace SeriesOnPointComposition {
                     d: SVGRenderer.prototype.crispLine([
                         ['M', xFrom, yFrom],
                         ['L', xTo, yTo]
-                    ], width, 'ceil'),
+                    ], width),
                     'stroke-width': width
                 };
 
@@ -380,7 +420,7 @@ namespace SeriesOnPointComposition {
             const allSeries = this.chart.series;
 
             // When toggling a series visibility, loop through all points
-            this.points.forEach((point): void => {
+            this.points?.forEach((point): void => {
                 // Find all series that are on toggled points
                 const series = find(allSeries, (series): boolean => {
                     const id = ((series.onPoint || {}).options || {}).id;
@@ -393,7 +433,7 @@ namespace SeriesOnPointComposition {
                 });
 
                 // And also toggle series that are on toggled points. Redraw is
-                // not needed because it's fired later after showOrhide event
+                // not needed because it's fired later after showOrHide event
                 series && series.setVisible(!series.visible, false);
             });
         }
@@ -420,13 +460,18 @@ namespace SeriesOnPointComposition {
             this.series.forEach((series: Series): void => {
                 const onPointOpts = series.options.onPoint;
 
-                zData.push(onPointOpts && onPointOpts.z ? onPointOpts.z : null);
+                zData.push(onPointOpts?.z ?? null);
             });
 
+            const dataTable = new DataTableCore({
+                columns: {
+                    z: zData
+                }
+            });
             this.series.forEach((series: Series): void => {
                 // Save z values of all the series
                 if (series.onPoint) {
-                    series.onPoint.zData = series.zData = zData;
+                    series.onPoint.dataTable = series.dataTable = dataTable;
                 }
             });
         }
@@ -439,6 +484,7 @@ namespace SeriesOnPointComposition {
  *
  * */
 
+/** @internal */
 export default SeriesOnPointComposition;
 
 /* *
@@ -455,6 +501,7 @@ export default SeriesOnPointComposition;
  *              Series on point
  * @sample      {highmaps} maps/demo/map-pies
  *              Pies on a map
+ * @requires    highcharts-more
  * @requires    modules/series-on-point
  * @since 10.2.0
  * @type        {object}
@@ -467,7 +514,6 @@ export default SeriesOnPointComposition;
  * In styled mode, the connector can be styled with the
  * `.highcharts-connector-seriesonpoint` class name.
  *
- * @requires    modules/series-on-point
  * @since 10.2.0
  * @type        {Highcharts.SVGAttributes}
  * @apioption   plotOptions.series.onPoint.connectorOptions
@@ -476,7 +522,6 @@ export default SeriesOnPointComposition;
 /**
  * Color of the connector line. By default it's the series' color.
  *
- * @requires    modules/series-on-point
  * @since 10.2.0
  * @type        {string}
  * @apioption   plotOptions.series.onPoint.connectorOptions.stroke
@@ -485,7 +530,6 @@ export default SeriesOnPointComposition;
 /**
  * A name for the dash style to use for the connector.
  *
- * @requires    modules/series-on-point
  * @since 10.2.0
  * @type        {string}
  * @apioption   plotOptions.series.onPoint.connectorOptions.dashstyle
@@ -495,7 +539,6 @@ export default SeriesOnPointComposition;
  * Pixel width of the connector line.
  *
  * @default     1
- * @requires    modules/series-on-point
  * @type        {number}
  * @since 10.2.0
  * @apioption   plotOptions.series.onPoint.connectorOptions.width
@@ -505,7 +548,6 @@ export default SeriesOnPointComposition;
  * The `id` of the point that we connect the series to. Only points with a given
  * `plotX` and `plotY` values and map points are valid.
  *
- * @requires   modules/series-on-point
  * @since 10.2.0
  * @type       {string}
  * @apioption  plotOptions.series.onPoint.id
@@ -515,7 +557,6 @@ export default SeriesOnPointComposition;
  * Options allowing to set a position and an offset of the series in the
  * _Series on point_ feature.
  *
- * @requires    modules/series-on-point
  * @since 10.2.0
  * @type        {object}
  * @apioption   plotOptions.series.onPoint.position
@@ -525,7 +566,6 @@ export default SeriesOnPointComposition;
  * Series center offset from the original x position. If defined, the connector
  * line is drawn connecting original position with new position.
  *
- * @requires   modules/series-on-point
  * @since 10.2.0
  * @type       {number}
  * @apioption  plotOptions.series.onPoint.position.offsetX
@@ -535,7 +575,6 @@ export default SeriesOnPointComposition;
  * Series center offset from the original y position. If defined, the connector
  * line is drawn from original position to a new position.
  *
- * @requires   modules/series-on-point
  * @since 10.2.0
  * @type       {number}
  * @apioption  plotOptions.series.onPoint.position.offsetY
@@ -545,7 +584,6 @@ export default SeriesOnPointComposition;
  * X position of the series center. By default, the series is displayed on the
  * point that it is connected to.
  *
- * @requires   modules/series-on-point
  * @since 10.2.0
  * @type       {number}
  * @apioption  plotOptions.series.onPoint.position.x
@@ -555,10 +593,9 @@ export default SeriesOnPointComposition;
  * Y position of the series center. By default, the series is displayed on the
  * point that it is connected to.
  *
- * @requires   modules/series-on-point
  * @since 10.2.0
  * @type       {number}
  * @apioption  plotOptions.series.onPoint.position.y
  */
 
-''; // keeps doclets above in transpiled file
+''; // Keeps doclets above in transpiled file

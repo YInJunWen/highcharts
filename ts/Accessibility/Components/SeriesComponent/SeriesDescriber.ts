@@ -1,12 +1,14 @@
 /* *
  *
- *  (c) 2009-2021 Øystein Moseng
+ *  (c) 2009-2026 Highsoft AS
+ *  Author: Øystein Moseng
  *
- *  Place desriptions on a series and its points.
+ *  Place descriptions on a series and its points.
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -37,23 +39,26 @@ const {
     getSeriesA11yElement,
     unhideChartElementFromAT
 } = ChartUtilities;
-import F from '../../../Core/FormatUtilities.js';
+import F from '../../../Core/Templating.js';
 const {
     format,
     numberFormat
 } = F;
+import H from '../../../Core/Globals.js';
+const { composed } = H;
 import HTMLUtilities from '../../Utils/HTMLUtilities.js';
 const {
     reverseChildNodes,
     stripHTMLTagsFromString: stripHTMLTags
 } = HTMLUtilities;
-import U from '../../../Core/Utilities.js';
-const {
+import {
+    defined,
     find,
+    isString,
     isNumber,
-    pick,
-    defined
-} = U;
+    pushUnique,
+    wrap
+} from '../../../Shared/Utilities.js';
 
 
 /* *
@@ -62,10 +67,11 @@ const {
  *
  * */
 
-declare module '../../../Core/Series/PointLike' {
-    interface PointLike {
+/** @internal */
+declare module '../../../Core/Series/PointBase' {
+    interface PointBase {
         /** @requires modules/accessibility */
-        hasDummyGraphic?: boolean;
+        hasMockGraphic?: boolean;
     }
 }
 
@@ -76,12 +82,41 @@ declare module '../../../Core/Series/PointLike' {
  *
  * */
 
-/* eslint-disable valid-jsdoc */
+/** @internal */
+function compose(
+    PointClass: typeof Point
+): void {
+
+    if (pushUnique(composed, 'A11y.SD')) {
+        wrap(PointClass.prototype, 'applyOptions', pointApplyOptions);
+    }
+
+}
 
 
 /**
- * @private
+ * Discard the mock graphic once the point is no longer null, so that the
+ * series can draw a real marker for it, #25299.
+ *
+ * @internal
  */
+function pointApplyOptions(
+    this: Point,
+    proceed: Point['applyOptions'],
+    ...args: Parameters<Point['applyOptions']>
+): Point {
+    const point = proceed.apply(this, args);
+
+    if (point.hasMockGraphic && !point.isNull) {
+        point.graphic = point.graphic?.destroy();
+        delete point.hasMockGraphic;
+    }
+
+    return point;
+}
+
+
+/** @internal */
 function findFirstPointWithGraphic(
     point: Point
 ): (Point|null) {
@@ -91,11 +126,13 @@ function findFirstPointWithGraphic(
         return null;
     }
 
+    const nullInteraction = point.series.options?.nullInteraction;
+
     return find(point.series.data, function (p: Point): boolean {
         return !!(
             p &&
             typeof p.index !== 'undefined' &&
-            p.index > sourcePointIndex &&
+            (nullInteraction || p.index > sourcePointIndex) &&
             p.graphic &&
             p.graphic.element
         );
@@ -104,11 +141,12 @@ function findFirstPointWithGraphic(
 
 
 /**
- * Whether or not we should add a dummy point element in
+ * Whether or not we should add a mock point element in
  * order to describe a point that has no graphic.
- * @private
+ *
+ * @internal
  */
-function shouldAddDummyPoint(point: Point): boolean {
+function shouldAddMockPoint(point: Point): boolean|undefined {
     // Note: Sunburst series use isNull for hidden points on drilldown.
     // Ignore these.
     const series = point.series,
@@ -123,32 +161,28 @@ function shouldAddDummyPoint(point: Point): boolean {
 }
 
 
-/**
- * @private
- */
-function makeDummyElement(
+/** @internal */
+function makeMockElement(
     point: Point,
     pos: PositionObject
 ): SVGElement {
     const renderer = point.series.chart.renderer,
-        dummy = renderer.rect(pos.x, pos.y, 1, 1);
+        mock = renderer.rect(pos.x, pos.y, 1, 1);
 
-    dummy.attr({
-        'class': 'highcharts-a11y-dummy-point',
+    mock.attr({
+        'class': 'highcharts-a11y-mock-point',
         fill: 'none',
         opacity: 0,
         'fill-opacity': 0,
         'stroke-opacity': 0
     });
 
-    return dummy;
+    return mock;
 }
 
 
-/**
- * @private
- */
-function addDummyPointElement(
+/** @internal */
+function addMockPointElement(
     point: Accessibility.PointComposition
 ): (DOMElementType|undefined) {
     const series = point.series,
@@ -157,35 +191,33 @@ function addDummyPointElement(
         parentGroup = firstGraphic ?
             firstGraphic.parentGroup :
             series.graph || series.group,
-        dummyPos = firstPointWithGraphic ? {
-            x: pick(point.plotX, firstPointWithGraphic.plotX, 0),
-            y: pick(point.plotY, firstPointWithGraphic.plotY, 0)
+        mockPos = firstPointWithGraphic ? {
+            x: (point.plotX ?? firstPointWithGraphic.plotX ?? 0),
+            y: (point.plotY ?? firstPointWithGraphic.plotY ?? 0)
         } : {
-            x: pick(point.plotX, 0),
-            y: pick(point.plotY, 0)
+            x: (point.plotX ?? 0),
+            y: (point.plotY ?? 0)
         },
-        dummyElement = makeDummyElement(point, dummyPos);
+        mockElement = makeMockElement(point, mockPos);
 
     if (parentGroup && parentGroup.element) {
-        point.graphic = dummyElement;
-        point.hasDummyGraphic = true;
+        point.graphic = mockElement;
+        point.hasMockGraphic = true;
 
-        dummyElement.add(parentGroup);
+        mockElement.add(parentGroup);
 
         // Move to correct pos in DOM
         parentGroup.element.insertBefore(
-            dummyElement.element,
+            mockElement.element,
             firstGraphic ? firstGraphic.element : null
         );
 
-        return dummyElement.element;
+        return mockElement.element;
     }
 }
 
 
-/**
- * @private
- */
+/** @internal */
 function hasMorePointsThanDescriptionThreshold(
     series: Accessibility.SeriesComposition
 ): boolean {
@@ -197,14 +229,12 @@ function hasMorePointsThanDescriptionThreshold(
     return !!(
         threshold !== false &&
         series.points &&
-        series.points.length >= threshold
+        series.points.length >= +threshold
     );
 }
 
 
-/**
- * @private
- */
+/** @internal */
 function shouldSetScreenReaderPropsOnPoints(
     series: Accessibility.SeriesComposition
 ): boolean {
@@ -215,9 +245,7 @@ function shouldSetScreenReaderPropsOnPoints(
 }
 
 
-/**
- * @private
- */
+/** @internal */
 function shouldSetKeyboardNavPropsOnPoints(
     series: Accessibility.SeriesComposition
 ): boolean {
@@ -227,16 +255,14 @@ function shouldSetKeyboardNavPropsOnPoints(
     return !!(
         series.points && (
             series.points.length <
-                seriesNavOptions.pointNavigationEnabledThreshold ||
+                +seriesNavOptions.pointNavigationEnabledThreshold ||
             seriesNavOptions.pointNavigationEnabledThreshold === false
         )
     );
 }
 
 
-/**
- * @private
- */
+/** @internal */
 function shouldDescribeSeriesElement(
     series: Accessibility.SeriesComposition
 ): boolean {
@@ -257,13 +283,11 @@ function shouldDescribeSeriesElement(
 }
 
 
-/**
- * @private
- */
+/** @internal */
 function pointNumberToString(
     point: Accessibility.PointComposition,
-    value: number
-): string {
+    value: number|undefined
+): string|undefined {
     const series = point.series,
         chart = series.chart,
         a11yPointOptions = chart.options.accessibility.point || {},
@@ -288,9 +312,7 @@ function pointNumberToString(
 }
 
 
-/**
- * @private
- */
+/** @internal */
 function getSeriesDescriptionText(
     series: Accessibility.SeriesComposition
 ): string {
@@ -306,9 +328,7 @@ function getSeriesDescriptionText(
 }
 
 
-/**
- * @private
- */
+/** @internal */
 function getSeriesAxisDescriptionText(
     series: Series,
     axisCollection: string
@@ -328,7 +348,7 @@ function getSeriesAxisDescriptionText(
 /**
  * Get accessible time description for a point on a datetime axis.
  *
- * @private
+ * @internal
  */
 function getPointA11yTimeDescription(
     point: Accessibility.PointComposition
@@ -347,7 +367,7 @@ function getPointA11yTimeDescription(
             ),
             dateFormat = seriesA11yOptions.dateFormatter &&
                 seriesA11yOptions.dateFormatter(point) ||
-                a11yOptions.dateFormatter && a11yOptions.dateFormatter(point) ||
+                a11yOptions.dateFormatter?.(point) ||
                 seriesA11yOptions.dateFormat ||
                 a11yOptions.dateFormat ||
                 tooltipDateFormat;
@@ -357,9 +377,7 @@ function getPointA11yTimeDescription(
 }
 
 
-/**
- * @private
- */
+/** @internal */
 function getPointXDescription(
     point: Accessibility.PointComposition
 ): string {
@@ -376,9 +394,7 @@ function getPointXDescription(
 }
 
 
-/**
- * @private
- */
+/** @internal */
 function getPointArrayMapValueDescription(
     point: Accessibility.PointComposition,
     prefix: string,
@@ -386,24 +402,28 @@ function getPointArrayMapValueDescription(
 ): string {
     const pre = prefix || '',
         suf = suffix || '',
-        keyToValStr = function (key: string): string {
+        keyToValStr = function (key: string): string|undefined {
             const num = pointNumberToString(
                 point,
-                pick((point as any)[key], (point.options as any)[key])
+                ((point as any)[key] ?? (point.options as any)[key]
+                )
             );
-            return key + ': ' + pre + num + suf;
+            return num !== void 0 ?
+                key + ': ' + pre + num + suf :
+                num;
         },
         pointArrayMap: Array<string> = point.series.pointArrayMap as any;
 
     return pointArrayMap.reduce(function (desc: string, key: string): string {
-        return desc + (desc.length ? ', ' : '') + keyToValStr(key);
+        const propDesc = keyToValStr(key);
+        return propDesc ?
+            (desc + (desc.length ? ', ' : '') + propDesc) :
+            desc;
     }, '');
 }
 
 
-/**
- * @private
- */
+/** @internal */
 function getPointValue(
     point: Accessibility.PointComposition
 ): string {
@@ -447,11 +467,12 @@ function getPointValue(
  * Return the description for the annotation(s) connected to a point, or
  * empty string if none.
  *
- * @private
  * @param {Highcharts.Point} point
  * The data point to get the annotation info from.
  * @return {string}
  * Annotation description
+ *
+ * @internal
  */
 function getPointAnnotationDescription(point: Point): string {
     const chart = point.series.chart;
@@ -467,7 +488,8 @@ function getPointAnnotationDescription(point: Point): string {
 
 /**
  * Return string with information about point.
- * @private
+ *
+ * @internal
  */
 function getPointValueDescription(
     point: Accessibility.PointComposition
@@ -479,11 +501,13 @@ function getPointValueDescription(
             seriesA11yOptions.point.valueDescriptionFormat,
         pointValueDescriptionFormat = seriesValueDescFormat ||
             chart.options.accessibility.point.valueDescriptionFormat,
-        showXDescription = pick(
-            series.xAxis &&
-            series.xAxis.options.accessibility &&
-            series.xAxis.options.accessibility.enabled,
-            !chart.angular
+        showXDescription = (
+            (
+                series.xAxis &&
+                series.xAxis.options.accessibility &&
+                series.xAxis.options.accessibility.enabled
+            ) ??
+            (!chart.angular && series.type !== 'flowmap')
         ),
         xDesc = showXDescription ? getPointXDescription(point) : '',
         context = {
@@ -500,7 +524,8 @@ function getPointValueDescription(
 
 /**
  * Return string with information about point.
- * @private
+ *
+ * @internal
  */
 function defaultPointDescriptionFormatter(
     point: Accessibility.PointComposition
@@ -525,24 +550,37 @@ function defaultPointDescriptionFormatter(
 
 /**
  * Set a11y props on a point element
- * @private
- * @param {Highcharts.Point} point
- * @param {Highcharts.HTMLDOMElement|Highcharts.SVGDOMElement} pointElement
+ *
+ * @internal
  */
 function setPointScreenReaderAttribs(
     point: Accessibility.PointComposition,
     pointElement: DOMElementType
 ): void {
     const series = point.series,
+        seriesPointA11yOptions = series.options.accessibility?.point || {},
         a11yPointOptions = series.chart.options.accessibility.point || {},
-        seriesPointA11yOptions = series.options.accessibility &&
-            series.options.accessibility.point || {},
         label = stripHTMLTags(
-            seriesPointA11yOptions.descriptionFormatter &&
-            seriesPointA11yOptions.descriptionFormatter(point) ||
-            a11yPointOptions.descriptionFormatter &&
-            a11yPointOptions.descriptionFormatter(point) ||
-            defaultPointDescriptionFormatter(point)
+            (
+                isString(seriesPointA11yOptions.descriptionFormat) &&
+                format(
+                    seriesPointA11yOptions.descriptionFormat,
+                    point,
+                    series.chart
+                )
+            ) ||
+            seriesPointA11yOptions.descriptionFormatter?.(point) ||
+            (
+                isString(a11yPointOptions.descriptionFormat) &&
+                format(
+                    a11yPointOptions.descriptionFormat,
+                    point,
+                    series.chart
+                )
+            ) ||
+            a11yPointOptions.descriptionFormatter?.(point) ||
+            defaultPointDescriptionFormatter(point),
+            series.chart.renderer.forExport
         );
 
     pointElement.setAttribute('role', 'img');
@@ -552,8 +590,8 @@ function setPointScreenReaderAttribs(
 
 /**
  * Add accessible info to individual point elements of a series
- * @private
- * @param {Highcharts.Series} series
+ *
+ * @internal
  */
 function describePointsInSeries(
     series: Accessibility.SeriesComposition
@@ -566,7 +604,7 @@ function describePointsInSeries(
     if (setScreenReaderProps || setKeyboardProps) {
         series.points.forEach((point): void => {
             const pointEl = point.graphic && point.graphic.element ||
-                    shouldAddDummyPoint(point) && addDummyPointElement(point),
+                    shouldAddMockPoint(point) && addMockPointElement(point),
                 pointA11yDisabled = (
                     point.options &&
                     point.options.accessibility &&
@@ -600,7 +638,8 @@ function describePointsInSeries(
 
 /**
  * Return string with information about series.
- * @private
+ *
+ * @internal
  */
 function defaultSeriesDescriptionFormatter(
     series: Accessibility.SeriesComposition
@@ -634,7 +673,12 @@ function defaultSeriesDescriptionFormatter(
         ) + (
             shouldDescribeAxis('xAxis') ? ' ' + xAxisInfo + '.' : ''
         ),
-        formatStr = chart.options.accessibility.series.descriptionFormat || '';
+        formatStr = (
+            (series.options.accessibility &&
+                series.options.accessibility.descriptionFormat) ??
+            chart.options.accessibility.series.descriptionFormat ??
+            ''
+        );
 
     return format(formatStr, {
         seriesDescription: summary,
@@ -649,9 +693,8 @@ function defaultSeriesDescriptionFormatter(
 
 /**
  * Set a11y props on a series element
- * @private
- * @param {Highcharts.Series} series
- * @param {Highcharts.HTMLDOMElement|Highcharts.SVGDOMElement} seriesElement
+ *
+ * @internal
  */
 function describeSeriesElement(
     series: Accessibility.SeriesComposition,
@@ -680,7 +723,8 @@ function describeSeriesElement(
         stripHTMLTags(
             (a11yOptions.series as any).descriptionFormatter &&
             (a11yOptions.series as any).descriptionFormatter(series) ||
-            defaultSeriesDescriptionFormatter(series)
+            defaultSeriesDescriptionFormatter(series),
+            series.chart.renderer.forExport
         )
     );
 }
@@ -725,10 +769,13 @@ function describeSeries(
  *
  * */
 
+/** @internal */
 const SeriesDescriber = {
+    compose,
     defaultPointDescriptionFormatter,
     defaultSeriesDescriptionFormatter,
     describeSeries
 };
 
+/** @internal */
 export default SeriesDescriber;

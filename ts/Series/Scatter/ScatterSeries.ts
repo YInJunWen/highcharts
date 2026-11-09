@@ -1,10 +1,12 @@
 /* *
  *
- *  (c) 2010-2021 Torstein Honsi
+ *  (c) 2010-2026 Highsoft AS
+ *  Author: Torstein Hønsi
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -19,17 +21,28 @@
 import type ScatterPoint from './ScatterPoint';
 import type ScatterSeriesOptions from './ScatterSeriesOptions';
 
+import ColumnSeries from '../Column/ColumnSeries.js';
+import LineSeries from '../Line/LineSeries.js';
+import ScatterSeriesDefaults from './ScatterSeriesDefaults.js';
 import SeriesRegistry from '../../Core/Series/SeriesRegistry.js';
-const {
-    column: ColumnSeries,
-    line: LineSeries
-} = SeriesRegistry.seriesTypes;
-import U from '../../Core/Utilities.js';
-const {
-    addEvent,
-    extend,
-    merge
-} = U;
+import { addEvent, extend, merge } from '../../Shared/Utilities.js';
+
+/* *
+ *
+ *  Declarations
+ *
+ * */
+
+/** @internal */
+declare module '../../Core/Series/SeriesBase' {
+    interface SeriesBase {
+        /**
+         * Allow scatter points on the edge to be interacted
+         * with outside the plot.
+         */
+        allowOutsidePlotInteraction?: boolean;
+    }
+}
 
 /* *
  *
@@ -50,112 +63,10 @@ class ScatterSeries extends LineSeries {
      *
      * */
 
-    /**
-     * A scatter plot uses cartesian coordinates to display values for two
-     * variables for a set of data.
-     *
-     * @sample {highcharts} highcharts/demo/scatter/
-     *         Scatter plot
-     *
-     * @extends      plotOptions.line
-     * @excluding    cropThreshold, pointPlacement, shadow, useOhlcData
-     * @product      highcharts highstock
-     * @optionparent plotOptions.scatter
-     */
-    public static defaultOptions: ScatterSeriesOptions = merge(LineSeries.defaultOptions, {
-
-        /**
-         * The width of the line connecting the data points.
-         *
-         * @sample {highcharts} highcharts/plotoptions/scatter-linewidth-none/
-         *         0 by default
-         * @sample {highcharts} highcharts/plotoptions/scatter-linewidth-1/
-         *         1px
-         *
-         * @product highcharts highstock
-         */
-        lineWidth: 0,
-
-        findNearestPointBy: 'xy',
-
-        /**
-         * Apply a jitter effect for the rendered markers. When plotting
-         * discrete values, a little random noise may help telling the points
-         * apart. The jitter setting applies a random displacement of up to `n`
-         * axis units in either direction. So for example on a horizontal X
-         * axis, setting the `jitter.x` to 0.24 will render the point in a
-         * random position between 0.24 units to the left and 0.24 units to the
-         * right of the true axis position. On a category axis, setting it to
-         * 0.5 will fill up the bin and make the data appear continuous.
-         *
-         * When rendered on top of a box plot or a column series, a jitter value
-         * of 0.24 will correspond to the underlying series' default
-         * [groupPadding](
-         * https://api.highcharts.com/highcharts/plotOptions.column.groupPadding)
-         * and [pointPadding](
-         * https://api.highcharts.com/highcharts/plotOptions.column.pointPadding)
-         * settings.
-         *
-         * @sample {highcharts} highcharts/series-scatter/jitter
-         *         Jitter on a scatter plot
-         *
-         * @sample {highcharts} highcharts/series-scatter/jitter-boxplot
-         *         Jittered scatter plot on top of a box plot
-         *
-         * @product highcharts highstock
-         * @since 7.0.2
-         */
-        jitter: {
-            /**
-             * The maximal X offset for the random jitter effect.
-             */
-            x: 0,
-            /**
-             * The maximal Y offset for the random jitter effect.
-             */
-            y: 0
-        },
-
-        marker: {
-
-            enabled: true // Overrides auto-enabling in line series (#3647)
-        },
-
-        /**
-         * Sticky tracking of mouse events. When true, the `mouseOut` event
-         * on a series isn't triggered until the mouse moves over another
-         * series, or out of the plot area. When false, the `mouseOut` event on
-         * a series is triggered when the mouse leaves the area around the
-         * series' graph or markers. This also implies the tooltip. When
-         * `stickyTracking` is false and `tooltip.shared` is false, the tooltip
-         * will be hidden when moving the mouse between series.
-         *
-         * @type      {boolean}
-         * @default   false
-         * @product   highcharts highstock highmaps
-         * @apioption plotOptions.scatter.stickyTracking
-         */
-
-        /**
-         * A configuration object for the tooltip rendering of each single
-         * series. Properties are inherited from [tooltip](#tooltip).
-         * Overridable properties are `headerFormat`, `pointFormat`,
-         * `yDecimals`, `xDateFormat`, `yPrefix` and `ySuffix`. Unlike other
-         * series, in a scatter plot the series.name by default shows in the
-         * headerFormat and point.x and point.y in the pointFormat.
-         *
-         * @product highcharts highstock highmaps
-         */
-        tooltip: {
-            /**
-             * @product highcharts highstock
-             */
-            headerFormat: '<span style="color:{point.color}">\u25CF</span> ' +
-                '<span style="font-size: 10px"> {series.name}</span><br/>',
-            pointFormat: 'x: <b>{point.x}</b><br/>y: <b>{point.y}</b><br/>'
-        }
-
-    } as ScatterSeriesOptions);
+    public static defaultOptions = merge(
+        LineSeries.defaultOptions,
+        ScatterSeriesDefaults
+    );
 
     /* *
      *
@@ -163,11 +74,11 @@ class ScatterSeries extends LineSeries {
      *
      * */
 
-    public data: Array<ScatterPoint> = void 0 as any;
+    public data!: Array<ScatterPoint>;
 
-    public options: ScatterSeriesOptions = void 0 as any;
+    public options!: ScatterSeriesOptions;
 
-    public points: Array<ScatterPoint> = void 0 as any;
+    public points!: Array<ScatterPoint>;
 
     /* *
      *
@@ -176,7 +87,6 @@ class ScatterSeries extends LineSeries {
      * */
 
     /* eslint-disable valid-jsdoc */
-
     /**
      * Optionally add the jitter effect.
      * @private
@@ -197,31 +107,24 @@ class ScatterSeries extends LineSeries {
         }
 
         if (jitter) {
-            this.points.forEach(function (point, i): void {
-                ['x', 'y'].forEach(function (dim, j): void {
-                    let axis,
-                        plotProp = 'plot' + dim.toUpperCase(),
-                        min,
-                        max,
-                        translatedJitter;
-                    if ((jitter as any)[dim] && !point.isNull) {
-                        axis = (series as any)[dim + 'Axis'];
-                        translatedJitter =
-                            (jitter as any)[dim] * axis.transA;
-                        if (axis && !axis.isLog) {
+            this.points.forEach((point, i): void => {
+                (['x', 'y'] as const).forEach((dim, j): void => {
+                    if (jitter[dim] && !point.isNull) {
+                        const plotProp: 'plotX'|'plotY' =
+                                `plot${dim.toUpperCase() as 'X'|'Y'}`,
+                            axis = series[`${dim}Axis`];
+
+                        if (axis && !axis.logarithmic) {
 
                             // Identify the outer bounds of the jitter range
-                            min = Math.max(
-                                0,
-                                (point as any)[plotProp] - translatedJitter
-                            );
-                            max = Math.min(
-                                axis.len,
-                                (point as any)[plotProp] + translatedJitter
-                            );
+                            // (#25054)
+                            const translatedJitter = jitter[dim] * axis.transA *
+                                    (axis.reversed ? -1 : 1),
+                                min = (point[plotProp] || 0) - translatedJitter,
+                                max = (point[plotProp] || 0) + translatedJitter;
 
                             // Find a random position within this range
-                            (point as any)[plotProp] = min +
+                            point[plotProp] = min +
                                 (max - min) * unrandom(i + j * len);
 
                             // Update clientX for the tooltip k-d-tree
@@ -246,7 +149,6 @@ class ScatterSeries extends LineSeries {
         }
     }
 
-    /* eslint-enable valid-jsdoc */
 
 }
 
@@ -258,16 +160,14 @@ class ScatterSeries extends LineSeries {
 
 interface ScatterSeries {
     pointClass: typeof ScatterPoint;
-    takeOrdinalPosition: boolean;
 }
 extend(ScatterSeries.prototype, {
+    allowOutsidePlotInteraction: true,
     drawTracker: ColumnSeries.prototype.drawTracker,
     sorted: false,
     requireSorting: false,
     noSharedTooltip: true,
-    trackerGroups: ['group', 'markerGroup', 'dataLabelsGroup'],
-    takeOrdinalPosition: false // #2342
-
+    trackerGroups: ['group', 'markerGroup', 'dataLabelsGroup']
 });
 
 /* *
@@ -297,6 +197,7 @@ declare module '../../Core/Series/SeriesType' {
 }
 SeriesRegistry.registerSeriesType('scatter', ScatterSeries);
 
+
 /* *
  *
  *  Default Export
@@ -304,81 +205,3 @@ SeriesRegistry.registerSeriesType('scatter', ScatterSeries);
  * */
 
 export default ScatterSeries;
-
-/* *
- *
- *  API Options
- *
- * */
-
-/**
- * A `scatter` series. If the [type](#series.scatter.type) option is
- * not specified, it is inherited from [chart.type](#chart.type).
- *
- * @extends   series,plotOptions.scatter
- * @excluding cropThreshold, dataParser, dataURL, useOhlcData
- * @product   highcharts highstock
- * @apioption series.scatter
- */
-
-/**
- * An array of data points for the series. For the `scatter` series
- * type, points can be given in the following ways:
- *
- * 1. An array of numerical values. In this case, the numerical values will be
- *    interpreted as `y` options. The `x` values will be automatically
- *    calculated, either starting at 0 and incremented by 1, or from
- *    `pointStart` and `pointInterval` given in the series options. If the axis
- *    has categories, these will be used. Example:
- *    ```js
- *    data: [0, 5, 3, 5]
- *    ```
- *
- * 2. An array of arrays with 2 values. In this case, the values correspond to
- *    `x,y`. If the first value is a string, it is applied as the name of the
- *    point, and the `x` value is inferred.
- *    ```js
- *    data: [
- *        [0, 0],
- *        [1, 8],
- *        [2, 9]
- *    ]
- *    ```
- *
- * 3. An array of objects with named values. The following snippet shows only a
- *    few settings, see the complete options set below. If the total number of
- *    data points exceeds the series'
- *    [turboThreshold](#series.scatter.turboThreshold), this option is not
- *    available.
- *    ```js
- *    data: [{
- *        x: 1,
- *        y: 2,
- *        name: "Point2",
- *        color: "#00FF00"
- *    }, {
- *        x: 1,
- *        y: 4,
- *        name: "Point1",
- *        color: "#FF00FF"
- *    }]
- *    ```
- *
- * @sample {highcharts} highcharts/chart/reflow-true/
- *         Numerical values
- * @sample {highcharts} highcharts/series/data-array-of-arrays/
- *         Arrays of numeric x and y
- * @sample {highcharts} highcharts/series/data-array-of-arrays-datetime/
- *         Arrays of datetime x and y
- * @sample {highcharts} highcharts/series/data-array-of-name-value/
- *         Arrays of point.name and y
- * @sample {highcharts} highcharts/series/data-array-of-objects/
- *         Config objects
- *
- * @type      {Array<number|Array<(number|string),(number|null)>|null|*>}
- * @extends   series.line.data
- * @product   highcharts highstock
- * @apioption series.scatter.data
- */
-
-''; // keeps doclets above in JS file

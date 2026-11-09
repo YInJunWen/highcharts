@@ -1,10 +1,12 @@
 /* *
  *
- *  (c) 2010-2021 Torstein Honsi
+ *  (c) 2010-2026 Highsoft AS
+ *  Author: Torstein Hønsi
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -16,37 +18,32 @@
  *
  * */
 
-import type ColorType from '../../Core/Color/ColorType';
 import type { FlagsShapeValue } from './FlagsPointOptions';
 import type FlagsSeriesOptions from './FlagsSeriesOptions';
 import type SVGAttributes from '../../Core/Renderer/SVG/SVGAttributes';
+import type { StatesOptionsKey } from '../../Core/Series/StatesOptions';
 
 import FlagsPoint from './FlagsPoint.js';
+import FlagsSeriesDefaults from './FlagsSeriesDefaults.js';
+import FlagsSymbols from './FlagsSymbols.js';
 import H from '../../Core/Globals.js';
 const { noop } = H;
 import OnSeriesComposition from '../OnSeriesComposition.js';
-import { Palette } from '../../Core/Color/Palettes.js';
 import R from '../../Core/Renderer/RendererUtilities.js';
 const { distribute } = R;
+import ColumnSeries from '../Column/ColumnSeries.js';
+import Series from '../../Core/Series/Series.js';
 import SeriesRegistry from '../../Core/Series/SeriesRegistry.js';
-const {
-    series: Series,
-    seriesTypes: {
-        column: ColumnSeries
-    }
-} = SeriesRegistry;
 import SVGElement from '../../Core/Renderer/SVG/SVGElement.js';
-import U from '../../Core/Utilities.js';
-const {
+import {
     addEvent,
     defined,
     extend,
+    isNumber,
     merge,
     objectEach,
     wrap
-} = U;
-
-import './FlagsSymbols.js';
+} from '../../Shared/Utilities.js';
 
 /* *
  *
@@ -54,20 +51,20 @@ import './FlagsSymbols.js';
  *
  * */
 
-declare module '../../Core/Series/SeriesLike' {
-    interface SeriesLike {
+/** @internal */
+declare module '../../Core/Series/SeriesBase' {
+    interface SeriesBase {
         allowDG?: boolean;
     }
 }
 
-declare module '../../Core/Series/SeriesOptions' {
-    interface SeriesStateHoverOptions {
-        fillColor?: ColorType;
-        lineColor?: ColorType;
+declare module '../../Core/Series/StatesOptions' {
+    interface StateOptionsBase {
         shape?: FlagsShapeValue;
     }
 }
 
+/** @internal */
 interface DistributedBoxObject extends R.BoxObject {
     anchorX?: number;
     plotX?: number;
@@ -82,7 +79,6 @@ interface DistributedBoxObject extends R.BoxObject {
 /**
  * The Flags series.
  *
- * @private
  * @class
  * @name Highcharts.seriesTypes.flags
  *
@@ -96,238 +92,14 @@ class FlagsSeries extends ColumnSeries {
      *
      * */
 
-    /**
-     * Flags are used to mark events in stock charts. They can be added on the
-     * timeline, or attached to a specific series.
-     *
-     * @sample stock/demo/flags-general/
-     *         Flags on a line series
-     *
-     * @extends      plotOptions.column
-     * @excluding    animation, borderColor, borderRadius, borderWidth,
-     *               colorByPoint, dataGrouping, pointPadding, pointWidth,
-     *               turboThreshold
-     * @product      highstock
-     * @optionparent plotOptions.flags
-     */
-    public static defaultOptions: FlagsSeriesOptions = merge(ColumnSeries.defaultOptions, {
+    /** @internal */
+    public static compose = FlagsSymbols.compose;
 
-        /**
-         * In case the flag is placed on a series, on what point key to place
-         * it. Line and columns have one key, `y`. In range or OHLC-type series,
-         * however, the flag can optionally be placed on the `open`, `high`,
-         * `low` or `close` key.
-         *
-         * @sample {highstock} stock/plotoptions/flags-onkey/
-         *         Range series, flag on high
-         *
-         * @type       {string}
-         * @default    y
-         * @since      4.2.2
-         * @product    highstock
-         * @validvalue ["y", "open", "high", "low", "close"]
-         * @apioption  plotOptions.flags.onKey
-         */
-
-        /**
-         * The id of the series that the flags should be drawn on. If no id
-         * is given, the flags are drawn on the x axis.
-         *
-         * @sample {highstock} stock/plotoptions/flags/
-         *         Flags on series and on x axis
-         *
-         * @type      {string}
-         * @product   highstock
-         * @apioption plotOptions.flags.onSeries
-         */
-
-        pointRange: 0, // #673
-
-        /**
-         * Whether the flags are allowed to overlap sideways. If `false`, the
-         * flags are moved sideways using an algorithm that seeks to place every
-         * flag as close as possible to its original position.
-         *
-         * @sample {highstock} stock/plotoptions/flags-allowoverlapx
-         *         Allow sideways overlap
-         *
-         * @since 6.0.4
-         */
-        allowOverlapX: false,
-
-        /**
-         * The shape of the marker. Can be one of "flag", "circlepin",
-         * "squarepin", or an image of the format `url(/path-to-image.jpg)`.
-         * Individual shapes can also be set for each point.
-         *
-         * @sample {highstock} stock/plotoptions/flags/
-         *         Different shapes
-         *
-         * @type    {Highcharts.FlagsShapeValue}
-         * @product highstock
-         */
-        shape: 'flag',
-
-        /**
-         * When multiple flags in the same series fall on the same value, this
-         * number determines the vertical offset between them.
-         *
-         * @sample {highstock} stock/plotoptions/flags-stackdistance/
-         *         A greater stack distance
-         *
-         * @product highstock
-         */
-        stackDistance: 12,
-
-        /**
-         * Text alignment for the text inside the flag.
-         *
-         * @since      5.0.0
-         * @product    highstock
-         * @validvalue ["left", "center", "right"]
-         */
-        textAlign: 'center',
-
-        /**
-         * Specific tooltip options for flag series. Flag series tooltips are
-         * different from most other types in that a flag doesn't have a data
-         * value, so the tooltip rather displays the `text` option for each
-         * point.
-         *
-         * @extends   plotOptions.series.tooltip
-         * @excluding changeDecimals, valueDecimals, valuePrefix, valueSuffix
-         * @product   highstock
-         */
-        tooltip: {
-            pointFormat: '{point.text}'
-        },
-
-        threshold: null as any,
-
-        /**
-         * The text to display on each flag. This can be defined on series
-         * level, or individually for each point. Defaults to `"A"`.
-         *
-         * @type      {string}
-         * @default   A
-         * @product   highstock
-         * @apioption plotOptions.flags.title
-         */
-
-        /**
-         * The y position of the top left corner of the flag relative to either
-         * the series (if onSeries is defined), or the x axis. Defaults to
-         * `-30`.
-         *
-         * @product highstock
-         */
-        y: -30,
-
-        /**
-         * Whether to use HTML to render the flag texts. Using HTML allows for
-         * advanced formatting, images and reliable bi-directional text
-         * rendering. Note that exported images won't respect the HTML, and that
-         * HTML won't respect Z-index settings.
-         *
-         * @type      {boolean}
-         * @default   false
-         * @since     1.3
-         * @product   highstock
-         * @apioption plotOptions.flags.useHTML
-         */
-
-        /**
-         * Fixed width of the flag's shape. By default, width is autocalculated
-         * according to the flag's title.
-         *
-         * @sample {highstock} stock/demo/flags-shapes/
-         *         Flags with fixed width
-         *
-         * @type      {number}
-         * @product   highstock
-         * @apioption plotOptions.flags.width
-         */
-
-        /**
-         * Fixed height of the flag's shape. By default, height is
-         * autocalculated according to the flag's title.
-         *
-         * @type      {number}
-         * @product   highstock
-         * @apioption plotOptions.flags.height
-         */
-
-        /**
-         * The fill color for the flags.
-         *
-         * @type    {Highcharts.ColorString|Highcharts.GradientColorObject|Highcharts.PatternObject}
-         * @product highstock
-         */
-        fillColor: Palette.backgroundColor,
-
-        /**
-         * The color of the line/border of the flag.
-         *
-         * In styled mode, the stroke is set in the
-         * `.highcharts-flag-series.highcharts-point` rule.
-         *
-         * @type      {Highcharts.ColorString|Highcharts.GradientColorObject|Highcharts.PatternObject}
-         * @default   #000000
-         * @product   highstock
-         * @apioption plotOptions.flags.lineColor
-         */
-
-        /**
-         * The pixel width of the flag's line/border.
-         *
-         * @product highstock
-         */
-        lineWidth: 1,
-
-        states: {
-
-            /**
-             * @extends plotOptions.column.states.hover
-             * @product highstock
-             */
-            hover: {
-
-                /**
-                 * The color of the line/border of the flag.
-                 *
-                 * @type    {Highcharts.ColorString|Highcharts.GradientColorObject|Highcharts.PatternObject}
-                 * @product highstock
-                 */
-                lineColor: Palette.neutralColor100,
-
-                /**
-                 * The fill or background color of the flag.
-                 *
-                 * @type    {Highcharts.ColorString|Highcharts.GradientColorObject|Highcharts.PatternObject}
-                 * @product highstock
-                 */
-                fillColor: Palette.highlightColor20
-            }
-        },
-
-        /**
-         * The text styles of the flag.
-         *
-         * In styled mode, the styles are set in the
-         * `.highcharts-flag-series .highcharts-point` rule.
-         *
-         * @type    {Highcharts.CSSObject}
-         * @default {"fontSize": "11px", "fontWeight": "bold"}
-         * @product highstock
-         */
-        style: {
-            /** @ignore-option */
-            fontSize: '11px',
-            /** @ignore-option */
-            fontWeight: 'bold'
-        }
-
-    } as FlagsSeriesOptions);
+    /** @internal */
+    public static defaultOptions: FlagsSeriesOptions = merge(
+        ColumnSeries.defaultOptions,
+        FlagsSeriesDefaults
+    );
 
     /* *
      *
@@ -335,13 +107,14 @@ class FlagsSeries extends ColumnSeries {
      *
      * */
 
-    public data: Array<FlagsPoint> = void 0 as any;
+    public data!: Array<FlagsPoint>;
 
+    /** @internal */
     public onSeries?: typeof Series.prototype;
 
-    public options: FlagsSeriesOptions = void 0 as any;
+    public options!: FlagsSeriesOptions;
 
-    public points: Array<FlagsPoint> = void 0 as any;
+    public points!: Array<FlagsPoint>;
 
     /* *
      *
@@ -349,11 +122,9 @@ class FlagsSeries extends ColumnSeries {
      *
      * */
 
-    /* eslint-disable valid-jsdoc */
-
     /**
      * Disable animation, but keep clipping (#8546).
-     * @private
+     * @internal
      */
     public animate(init?: boolean): void {
         if (init) {
@@ -363,18 +134,24 @@ class FlagsSeries extends ColumnSeries {
 
     /**
      * Draw the markers.
-     * @private
+     * @internal
      */
     public drawPoints(): void {
-        let series = this,
+        const series = this,
             points = series.points,
             chart = series.chart,
             renderer = chart.renderer,
-            plotX: (number|undefined),
-            plotY: (number|undefined),
             inverted = chart.inverted,
             options = series.options,
             optionsY = options.y,
+            yAxis = series.yAxis,
+            boxesMap: Record<string, DistributedBoxObject> = {},
+            boxes: Array<DistributedBoxObject> = [],
+            borderRadius = isNumber(options.borderRadius) ?
+                options.borderRadius : 0;
+
+        let plotX: (number|undefined),
+            plotY: (number|undefined),
             shape,
             i,
             point,
@@ -383,9 +160,6 @@ class FlagsSeries extends ColumnSeries {
             anchorY,
             attribs: SVGAttributes,
             outsideRight,
-            yAxis = series.yAxis,
-            boxesMap: Record<string, DistributedBoxObject> = {},
-            boxes: Array<DistributedBoxObject> = [],
             centered;
 
         i = points.length;
@@ -406,7 +180,7 @@ class FlagsSeries extends ColumnSeries {
                     (stackIndex * (options.stackDistance as any)) as any
                 );
             }
-            // skip connectors for higher level stacked points
+            // Skip connectors for higher level stacked points
             point.anchorX = stackIndex ? void 0 : point.plotX;
             anchorY = stackIndex ? void 0 : point.plotY;
             centered = shape !== 'flag';
@@ -429,19 +203,19 @@ class FlagsSeries extends ColumnSeries {
                 if (!graphic) {
                     graphic = point.graphic = renderer.label(
                         '',
-                        null as any,
-                        null as any,
+                        0,
+                        void 0,
                         shape as any,
-                        null as any,
-                        null as any,
+                        void 0,
+                        void 0,
                         options.useHTML
                     )
-                        .addClass('highcharts-point')
+                        .addClass(point.getClassName())
                         .add(series.markerGroup);
 
                     // Add reference to the point for tracker (#6303)
                     if (point.graphic.div) {
-                        point.graphic.div.point = point;
+                        (point.graphic.div as any).point = point;
                     }
 
                     graphic.isNew = true;
@@ -451,7 +225,8 @@ class FlagsSeries extends ColumnSeries {
                     align: centered ? 'center' : 'left',
                     width: options.width,
                     height: options.height,
-                    'text-align': options.textAlign
+                    'text-align': options.textAlign,
+                    r: borderRadius
                 });
 
                 if (!chart.styledMode) {
@@ -475,7 +250,8 @@ class FlagsSeries extends ColumnSeries {
                     attribs.anchorX = point.anchorX;
                 }
                 graphic.attr({
-                    text: point.options.title || options.title || 'A'
+                    // Allow empty string as a flag title (#20549)
+                    text: point.options.title ?? options.title ?? 'A'
                 })[graphic.isNew ? 'attr' : 'animate'](attribs);
 
                 // Rig for the distribute function
@@ -483,14 +259,14 @@ class FlagsSeries extends ColumnSeries {
                     if (!boxesMap[point.plotX as any]) {
                         boxesMap[point.plotX as any] = {
                             align: centered ? 0.5 : 0,
-                            size: graphic.width,
+                            size: graphic.width || 0,
                             target: plotX as any,
                             anchorX: plotX as any
                         };
                     } else {
                         boxesMap[point.plotX as any].size = Math.max(
                             boxesMap[point.plotX as any].size,
-                            graphic.width
+                            graphic.width || 0
                         );
                     }
                 }
@@ -525,7 +301,7 @@ class FlagsSeries extends ColumnSeries {
                 maxDistance
             );
 
-            points.forEach(function (point): void {
+            for (const point of points) {
                 const plotX = point.plotX as number,
                     graphic = point.graphic,
                     box = graphic && boxesMap[plotX];
@@ -544,20 +320,20 @@ class FlagsSeries extends ColumnSeries {
                         ).show().isNew = false;
                     }
                 }
-            });
+            }
         }
 
         // Can be a mix of SVG and HTML and we need events for both (#6303)
-        if (options.useHTML) {
+        if (options.useHTML && series.markerGroup) {
             wrap(series.markerGroup, 'on', function (
                 this: FlagsSeries,
                 proceed
             ): SVGElement {
                 return SVGElement.prototype.on.apply(
-                    // for HTML
+                    // For HTML
                     // eslint-disable-next-line no-invalid-this
                     proceed.apply(this, [].slice.call(arguments, 1)),
-                    // and for SVG
+                    // And for SVG
                     [].slice.call(arguments, 1) as any
                 );
             });
@@ -568,7 +344,7 @@ class FlagsSeries extends ColumnSeries {
     /**
      * Extend the column trackers with listeners to expand and contract
      * stacks.
-     * @private
+     * @internal
      */
     public drawTracker(): void {
         const series = this,
@@ -581,7 +357,7 @@ class FlagsSeries extends ColumnSeries {
         * of vertically stacked elements as well as tight points on the x
         * axis. #1924.
         */
-        points.forEach(function (point): void {
+        for (const point of points) {
             const graphic = point.graphic;
 
             if (graphic) {
@@ -594,7 +370,8 @@ class FlagsSeries extends ColumnSeries {
                     function (): void {
 
                         // Raise this point
-                        if ((point.stackIndex as any) > 0 &&
+                        if (
+                            (point.stackIndex as any) > 0 &&
                             !point.raised
                         ) {
                             point._y = (graphic as any).y;
@@ -605,42 +382,43 @@ class FlagsSeries extends ColumnSeries {
                         }
 
                         // Revert other raised points
-                        points.forEach(function (otherPoint): void {
+                        for (const otherPoint of points) {
                             if (
                                 otherPoint !== point &&
-                            otherPoint.raised &&
-                            otherPoint.graphic
+                                otherPoint.raised &&
+                                otherPoint.graphic
                             ) {
                                 otherPoint.graphic.attr({
                                     y: otherPoint._y
                                 });
                                 otherPoint.raised = false;
                             }
-                        });
+                        }
                     }
                 );
             }
-        });
+        }
     }
 
     /**
      * Get presentational attributes
-     * @private
+     * @internal
      */
     public pointAttribs(
         point: FlagsPoint,
-        state?: string
+        state?: StatesOptionsKey
     ): SVGAttributes {
-        let options = this.options,
-            color = (point && point.color) || this.color,
-            lineColor = options.lineColor,
-            lineWidth = (point && point.lineWidth),
-            fill = (point && point.fillColor) || options.fillColor;
+        const options = this.options,
+            color = point?.color || this.color;
+
+        let lineColor = options.lineColor,
+            lineWidth = point?.lineWidth,
+            fill = point?.fillColor || options.fillColor;
 
         if (state) {
-            fill = (options.states as any)[state].fillColor;
-            lineColor = (options.states as any)[state].lineColor;
-            lineWidth = (options.states as any)[state].lineWidth;
+            fill = options.states?.[state]?.fillColor;
+            lineColor = options.states?.[state]?.lineColor;
+            lineWidth = options.states?.[state]?.lineWidth;
         }
 
         return {
@@ -651,7 +429,7 @@ class FlagsSeries extends ColumnSeries {
     }
 
     /**
-     * @private
+     * @internal
      */
     public setClip(): void {
         Series.prototype.setClip.apply(this, arguments as any);
@@ -664,8 +442,6 @@ class FlagsSeries extends ColumnSeries {
         }
     }
 
-    /* eslint-enable valid-jsdoc */
-
 }
 
 /* *
@@ -674,6 +450,7 @@ class FlagsSeries extends ColumnSeries {
  *
  * */
 
+/** @internal */
 interface FlagsSeries extends OnSeriesComposition.SeriesComposition {
     allowDG: boolean;
     group: typeof ColumnSeries.prototype.group;
@@ -696,14 +473,9 @@ extend(FlagsSeries.prototype, {
     buildKDTree: noop,
     /**
      * Inherit the initialization from base Series.
-     * @private
+     * @internal
      */
-    init: Series.prototype.init,
-    /**
-     * Don't invert the flag marker group (#4960).
-     * @private
-     */
-    invertGroups: noop
+    init: Series.prototype.init
 });
 
 /* *
@@ -713,7 +485,7 @@ extend(FlagsSeries.prototype, {
  * */
 
 declare module '../../Core/Series/SeriesType' {
-    interface SeriesTypesDictionary {
+    interface SeriesTypeRegistry {
         flags: typeof FlagsSeries;
     }
 }
@@ -726,89 +498,3 @@ SeriesRegistry.registerSeriesType('flags', FlagsSeries);
  * */
 
 export default FlagsSeries;
-
-/* *
- *
- *  API Declarations
- *
- * */
-
-/**
- * @typedef {"circlepin"|"flag"|"squarepin"} Highcharts.FlagsShapeValue
- */
-
-''; // detach doclets above
-
-/* *
- *
- *  API Option
- *
- * */
-
-/**
- * A `flags` series. If the [type](#series.flags.type) option is not
- * specified, it is inherited from [chart.type](#chart.type).
- *
- * @extends   series,plotOptions.flags
- * @excluding animation, borderColor, borderRadius, borderWidth, colorByPoint,
- *            connectNulls, dashStyle, dataGrouping, dataParser, dataURL,
- *            gapSize, gapUnit, linecap, lineWidth, marker, pointPadding,
- *            pointWidth, step, turboThreshold, useOhlcData
- * @product   highstock
- * @apioption series.flags
- */
-
-/**
- * An array of data points for the series. For the `flags` series type,
- * points can be given in the following ways:
- *
- * 1. An array of objects with named values. The following snippet shows only a
- *    few settings, see the complete options set below. If the total number of
- *    data points exceeds the series'
- *    [turboThreshold](#series.flags.turboThreshold), this option is not
- *    available.
- *    ```js
- *    data: [{
- *        x: 1,
- *        title: "A",
- *        text: "First event"
- *    }, {
- *        x: 1,
- *        title: "B",
- *        text: "Second event"
- *    }]
- *    ```
- *
- * @type      {Array<*>}
- * @extends   series.line.data
- * @excluding dataLabels, marker, name, y
- * @product   highstock
- * @apioption series.flags.data
- */
-
-/**
- * The fill color of an individual flag. By default it inherits from
- * the series color.
- *
- * @type      {Highcharts.ColorString|Highcharts.GradientColorObject|Highcharts.PatternObject}
- * @product   highstock
- * @apioption series.flags.data.fillColor
- */
-
-/**
- * The longer text to be shown in the flag's tooltip.
- *
- * @type      {string}
- * @product   highstock
- * @apioption series.flags.data.text
- */
-
-/**
- * The short text to be shown on the flag.
- *
- * @type      {string}
- * @product   highstock
- * @apioption series.flags.data.title
- */
-
-''; // adds doclets above to transpiled file

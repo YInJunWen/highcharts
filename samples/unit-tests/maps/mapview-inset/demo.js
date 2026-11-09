@@ -84,7 +84,19 @@ QUnit.test('MapView Inset', assert => {
             dataLabels: {
                 enabled: true,
                 pointFormat: '{point.name}'
-            }
+            },
+            name: 'MapSeries'
+        }, {
+            type: 'mapbubble',
+            joinBy: 'name',
+            data: [{
+                name: 'Mainland',
+                z: 1
+            }, {
+                name: 'Island',
+                z: 1
+            }],
+            name: 'MapBubbleSeries'
         }]
     });
 
@@ -138,17 +150,19 @@ QUnit.test('MapView Inset', assert => {
         'fromPointToLatLon: outside inset'
     );
 
-    chart.series[0].points.forEach(p => {
-        assert.ok(
-            (
-                p.plotX > chart.plotLeft &&
-                p.plotX < chart.plotLeft + chart.plotWidth &&
-                p.plotY > chart.plotTop &&
-                p.plotY < chart.plotTop + chart.plotHeight
-            ),
-            `Plot coordinates of ${p.name} should be within pane (currently \
-                [${p.plotX}, ${p.plotY}])`
-        );
+    chart.series.forEach(s => {
+        s.points.forEach(p => {
+            assert.ok(
+                (
+                    p.plotX > chart.plotLeft &&
+                    p.plotX < chart.plotLeft + chart.plotWidth &&
+                    p.plotY > chart.plotTop &&
+                    p.plotY < chart.plotTop + chart.plotHeight
+                ),
+                `Plot coordinates of ${s.name}/${p.name} should be within pane \
+                    (currently [${p.plotX}, ${p.plotY}])`
+            );
+        });
     });
 
 
@@ -197,6 +211,24 @@ QUnit.test('MapView Inset', assert => {
         chart.mapView.lonLatToPixels({ lon: 95, lat: 55 }),
         xyBefore,
         'Translation inside what was previously the inset should change'
+    );
+
+    const insetClip = chart.mapView.groupClipRect.element;
+
+    assert.deepEqual(
+        [
+            +insetClip.getAttribute('x'),
+            +insetClip.getAttribute('y'),
+            +insetClip.getAttribute('width'),
+            +insetClip.getAttribute('height')
+        ],
+        [
+            chart.plotLeft,
+            chart.plotTop,
+            chart.plotWidth,
+            chart.plotHeight
+        ],
+        'The map-view group clip should match the plot area (#23723)'
     );
 
 });

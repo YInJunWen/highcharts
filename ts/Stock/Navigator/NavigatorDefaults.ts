@@ -1,10 +1,12 @@
 /* *
  *
- *  (c) 2010-2021 Torstein Honsi
+ *  (c) 2010-2026 Highsoft AS
+ *  Author: Torstein Hønsi
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -18,9 +20,6 @@
 
 import type NavigatorOptions from './NavigatorOptions';
 
-import Color from '../../Core/Color/Color.js';
-const { parse: color } = Color;
-import { Palette } from '../../Core/Color/Palettes.js';
 import SeriesRegistry from '../../Core/Series/SeriesRegistry.js';
 const { seriesTypes } = SeriesRegistry;
 
@@ -65,7 +64,7 @@ const NavigatorDefaults: NavigatorOptions = {
      *
      * @see [series.showInNavigator](#plotOptions.series.showInNavigator)
      *
-     * @deprecated
+     * @deprecated 5.0.0
      * @type      {number|string}
      * @default   0
      * @apioption navigator.baseSeries
@@ -106,13 +105,13 @@ const NavigatorDefaults: NavigatorOptions = {
      * @sample {highstock} stock/navigator/margin/
      *         A margin of 2 draws the navigator closer to the X axis labels
      */
-    margin: 25,
+    margin: 22,
 
     /**
      * Whether the mask should be inside the range marking the zoomed
      * range, or outside. In Highcharts Stock 1.x it was always `false`.
      *
-     * @sample {highstock} stock/navigator/maskinside-false/
+     * @sample {highstock} stock/demo/maskinside-false/
      *         False, mask outside
      *
      * @since   2.0
@@ -136,6 +135,16 @@ const NavigatorDefaults: NavigatorOptions = {
          */
         width: 7,
 
+        /**
+         * Border radius of the handles.
+         *
+         * @sample {highstock} stock/navigator/handles-border-radius/
+         *      Border radius on the navigator handles.
+         *
+         * @type {number|string}
+         * @since 11.4.2
+         */
+        borderRadius: 0,
         /**
          * Height for handles.
          *
@@ -189,22 +198,22 @@ const NavigatorDefaults: NavigatorOptions = {
         /**
          * The fill for the handle.
          *
-         * @type    {Highcharts.ColorString|Highcharts.GradientColorObject|Highcharts.PatternObject}
+         * @type {Highcharts.ColorType}
          */
-        backgroundColor: Palette.neutralColor5,
+        backgroundColor: 'var(--highcharts-neutral-color-5)',
 
         /**
          * The stroke for the handle border and the stripes inside.
          *
-         * @type    {Highcharts.ColorString|Highcharts.GradientColorObject|Highcharts.PatternObject}
+         * @type {Highcharts.ColorType}
          */
-        borderColor: Palette.neutralColor40
+        borderColor: 'var(--highcharts-neutral-color-40)'
     },
 
     /**
      * The color of the mask covering the areas of the navigator series
      * that are currently not visible in the main series. The default
-     * color is bluish with an opacity of 0.3 to see the series below.
+     * color is semi-transparent to see the series below.
      *
      * @see In styled mode, the mask is styled with the
      *      `.highcharts-navigator-mask` and
@@ -213,10 +222,9 @@ const NavigatorDefaults: NavigatorOptions = {
      * @sample {highstock} stock/navigator/maskfill/
      *         Blue, semi transparent mask
      *
-     * @type    {Highcharts.ColorString|Highcharts.GradientColorObject|Highcharts.PatternObject}
-     * @default rgba(102,133,194,0.3)
+     * @type    {Highcharts.ColorType}
      */
-    maskFill: color(Palette.highlightColor60).setOpacity(0.3).get(),
+    maskFill: 'color-mix(in srgb, var(--highcharts-highlight-color-60) 30%, transparent)', // eslint-disable-line max-len
 
     /**
      * The color of the line marking the currently zoomed area in the
@@ -225,10 +233,9 @@ const NavigatorDefaults: NavigatorOptions = {
      * @sample {highstock} stock/navigator/outline/
      *         2px blue outline
      *
-     * @type    {Highcharts.ColorString|Highcharts.GradientColorObject|Highcharts.PatternObject}
-     * @default #cccccc
+     * @type {Highcharts.ColorType}
      */
-    outlineColor: Palette.neutralColor20,
+    outlineColor: 'var(--highcharts-neutral-color-40)',
 
     /**
      * The width of the line marking the currently zoomed area in the
@@ -315,6 +322,13 @@ const NavigatorDefaults: NavigatorOptions = {
         compare: null as any,
 
         /**
+         * @ignore-option
+         */
+        sonification: {
+            enabled: false
+        },
+
+        /**
          * Unless data is explicitly defined, the data is borrowed from the
          * first series in the chart.
          *
@@ -365,10 +379,18 @@ const NavigatorDefaults: NavigatorOptions = {
         className: 'highcharts-navigator-series',
 
         /**
-         * Sets the fill color of the navigator series.
+         * Sets the color of the navigator series.
          *
-         * @type      {Highcharts.ColorString|Highcharts.GradientColorObject|Highcharts.PatternObject}
+         * @type      {Highcharts.ColorType}
          * @apioption navigator.series.color
+         */
+
+        /**
+         * Sets the fill color of the navigator series. Applies to series
+         * types with a filled area, like the default `areaspline`.
+         *
+         * @type      {Highcharts.ColorType}
+         * @apioption navigator.series.fillColor
          */
 
         /**
@@ -390,7 +412,6 @@ const NavigatorDefaults: NavigatorOptions = {
          *
          * In Highcharts Stock version < 8, defaults to 0.
          *
-         * @extends plotOptions.series.pointRange
          * @type {number|null}
          * @apioption navigator.series.pointRange
          */
@@ -444,12 +465,26 @@ const NavigatorDefaults: NavigatorOptions = {
     xAxis: {
         /**
          * Additional range on the right side of the xAxis. Works similar to
-         * xAxis.maxPadding, but value is set in milliseconds.
+         * `xAxis.maxPadding`, but the value is set in terms of axis values,
+         * percentage or pixels.
+         *
+         * If it's a number, it is interpreted as axis values, which in a
+         * datetime axis equals milliseconds.
+         *
+         * If it's a percentage string, is interpreted as percentages of the
+         * axis length. An overscroll of 50% will make a 100px axis 50px longer.
+         *
+         * If it's a pixel string, it is interpreted as a fixed pixel value, but
+         * limited to 90% of the axis length.
+         *
+         * If it's undefined, the value is inherited from `xAxis.overscroll`.
+         *
          * Can be set for both, main xAxis and navigator's xAxis.
          *
+         * @type    {number | string | undefined}
          * @since   6.0.0
+         * @apioption navigator.xAxis.overscroll
          */
-        overscroll: 0,
 
         className: 'highcharts-navigator-xaxis',
 
@@ -457,7 +492,9 @@ const NavigatorDefaults: NavigatorOptions = {
 
         lineWidth: 0,
 
-        gridLineColor: Palette.neutralColor10,
+        gridLineColor: 'var(--highcharts-neutral-color-10)',
+
+        id: 'navigator-x-axis',
 
         gridLineWidth: 1,
 
@@ -472,7 +509,13 @@ const NavigatorDefaults: NavigatorOptions = {
              */
             style: {
                 /** @ignore */
-                color: Palette.neutralColor40
+                color: 'var(--highcharts-neutral-color-100)',
+                /** @ignore */
+                fontSize: '0.7em',
+                /** @ignore */
+                opacity: 0.6,
+                /** @ignore */
+                textOutline: '2px contrast'
             },
 
             x: 3,
@@ -522,6 +565,8 @@ const NavigatorDefaults: NavigatorOptions = {
 
         minPadding: 0.1,
 
+        id: 'navigator-y-axis',
+
         maxPadding: 0.1,
 
         labels: {
@@ -531,7 +576,7 @@ const NavigatorDefaults: NavigatorOptions = {
         crosshair: false,
 
         title: {
-            text: null
+            text: void 0
         },
 
         tickLength: 0,
@@ -548,6 +593,7 @@ const NavigatorDefaults: NavigatorOptions = {
  *
  * */
 
+/** @internal */
 export default NavigatorDefaults;
 
 /* *
@@ -569,4 +615,4 @@ export default NavigatorDefaults;
  * @apioption xAxis.maxRange
  */
 
-(''); // keeps doclets above in JS file
+(''); // Keeps doclets above in JS file

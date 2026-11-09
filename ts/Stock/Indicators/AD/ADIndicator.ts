@@ -1,8 +1,9 @@
 /* *
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  * */
 
 'use strict';
@@ -18,19 +19,14 @@ import type {
     ADParamsOptions
 } from './ADOptions';
 import type ADPoint from './ADPoint';
+import type { IndicatorLinkedSeriesBase } from '../IndicatorBase';
 import type IndicatorValuesObject from '../IndicatorValuesObject';
 import type LineSeries from '../../../Series/Line/LineSeries';
 
+import SMAIndicator from '../SMA/SMAIndicator.js';
 import SeriesRegistry from '../../../Core/Series/SeriesRegistry.js';
-const {
-    sma: SMAIndicator
-} = SeriesRegistry.seriesTypes;
-import U from '../../../Core/Utilities.js';
-const {
-    error,
-    extend,
-    merge
-} = U;
+import { extend, merge } from '../../../Shared/Utilities.js';
+import { error } from '../../../Core/Utilities.js';
 
 /* *
  *
@@ -41,7 +37,6 @@ const {
 /**
  * The AD series type.
  *
- * @private
  * @class
  * @name Highcharts.seriesTypes.ad
  *
@@ -59,22 +54,23 @@ class ADIndicator extends SMAIndicator {
      * Accumulation Distribution (AD). This series requires `linkedTo` option to
      * be set.
      *
-     * @sample stock/indicators/accumulation-distribution
+     * @sample {highstock} stock/indicators/accumulation-distribution
      *         Accumulation/Distribution indicator
      *
      * @extends      plotOptions.sma
      * @since        6.0.0
      * @product      highstock
-     * @requires     stock/indicators/indicators
-     * @requires     stock/indicators/accumulation-distribution
+     * @requires     indicators/indicators
+     * @requires     indicators/accumulation-distribution
      * @optionparent plotOptions.ad
+     * @internal
      */
     public static defaultOptions: ADOptions = merge(SMAIndicator.defaultOptions, {
         /**
          * @excluding index
          */
         params: {
-            index: void 0, // unused index, do not inherit (#15362)
+            index: void 0, // Unused index, do not inherit (#15362)
             /**
              * The id of volume series which is mandatory.
              * For example using OHLC data, volumeSeriesID='volume' means
@@ -92,11 +88,13 @@ class ADIndicator extends SMAIndicator {
      *
      * */
 
+    /** @internal */
     protected static populateAverage(
         xVal: Array<number>,
         yVal: Array<Array<number>>,
         yValVolume: Array<number>,
         i: number,
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         _period: number
     ): Array<number> {
         const high = yVal[i][1],
@@ -117,9 +115,9 @@ class ADIndicator extends SMAIndicator {
      *
      * */
 
-    public data: Array<ADPoint> = void 0 as any;
-    public options: ADOptions = void 0 as any;
-    public points: Array<ADPoint> = void 0 as any;
+    public data!: Array<ADPoint>;
+    public options!: ADOptions;
+    public points!: Array<ADPoint>;
 
     /* *
      *
@@ -127,21 +125,22 @@ class ADIndicator extends SMAIndicator {
      *
      * */
 
+    /** @internal */
     public getValues<TLinkedSeries extends LineSeries>(
-        series: TLinkedSeries,
+        series: TLinkedSeries&IndicatorLinkedSeriesBase,
         params: ADParamsOptions
     ): (IndicatorValuesObject<TLinkedSeries>|undefined) {
-        let period: number = (params.period as any),
+        const period: number = (params.period as any),
             xVal: Array<number> = (series.xData as any),
             yVal: Array<(number|null|undefined)> = (series.yData as any),
             volumeSeriesID: string = (params.volumeSeriesID as any),
             volumeSeries: LineSeries = series.chart.get(volumeSeriesID) as any,
-            yValVolume = volumeSeries && volumeSeries.yData,
+            yValVolume = volumeSeries?.getColumn('y'),
             yValLen = yVal ? yVal.length : 0,
             AD: Array<Array<number>> = [],
             xData: Array<number> = [],
-            yData: Array<number> = [],
-            len: (number|undefined),
+            yData: Array<number> = [];
+        let len: (number|undefined),
             i: (number|undefined),
             ADPoint: Array<number>;
 
@@ -164,7 +163,7 @@ class ADIndicator extends SMAIndicator {
             return;
         }
 
-        // i = period <-- skip first N-points
+        // When i = period <-- skip first N-points
         // Calculate value one-by-one for each period in visible data
         for (i = period; i < yValLen; i++) {
 
@@ -241,11 +240,10 @@ export default ADIndicator;
  *
  * @extends   series,plotOptions.ad
  * @since     6.0.0
- * @excluding dataParser, dataURL
  * @product   highstock
- * @requires  stock/indicators/indicators
- * @requires  stock/indicators/accumulation-distribution
+ * @requires  indicators/indicators
+ * @requires  indicators/accumulation-distribution
  * @apioption series.ad
  */
 
-''; // add doclet above to transpiled file
+''; // Add doclet above to transpiled file

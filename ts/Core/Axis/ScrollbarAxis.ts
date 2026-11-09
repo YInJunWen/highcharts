@@ -1,10 +1,12 @@
 /* *
  *
- *  (c) 2010-2021 Torstein Honsi
+ *  (c) 2010-2026 Highsoft AS
+ *  Author: Torstein Hønsi
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -17,15 +19,21 @@
  * */
 
 import type Axis from './Axis';
-import type Scrollbar from '../../Stock/Scrollbar/Scrollbar';
-import type ScrollbarOptions from '../../Stock/Scrollbar/ScrollbarOptions';
+import type ScrollbarType from '../../Stock/Scrollbar/Scrollbar';
+import type {
+    AxisScrollbarOptions,
+    XAxisScrollbarOptions,
+    YAxisScrollbarOptions
+} from '../../Stock/Scrollbar/ScrollbarOptions';
 
-import U from '../Utilities.js';
-const {
+import H from '../Globals.js';
+const { composed } = H;
+import {
     addEvent,
+    correctFloat,
     defined,
-    pick
-} = U;
+    pushUnique
+} from '../../Shared/Utilities.js';
 
 /* *
  *
@@ -33,16 +41,66 @@ const {
  *
  * */
 
+/** @internal */
 declare module './AxisComposition' {
     interface AxisComposition {
-        scrollbar?: ScrollbarAxis['scrollbar'];
+        scrollbar?: ScrollbarType;
     }
 }
 
-declare module './AxisType' {
-    interface AxisTypeRegistry {
-        ScrollbarAxis: ScrollbarAxis;
+declare module './AxisOptions' {
+    interface AxisOptions {
+        /**
+         * An optional scrollbar to display on the axis in response to limiting
+         * the minimum and maximum of the axis values.
+         *
+         * In styled mode, all the presentational options for the scrollbar are
+         * replaced by the classes `.highcharts-scrollbar-thumb`,
+         * `.highcharts-scrollbar-arrow`, `.highcharts-scrollbar-button`,
+         * `.highcharts-scrollbar-rifles` and `.highcharts-scrollbar-track`.
+         *
+         * @product highstock
+         */
+        scrollbar?: AxisScrollbarOptions;
     }
+    interface XAxisOptions {
+        /**
+         * An optional scrollbar to display on the X axis in response to
+         * limiting the minimum and maximum of the axis values.
+         *
+         * In styled mode, all the presentational options for the scrollbar are
+         * replaced by the classes `.highcharts-scrollbar-thumb`,
+         * `.highcharts-scrollbar-arrow`, `.highcharts-scrollbar-button`,
+         * `.highcharts-scrollbar-rifles` and `.highcharts-scrollbar-track`.
+         *
+         * @sample {highstock} stock/yaxis/heatmap-scrollbars/
+         *         Heatmap with both scrollbars
+         *
+         * @since     4.2.6
+         * @product   highstock
+         * @apioption xAxis.scrollbar
+         */
+        scrollbar?: XAxisScrollbarOptions;
+    }
+    interface YAxisOptions {
+        /**
+         * An optional scrollbar to display on the Y axis in response to
+         * limiting the minimum and maximum of the axis values.
+         *
+         * In styled mode, all the presentational options for the scrollbar are
+         * replaced by the classes `.highcharts-scrollbar-thumb`,
+         * `.highcharts-scrollbar-arrow`, `.highcharts-scrollbar-button`,
+         * `.highcharts-scrollbar-rifles` and `.highcharts-scrollbar-track`.
+         *
+         * @product highstock
+         */
+        scrollbar?: YAxisScrollbarOptions;
+    }
+}
+
+/** @internal */
+interface ScrollbarAxis extends Axis {
+    scrollbar?: ScrollbarType;
 }
 
 /* *
@@ -51,277 +109,325 @@ declare module './AxisType' {
  *
  * */
 
-/* eslint-disable no-invalid-this, valid-jsdoc */
+/** @internal */
+namespace ScrollbarAxis {
 
-/**
- * Creates scrollbars if enabled.
- * @private
- */
-class ScrollbarAxis {
-    private static composed: Array<typeof Axis> = [];
+    /* *
+     *
+     *  Variables
+     *
+     * */
+
+    let Scrollbar: typeof ScrollbarType;
+
+    /* *
+     *
+     *  Functions
+     *
+     * */
 
     /**
      * Attaches to axis events to create scrollbars if enabled.
      *
-     * @private
+     * @internal
      *
-     * @param AxisClass
+     * @param {Highcharts.Axis} AxisClass
      * Axis class to extend.
      *
-     * @param ScrollbarClass
+     * @param {Highcharts.Scrollbar} ScrollbarClass
      * Scrollbar class to use.
      */
-    public static compose<T extends typeof Axis>(AxisClass: T, ScrollbarClass: typeof Scrollbar): (T&ScrollbarAxis) {
-        if (ScrollbarAxis.composed.indexOf(AxisClass) === -1) {
-            ScrollbarAxis.composed.push(AxisClass);
-        } else {
-            return AxisClass as (T&ScrollbarAxis);
+    export function compose(
+        AxisClass: typeof Axis,
+        ScrollbarClass: typeof ScrollbarType
+    ): void {
+
+        if (pushUnique(composed, 'Axis.Scrollbar')) {
+            Scrollbar = ScrollbarClass;
+
+            addEvent(AxisClass, 'afterGetOffset', onAxisAfterGetOffset);
+            addEvent(AxisClass, 'afterInit', onAxisAfterInit);
+            addEvent(AxisClass, 'afterRender', onAxisAfterRender);
         }
 
-        const getExtremes = (axis: ScrollbarAxis): Record<string, number> => {
-            const axisMin = pick(
-                axis.options && axis.options.min,
-                axis.min as any
-            );
-            const axisMax = pick(
-                axis.options && axis.options.max,
-                axis.max as any
-            );
-            return {
-                axisMin,
-                axisMax,
-                scrollMin: defined(axis.dataMin) ?
-                    Math.min(
-                        axisMin,
-                        axis.min as any,
-                        axis.dataMin,
-                        pick(axis.threshold, Infinity)
-                    ) : axisMin,
-                scrollMax: defined(axis.dataMax) ?
+    }
+
+    /** @internal */
+    function getExtremes(
+        axis: ScrollbarAxis
+    ): Record<string, number> {
+        const axisMin = (axis.options?.min ?? axis.min as any);
+        const axisMax = (axis.options?.max ?? axis.max as any);
+        return {
+            axisMin,
+            axisMax,
+            scrollMin: defined(axis.dataMin) ?
+                Math.min(
+                    axisMin,
+                    axis.min ?? Infinity,
+                    axis.dataMin,
+                    axis.threshold ?? Infinity
+                ) : axisMin,
+            scrollMax: axis.treeGrid?.adjustedMax ?? (
+                defined(axis.dataMax) ?
                     Math.max(
                         axisMax,
-                        axis.max as any,
+                        axis.max ?? -Infinity,
                         axis.dataMax,
-                        pick(axis.threshold, -Infinity)
-                    ) : axisMax
-            };
+                        axis.threshold ?? -Infinity
+                    ) :
+                    axisMax
+            )
         };
+    }
 
-        // Wrap axis initialization and create scrollbar if enabled:
-        addEvent(AxisClass, 'afterInit', function (): void {
-            const axis = this as ScrollbarAxis;
+    /**
+     * Make space for a scrollbar.
+     * @internal
+     */
+    function onAxisAfterGetOffset(
+        this: Axis
+    ): void {
+        const axis = this as ScrollbarAxis,
+            scrollbar = axis.scrollbar,
+            opposite = scrollbar && !scrollbar.options.opposite,
+            index = axis.horiz ? 2 : opposite ? 3 : 1;
 
-            if (
-                axis.options &&
-                axis.options.scrollbar &&
-                axis.options.scrollbar.enabled
-            ) {
-                // Predefined options:
-                axis.options.scrollbar.vertical = !axis.horiz;
-                axis.options.startOnTick = axis.options.endOnTick = false;
+        if (scrollbar) {
+            // Reset scrollbars offsets
+            axis.chart.scrollbarsOffsets = [0, 0];
+            axis.chart.axisOffset[index] +=
+                scrollbar.size + (scrollbar.options.margin || 0);
+        }
+    }
 
-                axis.scrollbar = new ScrollbarClass(
-                    axis.chart.renderer,
-                    axis.options.scrollbar,
-                    axis.chart
-                );
+    /**
+     * Wrap axis initialization and create scrollbar if enabled.
+     * @internal
+     */
+    function onAxisAfterInit(
+        this: Axis
+    ): void {
+        const axis = this as ScrollbarAxis;
 
-                addEvent(axis.scrollbar, 'changed', function (
-                    e: Scrollbar.ChangedEvent
-                ): void {
-                    let {
-                            axisMin,
-                            axisMax,
-                            scrollMin: unitedMin,
-                            scrollMax: unitedMax
-                        } = getExtremes(axis),
-                        range = unitedMax - unitedMin,
-                        to,
-                        from;
+        if (axis.options?.scrollbar?.enabled) {
+            // Predefined options:
+            axis.options.scrollbar.vertical = !axis.horiz;
+            axis.options.startOnTick = axis.options.endOnTick = false;
 
-                    // #12834, scroll when show/hide series, wrong extremes
-                    if (!defined(axisMin) || !defined(axisMax)) {
-                        return;
-                    }
+            axis.scrollbar = new Scrollbar(
+                axis.chart.renderer,
+                axis.options.scrollbar,
+                axis.chart
+            );
 
-                    if (
-                        (axis.horiz && !axis.reversed) ||
-                        (!axis.horiz && axis.reversed)
-                    ) {
-                        to = unitedMin + range * (this.to as any);
-                        from = unitedMin + range * (this.from as any);
-                    } else {
-                        // y-values in browser are reversed, but this also
-                        // applies for reversed horizontal axis:
-                        to = unitedMin + range * (1 - (this.from as any));
-                        from = unitedMin + range * (1 - (this.to as any));
-                    }
+            addEvent(axis.scrollbar, 'changed', function (
+                e: ScrollbarType.ChangedEvent
+            ): void {
+                const {
+                        axisMin,
+                        axisMax,
+                        scrollMin: unitedMin,
+                        scrollMax: unitedMax
+                    } = getExtremes(axis),
+                    minPX = axis.toPixels(unitedMin),
+                    maxPX = axis.toPixels(unitedMax),
+                    rangePX = maxPX - minPX;
 
-                    if (this.shouldUpdateExtremes(e.DOMType)) {
-                        axis.setExtremes(
-                            from,
-                            to,
-                            true,
-                            (
-                                e.DOMType !== 'mousemove' &&
-                                e.DOMType !== 'touchmove'
-                            ),
-                            e
-                        );
-                    } else {
-                        // When live redraw is disabled, don't change extremes
-                        // Only change the position of the scollbar thumb
-                        this.setRange(this.from as any, this.to as any);
-                    }
-                });
-            }
-        });
+                let to: number,
+                    from: number;
 
-        // Wrap rendering axis, and update scrollbar if one is created:
-        addEvent(AxisClass, 'afterRender', function (): void {
-            let axis = this as ScrollbarAxis,
-                {
-                    scrollMin,
-                    scrollMax
-                } = getExtremes(axis),
-                scrollbar = axis.scrollbar,
-                offset = (
-                    (axis.axisTitleMargin as any) + (axis.titleOffset || 0)
-                ),
-                scrollbarsOffsets = axis.chart.scrollbarsOffsets,
-                axisMargin = axis.options.margin || 0,
-                offsetsIndex,
-                from,
-                to;
-
-            if (scrollbar) {
-
-                if (axis.horiz) {
-
-                    // Reserve space for labels/title
-                    if (!axis.opposite) {
-                        (scrollbarsOffsets as any)[1] += offset;
-                    }
-
-                    scrollbar.position(
-                        axis.left,
-                        (
-                            axis.top +
-                            axis.height +
-                            2 +
-                            (scrollbarsOffsets as any)[1] -
-                            (axis.opposite ? axisMargin : 0)
-                        ),
-                        axis.width,
-                        axis.height
-                    );
-
-                    // Next scrollbar should reserve space for margin (if set)
-                    if (!axis.opposite) {
-                        (scrollbarsOffsets as any)[1] += axisMargin;
-                    }
-
-                    offsetsIndex = 1;
-                } else {
-
-                    // Reserve space for labels/title
-                    if (axis.opposite) {
-                        (scrollbarsOffsets as any)[0] += offset;
-                    }
-
-                    let xPosition;
-                    if (!scrollbar.options.opposite) {
-                        xPosition = axis.opposite ? 0 : axisMargin;
-                    } else {
-                        xPosition = axis.left +
-                            axis.width +
-                            2 +
-                            (scrollbarsOffsets as any)[0] -
-                            (axis.opposite ? 0 : axisMargin);
-                    }
-
-                    scrollbar.position(
-                        xPosition,
-                        axis.top,
-                        axis.width,
-                        axis.height
-                    );
-
-                    // Next scrollbar should reserve space for margin (if set)
-                    if (axis.opposite) {
-                        (scrollbarsOffsets as any)[0] += axisMargin;
-                    }
-
-                    offsetsIndex = 0;
+                // #12834, scroll when show/hide series, wrong extremes
+                if (!defined(axisMin) || !defined(axisMax)) {
+                    return;
                 }
-
-                (scrollbarsOffsets as any)[offsetsIndex] += scrollbar.size +
-                    (scrollbar.options.margin as any);
 
                 if (
-                    isNaN(scrollMin) ||
-                    isNaN(scrollMax) ||
-                    !defined(axis.min) ||
-                    !defined(axis.max) ||
-                    axis.min === axis.max // #10733
+                    (axis.horiz && !axis.reversed) ||
+                    (!axis.horiz && axis.reversed)
                 ) {
-                    // default action: when extremes are the same or there is
-                    // not extremes on the axis, but scrollbar exists, make it
-                    // full size
-                    scrollbar.setRange(0, 1);
+                    to = Math.min(
+                        unitedMax,
+                        axis.toValue(minPX + rangePX * this.to)
+                    );
+                    from = Math.max(
+                        unitedMin,
+                        axis.toValue(minPX + rangePX * this.from)
+                    );
                 } else {
-                    from = (
-                        ((axis.min as any) - scrollMin) /
-                        (scrollMax - scrollMin)
+                    // Y-values in browser are reversed, but this also
+                    // applies for reversed horizontal axis:
+                    to = Math.min(
+                        unitedMax,
+                        axis.toValue(minPX + rangePX * (1 - this.from))
                     );
-                    to = (
-                        ((axis.max as any) - scrollMin) /
-                        (scrollMax - scrollMin)
+                    from = Math.max(
+                        unitedMin,
+                        axis.toValue(minPX + rangePX * (1 - this.to))
                     );
+                }
 
-                    if (
-                        (axis.horiz && !axis.reversed) ||
-                        (!axis.horiz && axis.reversed)
-                    ) {
-                        scrollbar.setRange(from, to);
-                    } else {
-                        // inverse vertical axis
-                        scrollbar.setRange(1 - to, 1 - from);
-                    }
+                if (this.shouldUpdateExtremes(e.DOMType)) {
+                    // #17977, set animation to undefined instead of true
+                    const animate = e.DOMType === 'mousemove' ||
+                        e.DOMType === 'touchmove' ? false : void 0;
+
+                    axis.setExtremes(
+                        correctFloat(from),
+                        correctFloat(to),
+                        true,
+                        animate,
+                        e
+                    );
+                } else {
+                    // When live redraw is disabled, don't change extremes
+                    // Only change the position of the scrollbar thumb
+                    this.setRange(this.from, this.to);
+                }
+            });
+
+        } else if (axis.scrollbar) {
+            axis.scrollbar = axis.scrollbar.destroy();
+        }
+    }
+
+    /**
+     * Wrap rendering axis, and update scrollbar if one is created.
+     * @internal
+     */
+    function onAxisAfterRender(
+        this: Axis
+    ): void {
+        const axis = this as ScrollbarAxis,
+            {
+                scrollMin,
+                scrollMax
+            } = getExtremes(axis),
+            scrollbar = axis.scrollbar,
+            offset = (axis.axisTitleMargin || 0) + (axis.titleOffset || 0),
+            scrollbarsOffsets = axis.chart.scrollbarsOffsets,
+            axisMargin = axis.options.margin || 0;
+
+        let offsetsIndex: number,
+            from: number,
+            to: number;
+
+        if (scrollbar && scrollbarsOffsets) {
+            if (axis.horiz) {
+
+                // Reserve space for labels/title
+                if (!axis.opposite) {
+                    scrollbarsOffsets[1] += offset;
+                }
+
+                scrollbar.position(
+                    axis.left,
+                    (
+                        axis.top +
+                        axis.height +
+                        2 +
+                        scrollbarsOffsets[1] -
+                        (axis.opposite ? axisMargin : 0)
+                    ),
+                    axis.width,
+                    axis.height
+                );
+
+                // Next scrollbar should reserve space for margin (if set)
+                if (!axis.opposite) {
+                    scrollbarsOffsets[1] += axisMargin;
+                }
+
+                offsetsIndex = 1;
+            } else {
+
+                // Reserve space for labels/title
+                if (axis.opposite) {
+                    scrollbarsOffsets[0] += offset;
+                }
+
+                let xPosition;
+                if (!scrollbar.options.opposite) {
+                    xPosition = axis.opposite ? 0 : axisMargin;
+                } else {
+                    xPosition = axis.left +
+                        axis.width +
+                        2 +
+                        scrollbarsOffsets[0] -
+                        (axis.opposite ? 0 : axisMargin);
+                }
+
+                scrollbar.position(
+                    xPosition,
+                    axis.top,
+                    axis.width,
+                    axis.height
+                );
+
+                // Next scrollbar should reserve space for margin (if set)
+                if (axis.opposite) {
+                    scrollbarsOffsets[0] += axisMargin;
+                }
+
+                offsetsIndex = 0;
+            }
+
+            scrollbarsOffsets[offsetsIndex] += scrollbar.size +
+                (scrollbar.options.margin || 0);
+
+            if (
+                isNaN(scrollMin) ||
+                isNaN(scrollMax) ||
+                !defined(axis.min) ||
+                !defined(axis.max) ||
+                (
+                    defined(axis.dataMin) && // #23335
+                    axis.dataMin === axis.dataMax // #10733
+                )
+            ) {
+                // Default action: when data extremes are the same or there is
+                // not extremes on the axis, but scrollbar exists, make it
+                // full size
+
+                scrollbar.setRange(0, 1);
+            } else if (axis.min === axis.max) { // #20359
+                // When the extremes are the same, set the scrollbar to a point
+                // within the extremes range. Utilize pointRange to perform the
+                // calculations. (#20359)
+
+                const interval: number = axis.pointRange / (
+                    axis.dataMax as number +
+                    1
+                );
+                from = interval * axis.min;
+                to = interval * (axis.max + 1);
+
+                scrollbar.setRange(from, to);
+            } else {
+                from = (axis.toPixels(axis.min) - axis.toPixels(scrollMin)) /
+                    (axis.toPixels(scrollMax) - axis.toPixels(scrollMin));
+                to = (axis.toPixels(axis.max) - axis.toPixels(scrollMin)) /
+                    (axis.toPixels(scrollMax) - axis.toPixels(scrollMin));
+
+                if (
+                    (axis.horiz && !axis.reversed) ||
+                    (!axis.horiz && axis.reversed)
+                ) {
+                    scrollbar.setRange(from, to);
+                } else {
+                    // Inverse vertical axis
+                    scrollbar.setRange(1 - to, 1 - from);
                 }
             }
-        });
-
-        // Make space for a scrollbar:
-        addEvent(AxisClass, 'afterGetOffset', function (): void {
-            const axis = this as ScrollbarAxis,
-                opposite = axis.scrollbar && !axis.scrollbar.options.opposite,
-                index = axis.horiz ? 2 : opposite ? 3 : 1,
-                scrollbar = axis.scrollbar;
-
-            if (scrollbar) {
-                // reset scrollbars offsets
-                axis.chart.scrollbarsOffsets = [0, 0];
-                axis.chart.axisOffset[index] +=
-                    scrollbar.size + (scrollbar.options.margin as any);
-            }
-        });
-
-        return AxisClass as (T&ScrollbarAxis);
+        }
     }
 }
 
-interface ScrollbarAxis extends Axis {
-    options: Axis['options'] & ScrollbarAxis.Options;
-    scrollbar: Scrollbar;
-}
+/* *
+ *
+ *  Default Export
+ *
+ * */
 
-namespace ScrollbarAxis {
-
-    export interface Options {
-        scrollbar?: ScrollbarOptions;
-    }
-
-}
-
+/** @internal */
 export default ScrollbarAxis;

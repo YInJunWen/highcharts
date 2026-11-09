@@ -1,6 +1,5 @@
 /* *
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -19,26 +18,25 @@ import type SVGAttributes from '../Core/Renderer/SVG/SVGAttributes';
 import type SVGElement from '../Core/Renderer/SVG/SVGElement';
 import type SVGRenderer from '../Core/Renderer/SVG/SVGRenderer';
 
-import U from '../Core/Utilities.js';
-const { isNumber } = U;
-
 /* *
  *
  *  Declarations
  *
  * */
 
+/** @internal */
 export interface DrawPointParams {
     animatableAttribs: SVGAttributes;
     attribs: SVGAttributes;
     css?: CSSObject;
     group: SVGElement;
     onComplete?: Function;
+    imageUrl?: string;
     isNew?: boolean;
     renderer: SVGRenderer;
     shadow?: (boolean|Partial<ShadowOptionsObject>);
     shapeArgs?: SVGAttributes;
-    shapeType: 'arc'|'circle'|'path'|'rect'|'text';
+    shapeType: 'arc'|'circle'|'image'|'path'|'rect'|'text';
 }
 
 /* *
@@ -52,7 +50,7 @@ export interface DrawPointParams {
  * Can be used for any type of component that reserves the graphic property,
  * and provides a shouldDraw on its context.
  *
- * @private
+ * @internal
  *
  * @todo add type checking.
  * @todo export this function to enable usage
@@ -79,17 +77,22 @@ function draw(
 
     let graphic = point.graphic;
 
-    params.attribs = params.attribs || {};
-
-    // Assigning class in dot notation does go well in IE8
-    // eslint-disable-next-line dot-notation
-    params.attribs['class'] = point.getClassName();
+    params.attribs = {
+        ...params.attribs,
+        'class': point.getClassName()
+    };
 
     if ((point.shouldDraw())) {
         if (!graphic) {
-            point.graphic = graphic = params.shapeType === 'text' ?
-                renderer.text() :
-                renderer[params.shapeType](params.shapeArgs || {});
+            if (params.shapeType === 'text') {
+                graphic = renderer.text();
+            } else if (params.shapeType === 'image') {
+                graphic = renderer.image(params.imageUrl || '')
+                    .attr(params.shapeArgs || {});
+            } else {
+                graphic = renderer[params.shapeType](params.shapeArgs || {});
+            }
+            point.graphic = graphic;
             graphic.add(params.group);
         }
         if (css) {
@@ -110,7 +113,7 @@ function draw(
             }
         };
 
-        // animate only runs complete callback if something was animated.
+        // Animate only runs complete callback if something was animated.
         if (Object.keys(animatableAttribs).length) {
             graphic.animate(
                 animatableAttribs,
@@ -129,8 +132,10 @@ function draw(
  *
  * */
 
+/** @internal */
 const DrawPointUtilities = {
     draw
 };
 
+/** @internal */
 export default DrawPointUtilities;

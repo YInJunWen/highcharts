@@ -3,7 +3,7 @@
  */
 
 const gulp = require('gulp');
-const log = require('./lib/log.js');
+const log = require('../libs/log.js');
 
 /* eslint-disable no-use-before-define */
 
@@ -117,27 +117,18 @@ function loadNewTree() {
  * @return {Promise<object>}
  * JSON object
  */
-function loadOldTree() {
-    const request = require('request');
+async function loadOldTree() {
+    log.message('Loading old tree.json...');
 
-    return new Promise((resolve, reject) => {
-        log.message('Loading old tree.json...');
-        request.get(
-            'https://api.highcharts.com/highcharts/tree.json',
-            function (error, response) {
+    const response = await fetch('https://api.highcharts.com/highcharts/tree.json');
 
-                if (error) {
-                    reject(error);
-                    return;
-                }
+    if (!response.ok) {
+        throw new Error(`Failed to fetch old tree.json: ${response.status} ${response.statusText}`);
+    }
 
-                log.message('Parsing old tree.json...');
+    log.message('Parsing old tree.json...');
 
-                resolve(JSON.parse(response.body.toString()));
-            }
-        );
-
-    });
+    return response.json();
 }
 
 /* *

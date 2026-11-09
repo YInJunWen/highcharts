@@ -1,10 +1,12 @@
 /* *
  *
- *  (c) 2010-2022 Pawel Lysy
+ *  (c) 2010-2026 Highsoft AS
+ *  Author: Paweł Lysy
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -16,26 +18,28 @@
  *
  * */
 
-import type TreemapSeries from './TreemapSeries.js';
-import type BBoxObject from '../../Core/Renderer/BBoxObject.js';
-import type TreemapPoint from './TreemapPoint.js';
+import type TreemapSeries from './TreemapSeries';
+import type BBoxObject from '../../Core/Renderer/BBoxObject';
+import type TreemapPoint from './TreemapPoint';
 
 /* *
-*
-*  Class
-*
-* */
+ *
+ *  Class
+ *
+ * */
+
 class TreemapNode {
 
     /* *
-    *
-    *  Properties
-    *
-    * */
+     *
+     *  Properties
+     *
+     * */
 
     childrenTotal = 0;
     ignore?: boolean;
     isLeaf?: boolean;
+    isGroup?: boolean;
     levelDynamic?: number;
     name?: string;
     parent?: string;
@@ -48,10 +52,10 @@ class TreemapNode {
 
 
     /* *
-    *
-    *  Functions
-    *
-    * */
+     *
+     *  Functions
+     *
+     * */
 
     public init(
         id: string,
@@ -75,10 +79,10 @@ class TreemapNode {
 }
 
 /* *
-*
-*  Class interface
-*
-* */
+ *
+ *  Class Prototype
+ *
+ * */
 
 interface TreemapNode {
     height: number;
@@ -92,22 +96,30 @@ interface TreemapNode {
 }
 
 /* *
-*
-*  Class Namespace
-*
-* */
+ *
+ *  Class Namespace
+ *
+ * */
 
 namespace TreemapNode {
+
+    /* *
+     *
+     *  Declarations
+     *
+     * */
+
     export interface NodeValuesObject extends BBoxObject {
         direction: number;
         val: number;
     }
+
 }
 
 /* *
-*
-*  Default Export
-*
-* */
+ *
+ *  Default Export
+ *
+ * */
 
 export default TreemapNode;

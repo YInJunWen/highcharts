@@ -1,4 +1,9 @@
-Highcharts.getJSON('https://demo-live-data.highcharts.com/aapl-ohlc.json', function (data) {
+(async () => {
+
+    // Load the dataset
+    const data = await fetch(
+        'https://demo-live-data.highcharts.com/aapl-ohlc.json'
+    ).then(response => response.json());
 
     Highcharts.stockChart('container', {
         rangeSelector: {
@@ -20,14 +25,14 @@ Highcharts.getJSON('https://demo-live-data.highcharts.com/aapl-ohlc.json', funct
             data: data,
             id: 'base'
         }, {
-            type: 'linearRegression',
+            type: 'linearregression',
             linkedTo: 'base',
             zIndex: -1,
             params: {
                 period: 5
             }
         }, {
-            type: 'linearRegression',
+            type: 'linearregression',
             linkedTo: 'base',
             zIndex: -1,
             params: {
@@ -39,4 +44,4 @@ Highcharts.getJSON('https://demo-live-data.highcharts.com/aapl-ohlc.json', funct
             split: false
         }
     });
-});
+})();

@@ -1,10 +1,12 @@
 /* *
  *
- *  (c) 2010-2021 Torstein Honsi
+ *  (c) 2010-2026 Highsoft AS
+ *  Author: Torstein Hønsi
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -16,17 +18,16 @@
  *
  * */
 
+import type ColorType from '../Color/ColorType';
 import type Legend from './Legend';
-import type LegendItemObject from './LegendItemObject';
+import type LegendItem from './LegendItem';
 import type Point from '../Series/Point';
 import type Series from '../Series/Series';
 import type SVGAttributes from '../Renderer/SVG/SVGAttributes';
+import type SVGPath from '../Renderer/SVG/SVGPath';
+import type SymbolOptions from '../Renderer/SVG/SymbolOptions';
 
-import U from '../Utilities.js';
-const {
-    merge,
-    pick
-} = U;
+import { extend, merge } from '../../Shared/Utilities.js';
 
 /* *
  *
@@ -34,24 +35,62 @@ const {
  *
  * */
 
-declare module '../Axis/AxisLike' {
-    interface AxisLike extends LegendItemObject {
-        // nothing to add
+declare module '../Axis/AxisBase' {
+    interface AxisBase extends LegendItem {
+        // Nothing to add
     }
 }
 
-declare module '../Series/PointLike' {
-    interface PointLike extends LegendItemObject {
-        // nothing to add
+declare module '../Series/PointBase' {
+    interface PointBase extends LegendItem {
+        // Nothing to add
     }
 }
 
-declare module '../Series/SeriesLike' {
-    interface SeriesLike extends LegendItemObject {
+declare module '../Series/SeriesBase' {
+    interface SeriesBase extends LegendItem {
+        /**
+         * Legend data for the series.
+         *
+         * @since 10.3.0
+         */
+        legendItem?: LegendItem['legendItem'];
+
+        /** @internal */
         drawLegendSymbol: (
-            typeof LegendSymbol.drawLineMarker|
-            typeof LegendSymbol.drawRectangle
-        );
+            legend: Legend,
+            item: (Point|Series)
+        ) => void;
+    }
+}
+
+declare module '../Series/SeriesOptions' {
+    interface SeriesOptions {
+        /**
+         * What type of legend symbol to render for this series. Can be one of
+         * `areaMarker`, `lineMarker` or `rectangle`. The financial series of
+         * Highcharts Stock add `candlestick`, `hlc` and `ohlc`.
+         *
+         * @sample {highcharts} highcharts/series/legend-symbol/
+         *         Change the legend symbol
+         *
+         * @default 'rectangle'
+         * @since   11.0.1
+         */
+        legendSymbol?: string;
+
+        /**
+         * Defines the color of the legend symbol for this series. Defaults to
+         * undefined, in which case the series color is used. Does not work with
+         * styled mode.
+         *
+         * @sample {highcharts|highstock} highcharts/series/legend-symbol-color/
+         *         Change the legend symbol color
+         *
+         * @since   12.0.0
+         * @product highcharts highstock highmaps
+         */
+        legendSymbolColor?: ColorType;
     }
 }
 
@@ -64,73 +103,121 @@ declare module '../Series/SeriesLike' {
 namespace LegendSymbol {
 
     /* *
-    *
-    *  Functions
-    *
-    * */
-
-    /* eslint-disable valid-jsdoc */
+     *
+     *  Functions
+     *
+     * */
 
     /**
-     * Get the series' symbol in the legend.
+     * Draw a line, a point marker and an area in the legend.
      *
-     * This method should be overridable to create custom symbols through
-     * Highcharts.seriesTypes[type].prototype.drawLegendSymbol.
-     *
-     * @private
-     * @function Highcharts.LegendSymbolMixin.drawLineMarker
+     * @function Highcharts.LegendSymbolMixin.areaMarker
      *
      * @param {Highcharts.Legend} legend
      * The legend object.
      */
-    export function drawLineMarker(
+    export function areaMarker(
         this: Series,
-        legend: Legend
+        legend: Legend,
+        item?: LegendItem
+    ): void {
+        lineMarker.call(this, legend, item, true);
+    }
+
+    /**
+     * Draw a line and a point marker in the legend.
+     *
+     * @function Highcharts.LegendSymbolMixin.lineMarker
+     *
+     * @param {Highcharts.Legend} legend
+     * The legend object.
+     */
+    export function lineMarker(
+        this: Series,
+        legend: Legend,
+        item?: LegendItem,
+        hasArea?: boolean
     ): void {
 
-        const options = this.options,
-            symbolWidth = legend.symbolWidth,
-            symbolHeight = legend.symbolHeight,
+        const legendItem = this.legendItem = this.legendItem || {},
+            { chart, options } = this,
+            { baseline = 0, symbolWidth, symbolHeight } = legend,
+            symbol = this.symbol || 'circle',
             generalRadius = symbolHeight / 2,
-            renderer = this.chart.renderer,
-            legendItemGroup = this.legendGroup,
-            verticalCenter = (legend.baseline as any) -
-                Math.round((legend.fontMetrics as any).b * 0.3);
+            renderer = chart.renderer,
+            legendItemGroup = legendItem.group,
+            verticalCenter = baseline - Math.round(
+                (legend.fontMetrics?.b || symbolHeight) *
+                // Render line and marker slightly higher to make room for the
+                // area
+                (hasArea ? 0.4 : 0.3)
+            ),
+            attr: SVGAttributes = {};
 
-        let attr: SVGAttributes = {},
-            legendSymbol,
-            markerOptions = options.marker;
+        let legendSymbol,
+            markerOptions = options.marker,
+            lineSizer = 0;
 
         // Draw the line
-        if (!this.chart.styledMode) {
-            attr = {
-                'stroke-width': options.lineWidth || 0
-            };
+        if (!chart.styledMode) {
+            attr['stroke-width'] = Math.min(options.lineWidth || 0, 24);
+
             if (options.dashStyle) {
                 attr.dashstyle = options.dashStyle;
+            } else if (options.linecap !== 'square') {
+                attr['stroke-linecap'] = 'round';
             }
         }
 
-        this.legendLine = renderer
-            .path([
-                ['M', 0, verticalCenter],
-                ['L', symbolWidth, verticalCenter]
-            ])
+        legendItem.line = renderer
+            .path()
             .addClass('highcharts-graph')
             .attr(attr)
             .add(legendItemGroup);
+
+        if (hasArea) {
+            legendItem.area = renderer
+                .path()
+                .addClass('highcharts-area')
+                .add(legendItemGroup);
+        }
+
+        if (attr['stroke-linecap']) {
+            lineSizer = Math.min(
+                legendItem.line.strokeWidth(),
+                symbolWidth
+            ) / 2;
+        }
+
+        if (symbolWidth) {
+            const d: SVGPath = [
+                ['M', lineSizer, verticalCenter],
+                ['L', symbolWidth - lineSizer, verticalCenter]
+            ];
+
+            legendItem.line.attr({ d });
+
+            legendItem.area?.attr({
+                d: [
+                    ...d,
+                    ['L', symbolWidth - lineSizer, baseline],
+                    ['L', lineSizer, baseline]
+                ]
+            });
+        }
 
         // Draw the marker
         if (markerOptions && markerOptions.enabled !== false && symbolWidth) {
 
             // Do not allow the marker to be larger than the symbolHeight
             let radius = Math.min(
-                pick(markerOptions.radius, generalRadius),
+                (
+                    markerOptions.radius ?? generalRadius),
                 generalRadius
             );
 
             // Restrict symbol markers size
-            if ((this.symbol as any).indexOf('url') === 0) {
+            if (symbol.indexOf('url') === 0) {
                 markerOptions = merge(markerOptions, {
                     width: symbolHeight,
                     height: symbolHeight
@@ -138,57 +225,19 @@ namespace LegendSymbol {
                 radius = 0;
             }
 
-            this.legendSymbol = legendSymbol = renderer.symbol(
-                this.symbol as any,
-                (symbolWidth / 2) - radius,
-                verticalCenter - radius,
-                2 * radius,
-                2 * radius,
-                markerOptions
-            )
+            legendItem.symbol = legendSymbol = renderer
+                .symbol(
+                    symbol,
+                    (symbolWidth / 2) - radius,
+                    verticalCenter - radius,
+                    2 * radius,
+                    2 * radius,
+                    extend<SymbolOptions>({ context: 'legend' }, markerOptions)
+                )
                 .addClass('highcharts-point')
                 .add(legendItemGroup);
             legendSymbol.isMarker = true;
         }
-    }
-
-    /**
-     * Get the series' symbol in the legend.
-     *
-     * This method should be overridable to create custom symbols through
-     * Highcharts.seriesTypes[type].prototype.drawLegendSymbol.
-     *
-     * @private
-     * @function Highcharts.LegendSymbolMixin.drawRectangle
-     *
-     * @param {Highcharts.Legend} legend
-     * The legend object
-     *
-     * @param {Highcharts.Point|Highcharts.Series} item
-     * The series (this) or point
-     */
-    export function drawRectangle(
-        this: Series,
-        legend: Legend,
-        item: (Point|Series)
-    ): void {
-        const options = legend.options,
-            symbolHeight = legend.symbolHeight,
-            square = options.squareSymbol,
-            symbolWidth = square ? symbolHeight : legend.symbolWidth;
-
-        item.legendSymbol = this.chart.renderer.rect(
-            square ? (legend.symbolWidth - symbolHeight) / 2 : 0,
-            (legend.baseline as any) - symbolHeight + 1, // #3988
-            symbolWidth,
-            symbolHeight,
-            pick(legend.options.symbolRadius, symbolHeight / 2)
-        )
-            .addClass('highcharts-point')
-            .attr({
-                zIndex: 3
-            }).add(item.legendGroup);
-
     }
 
 }

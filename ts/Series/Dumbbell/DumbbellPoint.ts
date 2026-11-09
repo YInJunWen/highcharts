@@ -1,10 +1,12 @@
 /* *
  *
- *  (c) 2010-2021 Sebastian Bochan, Rafal Sebestjanski
+ *  (c) 2010-2026 Highsoft AS
+ *  Author: Sebastian Bochan, Rafał Sebestjański
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -21,11 +23,7 @@ import type DumbbellPointOptions from './DumbbellPointOptions';
 import type SVGElement from '../../Core/Renderer/SVG/SVGElement';
 
 import AreaRangePoint from '../AreaRange/AreaRangePoint.js';
-import U from '../../Core/Utilities.js';
-const {
-    extend,
-    pick
-} = U;
+import { extend } from '../../Shared/Utilities.js';
 
 /* *
  *
@@ -41,10 +39,13 @@ class DumbbellPoint extends AreaRangePoint {
      *
      * */
 
-    public series: DumbbellSeries = void 0 as any;
-    public options: DumbbellPointOptions = void 0 as any;
-    public connector: SVGElement = void 0 as any;
-    public pointWidth: number = void 0 as any;
+    /** @internal */
+    public series!: DumbbellSeries;
+    public options!: DumbbellPointOptions;
+    /** @internal */
+    public connector?: SVGElement;
+    /** @internal */
+    public pointWidth!: number;
 
     /* *
      *
@@ -56,32 +57,31 @@ class DumbbellPoint extends AreaRangePoint {
      * Set the point's state extended by have influence on the connector
      * (between low and high value).
      *
-     * @private
-     * @param {Highcharts.Point} this The point to inspect.
-     *
+     * @internal
      */
-    setState(): void {
-        let point = this,
+    public setState(): void {
+        const point = this,
             series = point.series,
             chart = series.chart,
             seriesLowColor = series.options.lowColor,
             seriesMarker = series.options.marker,
+            seriesLowMarker = series.options.lowMarker,
             pointOptions = point.options,
             pointLowColor = pointOptions.lowColor,
             zoneColor = point.zone && point.zone.color,
-            lowerGraphicColor = pick(
-                pointLowColor,
-                seriesLowColor,
-                pointOptions.color,
-                zoneColor,
-                point.color,
-                series.color
-            ),
-            verb = 'attr',
+            lowerGraphicColor =
+                pointLowColor ??
+                seriesLowMarker?.fillColor ??
+                seriesLowColor ??
+                pointOptions.color ??
+                zoneColor ??
+                point.color ??
+                series.color;
+        let verb = 'attr',
             upperGraphicColor,
             origProps: Partial<DumbbellPoint>;
 
-        this.pointSetState.apply(this, arguments);
+        this.pointSetState.apply(point, arguments);
 
         if (!point.state) {
             verb = 'animate';
@@ -97,13 +97,12 @@ class DumbbellPoint extends AreaRangePoint {
                     };
                     point.y = point.high;
                     point.zone = point.zone ? point.getZone() : void 0;
-                    upperGraphicColor = pick(
-                        point.marker ? point.marker.fillColor : void 0,
-                        seriesMarker ? seriesMarker.fillColor : void 0,
-                        pointOptions.color,
-                        point.zone ? point.zone.color : void 0,
-                        point.color
-                    );
+                    upperGraphicColor =
+                        (point.marker ? point.marker.fillColor : void 0) ??
+                        (seriesMarker ? seriesMarker.fillColor : void 0) ??
+                        pointOptions.color ??
+                        (point.zone ? point.zone.color : void 0) ??
+                        point.color;
                     upperGraphic.attr({
                         fill: upperGraphicColor
                     });
@@ -112,25 +111,31 @@ class DumbbellPoint extends AreaRangePoint {
             }
         }
 
-        point.connector[verb](series.getConnectorAttribs(point));
+        point.connector?.[verb](series.getConnectorAttribs(point));
     }
 
-    public destroy(): void {
+    /** @internal */
+    public destroy(sync?: boolean): void {
+        const point = this;
+
         // #15560
-        if (!this.graphic) {
-            this.graphic = this.connector;
-            this.connector = void 0 as any;
+        if (!point.graphic) {
+            point.graphic = point.connector;
+            point.connector = void 0 as any;
         }
-        return super.destroy();
+        return super.destroy(sync);
     }
 }
 
 /* *
  *
- *  Prototype properties
+ *  Class Prototype
  *
  * */
-interface DumbbellPoint{
+
+/** @internal */
+interface DumbbellPoint {
+    /** @internal */
     pointSetState: typeof AreaRangePoint.prototype.setState;
 }
 

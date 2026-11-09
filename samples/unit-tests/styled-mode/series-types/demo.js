@@ -3,24 +3,27 @@ QUnit.module('Styled mode for series types', function () {
 
     function checkStyledMode(chart, assert) {
         var container = chart.container;
-        var blacklist = [
+        var denylist = [
             'fill',
             'fill-opacity',
-            //'opacity', // To do: check this in HC7
+            // 'opacity', // To do: check this in HC7
             'stroke',
             'stroke-width',
             'style'
         ];
         if (
-            new RegExp(' (' + blacklist.join('|') + ')="', 'g').test(
+            new RegExp(' (' + denylist.join('|') + ')="', 'gu').test(
                 container.innerHTML
             )
         ) {
-            blacklist.forEach(function (attr) {
+            denylist.forEach(function (attr) {
                 container
                     .querySelectorAll('*[' + attr + ']')
                     .forEach(function (elem) {
-                        if (elem.className === 'highcharts-a11y-proxy-button') {
+                        if (
+                            elem.className ===
+                            'highcharts-a11y-proxy-element'
+                        ) {
                             return;
                         }
                         var key = [
@@ -30,7 +33,8 @@ QUnit.module('Styled mode for series types', function () {
                         ].join(',');
                         if (!notified[key]) {
                             console.log(
-                                '⚠️ Found presentational attribute in styled mode:',
+                                '⚠️ Found presentational attribute in styled ' +
+                                'mode:',
                                 attr,
                                 elem
                             );
@@ -47,7 +51,7 @@ QUnit.module('Styled mode for series types', function () {
         }
     }
 
-    Object.keys(Highcharts.seriesTypes).forEach(function (type) {
+    Object.keys(Highcharts.Series.types).forEach(function (type) {
         if (
             // Don't test indicator series (yet), they have more complex setup
             !('linkedTo' in Highcharts.defaultOptions.plotOptions[type]) &&
@@ -56,7 +60,11 @@ QUnit.module('Styled mode for series types', function () {
             // Complains about a missing axis
             type !== 'scatter3d' &&
             // Uses CSS for HTML data label positioning
-            type !== 'organization'
+            type !== 'organization' &&
+            // Error because of missing data
+            type !== 'renko' &&
+            // WebGPU
+            type !== 'contour'
         ) {
             QUnit.test('Styled mode for ' + type, function (assert) {
                 var cfg = {
@@ -110,6 +118,11 @@ QUnit.module('Styled mode for series types', function () {
                 if (type === 'networkgraph') {
                     cfg.series[0].keys = ['from', 'to'];
                     cfg.series[1].keys = ['from', 'to'];
+                }
+
+                if (type === 'histogram' || type === 'bellcurve') {
+                    cfg.series[0].data = [1, 1, 2, 2, 2, 2, 3, 3];
+                    cfg.series[1].data = [1, 1, 2, 2, 2, 2, 3, 3];
                 }
 
                 var chart = Highcharts.chart('container', cfg);

@@ -1,8 +1,9 @@
 /* *
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -22,16 +23,10 @@ import type APOPoint from './APOPoint';
 import type IndicatorValuesObject from '../IndicatorValuesObject';
 import type LineSeries from '../../../Series/Line/LineSeries';
 
+import EMAIndicator from '../EMA/EMAIndicator.js';
 import SeriesRegistry from '../../../Core/Series/SeriesRegistry.js';
-const {
-    ema: EMAIndicator
-} = SeriesRegistry.seriesTypes;
-import U from '../../../Core/Utilities.js';
-const {
-    extend,
-    merge,
-    error
-} = U;
+import { extend, merge } from '../../../Shared/Utilities.js';
+import { error } from '../../../Core/Utilities.js';
 
 /* *
  *
@@ -42,7 +37,6 @@ const {
 /**
  * The APO series type.
  *
- * @private
  * @class
  * @name Highcharts.seriesTypes.apo
  *
@@ -69,19 +63,20 @@ class APOIndicator extends EMAIndicator {
      * @excluding    allAreas, colorAxis, joinBy, keys, navigatorOptions,
      *               pointInterval, pointIntervalUnit, pointPlacement,
      *               pointRange, pointStart, showInNavigator, stacking
-     * @requires     stock/indicators/indicators
-     * @requires     stock/indicators/apo
+     * @requires     indicators/indicators
+     * @requires     indicators/apo
      * @optionparent plotOptions.apo
+     * @internal
      */
     public static defaultOptions: APOOptions = merge(EMAIndicator.defaultOptions, {
         /**
-         * Paramters used in calculation of Absolute Price Oscillator
+         * Parameters used in calculation of Absolute Price Oscillator
          * series points.
          *
          * @excluding period
          */
         params: {
-            period: void 0, // unchangeable period, do not inherit (#15362)
+            period: void 0, // Unchangeable period, do not inherit (#15362)
             /**
              * Periods for Absolute Price Oscillator calculations.
              *
@@ -99,9 +94,9 @@ class APOIndicator extends EMAIndicator {
      *
      * */
 
-    public data: Array<APOPoint> = void 0 as any;
-    public options: APOOptions = void 0 as any;
-    public points: Array<APOPoint> = void 0 as any;
+    public data!: Array<APOPoint>;
+    public options!: APOOptions;
+    public points!: Array<APOPoint>;
 
     /* *
      *
@@ -109,28 +104,18 @@ class APOIndicator extends EMAIndicator {
      *
      * */
 
+    /** @internal */
     public getValues<TLinkedSeries extends LineSeries>(
         series: TLinkedSeries,
         params: APOParamsOptions
     ): (IndicatorValuesObject<TLinkedSeries> | undefined) {
-        let periods: Array<number> = (params.periods as number[]),
+        const periods: Array<number> = (params.periods as number[]),
             index: number = (params.index as number),
             // 0- date, 1- Absolute price oscillator
             APO: Array<Array<number>> = [],
             xData: Array<number> = [],
-            yData: Array<number> = [],
-            periodsOffset: number,
-            // Shorter Period EMA
-            SPE: (
-                IndicatorValuesObject<TLinkedSeries> |
-                undefined
-            ),
-            // Longer Period EMA
-            LPE: (
-                IndicatorValuesObject<TLinkedSeries> |
-                undefined
-            ),
-            oscillator: number,
+            yData: Array<number> = [];
+        let oscillator: number,
             i: number;
 
         // Check if periods are correct
@@ -142,22 +127,26 @@ class APOIndicator extends EMAIndicator {
             return;
         }
 
-        SPE = EMAIndicator.prototype.getValues.call(this, series, {
-            index: index,
-            period: periods[0]
-        }) as IndicatorValuesObject<TLinkedSeries>;
+        // Shorter Period EMA
+        const SPE: (IndicatorValuesObject<TLinkedSeries> | undefined) =
+            super.getValues.call(this, series, {
+                index: index,
+                period: periods[0]
+            }) as IndicatorValuesObject<TLinkedSeries>;
 
-        LPE = EMAIndicator.prototype.getValues.call(this, series, {
-            index: index,
-            period: periods[1]
-        }) as IndicatorValuesObject<TLinkedSeries>;
+        // Longer Period EMA
+        const LPE: (IndicatorValuesObject<TLinkedSeries> | undefined) =
+            super.getValues.call(this, series, {
+                index: index,
+                period: periods[1]
+            }) as IndicatorValuesObject<TLinkedSeries>;
 
         // Check if ema is calculated properly, if not skip
         if (!SPE || !LPE) {
             return;
         }
 
-        periodsOffset = periods[1] - periods[0];
+        const periodsOffset: number = periods[1] - periods[0];
 
         for (i = 0; i < LPE.yData.length; i++) {
             oscillator = (
@@ -230,12 +219,12 @@ export default APOIndicator;
  * @extends   series,plotOptions.apo
  * @since     7.0.0
  * @product   highstock
- * @excluding allAreas, colorAxis, dataParser, dataURL, joinBy, keys,
+ * @excluding allAreas, colorAxis, joinBy, keys,
  *            navigatorOptions, pointInterval, pointIntervalUnit,
  *            pointPlacement, pointRange, pointStart, showInNavigator, stacking
- * @requires  stock/indicators/indicators
- * @requires  stock/indicators/apo
+ * @requires  indicators/indicators
+ * @requires  indicators/apo
  * @apioption series.apo
  */
 
-''; // to include the above in the js output
+''; // To include the above in the js output

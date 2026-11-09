@@ -1,10 +1,12 @@
 /* *
  *
- *  (c) 2010-2022 Pawel Lysy Grzegorz Blachlinski
+ *  (c) 2010-2026 Highsoft AS
+ *  Authors: Paweł Lysy, Grzegorz Blachliński
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -12,69 +14,157 @@
 
 /* *
  *
- * Imports
+ *  Imports
  *
  * */
 
+import type ColorString from '../../Core/Color/ColorString';
 import type PointOptions from '../../Core/Series/PointOptions.js';
 import type TreegraphSeries from './TreegraphSeries';
 import type { OrganizationLinkOptions } from '../Organization/OrganizationSeriesOptions.js';
+
 import Point from '../../Core/Series/Point.js';
 import TreegraphPoint from './TreegraphPoint.js';
 import TreegraphPointOptions from './TreegraphPointOptions.js';
-import U from '../../Core/Utilities.js';
-const { pick, extend } = U;
+import ColumnSeries from '../Column/ColumnSeries.js';
+import { extend } from '../../Shared/Utilities.js';
 
 /* *
-*
-*  Declarations
-*
-* */
+ *
+ *  Constants
+ *
+ * */
 
-export interface TreegraphLinkOptions extends OrganizationLinkOptions {}
-export interface LinkPointOptions extends TreegraphPointOptions {
-    link?: TreegraphLinkOptions
+const ColumnPoint = ColumnSeries.prototype.pointClass;
+
+/* *
+ *
+ *  Declarations
+ *
+ * */
+
+export interface TreegraphLinkOptions extends OrganizationLinkOptions {
+
+    /**
+     * For the orthogonal link type, this defines how far down the link bends.
+     * A number defines the pixel offset from the start of the link, and a
+     * percentage defines the relative position on the link. For example, a
+     * `bendAt` of `50%` means that the link bends in the middle.
+     *
+     * @since 12.5.0
+     * @default '50%'
+     */
+    bendAt?: number|string;
+
+    /**
+     * The color of the links between nodes.
+     *
+     * @default ${palette.neutralColor60}
+     */
+    color?: ColorString;
+
+    // TODO: cursor
+
+    /**
+     * Modifier of the shape of the curved link. Works best for values between 0
+     * and 1, where 0 is a straight line, and 1 is a shape close to the default
+     * one.
+     *
+     * @default 0.5
+     *
+     * @product highcharts
+     *
+     * @since 10.3.0
+     */
+    curveFactor?: number;
+
+    /**
+     * The line width of the links connecting nodes, in pixels.
+     *
+     * @default 1
+     */
+    lineWidth?: number;
+
+    /**
+     * Radius for the rounded corners of the links between nodes. Works for
+     * `orthogonal` link type.
+     *
+     * @default 10
+     */
+    radius?: number;
+
+    /**
+     * Type of the link shape.
+     *
+     * @sample highcharts/series-treegraph/link-types
+     *         Different link types
+     *
+     * @product highcharts
+     * @default 'curved'
+     */
+    type?: 'curved' | 'orthogonal' | 'straight';
+
 }
+
+export interface LinkPointOptions extends TreegraphPointOptions {
+    link?: TreegraphLinkOptions;
+}
+
 /* *
-*
-*  Class
-*
-* */
-class LinkPoint extends Point {
-    /* *
-    *
-    *  Class properties
-    *
-    * */
-    isLink = true;
-    node = {};
-    formatPrefix = 'link';
-    dataLabelOnNull = true;
+ *
+ *  Class
+ *
+ * */
+
+/**
+ * @private
+ * @class
+ */
+class LinkPoint extends ColumnPoint {
 
     /* *
-    *
-    *  Functions
-    *
-    * */
+     *
+     *  Constructor
+     *
+     * */
 
-    public init(
+    public constructor(
         series: TreegraphSeries,
         options: string | number | PointOptions | (string | number | null)[],
         x?: number,
         point?: TreegraphPoint
-    ): LinkPoint {
-        const link = super.init.apply(this, arguments) as LinkPoint;
+    ) {
+        super(series, options, x);
         this.formatPrefix = 'link';
         this.dataLabelOnNull = true;
 
         if (point) {
-            link.fromNode = point.node.parentNode.point;
-            link.visible = point.visible;
-            link.toNode = point;
-            this.id = link.toNode.id + '-' + link.fromNode.id;
+            this.fromNode = point.node.parentNode.point;
+            this.visible = point.visible;
+            this.toNode = point;
+            this.id = this.toNode.id + '-' + this.fromNode.id;
         }
-        return link;
     }
+
+    /* *
+     *
+     *  Properties
+     *
+     * */
+
+    public dataLabelOnNull = true;
+
+    public formatPrefix = 'link';
+
+    public isLink = true;
+
+    public node = {};
+
+    /* *
+     *
+     *  Functions
+     *
+     * */
 
     public update(
         options: TreegraphPointOptions | LinkPointOptions,
@@ -97,17 +187,18 @@ class LinkPoint extends Point {
 
         this.visible = this.toNode.visible;
         extend(this, oldOptions);
-        if (pick(redraw, true)) {
+        if (redraw ?? true) {
             this.series.chart.redraw(animation);
         }
     }
+
 }
 
 /* *
-*
-*  Class Interface
-*
-* */
+ *
+ *  Class Prototype
+ *
+ * */
 
 interface LinkPoint {
     options: LinkPointOptions;
@@ -116,9 +207,9 @@ interface LinkPoint {
 }
 
 /* *
-*
-*  Export Default
-*
-* */
+ *
+ *  Export Default
+ *
+ * */
 
 export default LinkPoint;

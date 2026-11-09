@@ -1,10 +1,12 @@
 /* *
  *
- *  (c) 2010-2021 Torstein Honsi
+ *  (c) 2010-2026 Highsoft AS
+ *  Author: Torstein Hønsi
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -17,32 +19,56 @@
  * */
 
 import type {
-    AlignObject,
-    AlignValue
+    AlignValue,
+    VerticalAlignValue
 } from '../../Renderer/AlignObject';
 import type Axis from '../Axis';
 import type BBoxObject from '../../Renderer/BBoxObject';
-import type Chart from '../../Chart/Chart';
 import type StackingAxis from './StackingAxis';
-import type {
-    StackLabelOptions,
-    StackOverflowValue
-} from './StackingOptions';
 import type SVGAttributes from '../../Renderer/SVG/SVGAttributes';
 import type SVGElement from '../../Renderer/SVG/SVGElement';
 import type SVGLabel from '../../Renderer/SVG/SVGLabel';
 
-import FU from '../../FormatUtilities.js';
-const { format } = FU;
-import SeriesRegistry from '../../Series/SeriesRegistry.js';
-const { series: Series } = SeriesRegistry;
-import U from '../../Utilities.js';
-const {
-    defined,
+import T from '../../Templating.js';
+const { format } = T;
+import Series from '../../Series/Series.js';
+import {
     destroyObjectProperties,
-    isNumber,
-    pick
-} = U;
+    fireEvent,
+    getAlignFactor,
+    isNumber
+} from '../../../Shared/Utilities.js';
+
+/* *
+ *
+ *  Declarations
+ *
+ * */
+
+/** @internal */
+export interface AdjustStackPositionProps {
+    labelBox: BBoxObject;
+    verticalAlign: VerticalAlignValue;
+    textAlign: AlignValue;
+}
+
+export interface AlignOptions {
+    verticalAlign: 'top'|'middle'|'bottom';
+    align: 'left'|'center'|'right';
+    x?: number;
+    y?: number;
+}
+
+/** @internal */
+export interface StackBoxProps {
+    boxBottom?: number;
+    boxTop?: number;
+    defaultX?: number;
+    isNegative: boolean;
+    width: number;
+    xAxis?: Axis;
+    xOffset: number;
+}
 
 /* *
  *
@@ -53,7 +79,6 @@ const {
 /**
  * The class for stacks. Each stack, on a specific X value and either negative
  * or positive, has its own stack item.
- * @private
  */
 class StackItem {
 
@@ -63,23 +88,18 @@ class StackItem {
      *
      * */
 
+    /** @internal */
     public constructor(
         axis: StackingAxis,
-        options: StackLabelOptions,
-        isNegative: boolean,
+        negativeValue: boolean,
         x: number,
-        stackOption?: StackOverflowValue
+        stackOption?: number|string
     ) {
-
-        const inverted = axis.chart.inverted;
-
         this.axis = axis;
 
-        // Tells if the stack is negative
-        this.isNegative = isNegative;
-
-        // Save the options to be able to style the label
-        this.options = options = options || {};
+        // The stack goes to the left either if the stack has negative value
+        // or when axis is reversed. XOR operator.
+        this.negativeValue = negativeValue;
 
         // Save the x value to be able to position the label later
         this.x = x;
@@ -99,264 +119,335 @@ class StackItem {
         this.leftCliff = 0;
         this.rightCliff = 0;
 
-        // The align options and text align varies on whether the stack is
-        // negative and if the chart is inverted or not.
-        // First test the user supplied value, then use the dynamic.
-        this.alignOptions = {
-            align: options.align ||
-                (inverted ? (isNegative ? 'left' : 'right') : 'center'),
-            verticalAlign: options.verticalAlign ||
-                (inverted ? 'middle' : (isNegative ? 'bottom' : 'top')),
-            y: options.y,
-            x: options.x
-        };
-        this.textAlign = options.textAlign ||
-        (inverted ? (isNegative ? 'right' : 'left') : 'center');
     }
 
-    public alignOptions: AlignObject;
-    public axis: StackingAxis;
-    public base?: string;
-    public cumulative: (number|null);
-    public hasValidPoints: boolean;
-    public isNegative: boolean;
-    public label?: SVGLabel;
-    public leftCliff: number;
-    public options: StackLabelOptions;
-    public padding?: number;
-    public points: Record<string, Array<number>>;
-    public rightCliff: number;
-    public rotation?: number;
-    public stack?: StackOverflowValue;
-    public textAlign: AlignValue;
-    public total: (number|null);
-    public touched?: number;
-    public x: number;
+    /* *
+     *
+     *  Properties
+     *
+     * */
 
     /**
-     * @private
+     * Related axis
+     * @name Highcharts.StackItemObject#axis
+     * @type {Highcharts.Axis}
      */
+    public axis: StackingAxis;
+
+    /** @internal */
+    public base?: string;
+
+    /**
+     * Cumulative value of the stacked data points
+     * @name Highcharts.StackItemObject#cumulative
+     * @type {number}
+     */
+    public cumulative: number | null;
+
+    /** @internal */
+    public hasValidPoints: boolean;
+
+    /**
+     * Related SVG element
+     * @name Highcharts.StackItemObject#label
+     * @type {Highcharts.SVGElement}
+     */
+    public label?: SVGLabel;
+
+    /** @internal */
+    public leftCliff: number;
+
+    /** @internal */
+    public negativeValue: boolean;
+
+    /** @internal */
+    public padding?: number;
+
+    /** @internal */
+    public points: Record<string, Array<number>>;
+
+    /** @internal */
+    public rightCliff: number;
+
+    /** @internal */
+    public rotation?: number;
+
+    /** @internal */
+    public shadow?: SVGElement;
+
+    /** @internal */
+    public shadowGroup?: SVGElement;
+
+    /** @internal */
+    public stack?: string|number;
+
+    /**
+     * Total value of the stacked data points
+     * @name Highcharts.StackItemObject#total
+     * @type {number}
+     */
+    public total: number | null;
+
+    /** @internal */
+    public touched?: number;
+
+    /**
+     * Shared x value of the stack
+     * @name Highcharts.StackItemObject#x
+     * @type {number}
+     */
+    public x: number;
+
+    /* *
+     *
+     *  Functions
+     *
+     * */
+
+    /** @internal */
     public destroy(): void {
         destroyObjectProperties(this, this.axis);
     }
 
     /**
      * Renders the stack total label and adds it to the stack label group.
-     * @private
+     * @internal
      */
     public render(group: SVGElement): void {
-        const chart = this.axis.chart,
-            options = this.options,
+        const axis = this.axis,
+            chart = axis.chart,
+            options = axis.options.stackLabels || {},
             formatOption = options.format,
-            str = formatOption ? // format the text in the label
-                format(formatOption, this, chart) :
-                (options.formatter as any).call(this);
+            // Format the text in the label.
+            text = (
+                formatOption ?
+                    format(formatOption, this, chart) :
+                    options.formatter?.call(this, this)
+            ) || '',
+            verb = this.label ? 'animate' : 'attr';
 
-        // Change the text to reflect the new total and set visibility to hidden
-        // in case the serie is hidden
-        if (this.label) {
-            this.label.attr({ text: str, visibility: 'hidden' });
-        } else {
-            // Create new label
-            this.label = chart.renderer
-                .label(
-                    str,
-                    null as any,
-                    null as any,
-                    (options as any).shape,
-                    null as any,
-                    null as any,
-                    options.useHTML,
-                    false,
-                    'stack-labels'
-                );
+        // Create new label
+        this.label ||= chart.renderer.label(
+            text,
+            0,
+            void 0,
+            options.shape,
+            void 0,
+            void 0,
+            options.useHTML,
+            false,
+            'stack-labels'
+        );
 
-            const attr: SVGAttributes = {
+        const label = this.label,
+            animatableAttribs: SVGAttributes = {
                 r: options.borderRadius || 0,
-                text: str,
-                rotation: (options as any).rotation,
-                // set default padding to 5 as it is in datalabels #12308
-                padding: pick((options as any).padding, 5),
-                visibility: 'hidden' // hidden until setOffset is called
+                // Set default padding to 5 as it is in dataLabels #12308
+                padding: (options.padding ?? 5)
             };
 
-            if (!chart.styledMode) {
-                attr.fill = options.backgroundColor;
-                attr.stroke = options.borderColor;
-                attr['stroke-width'] = options.borderWidth;
-                this.label.css(options.style as any);
-            }
+        if (!chart.styledMode) {
+            animatableAttribs.fill = options.backgroundColor;
+            animatableAttribs.stroke = options.borderColor;
+            animatableAttribs['stroke-width'] = options.borderWidth;
+            label.css(options.style || {});
+        }
 
-            this.label.attr(attr);
+        label
+            .attr({
+                text,
+                visibility: 'hidden' // Hidden until setOffset is called
+            })[verb](animatableAttribs);
 
-            if (!this.label.added) {
-                this.label.add(group); // add to the labels-group
-            }
+        if (!label.added) {
+            label.add(group); // Add to the labels-group
         }
 
         // Rank it higher than data labels (#8742)
-        this.label.labelrank = chart.plotSizeY;
+        label.labelrank = chart.plotSizeY;
+        fireEvent(this, 'afterRender');
     }
 
     /**
      * Sets the offset that the stack has from the x value and repositions the
      * label.
-     * @private
+     * @internal
      */
     public setOffset(
         xOffset: number,
-        xWidth: number,
+        width: number,
         boxBottom?: number,
         boxTop?: number,
-        defaultX?: number
+        defaultX?: number,
+        xAxis?: Axis
     ): void {
-        const axis = this.axis,
+        const { axis, label } = this,
             chart = axis.chart,
-            // stack value translated mapped to chart coordinates
-            y = axis.translate(
-                axis.stacking.usePercentage ?
-                    100 :
-                    (boxTop ?
-                        boxTop :
-                        (this.total as any)),
-                0 as any,
-                0 as any,
-                0 as any,
-                1 as any
-            ),
-            yZero = axis.translate(boxBottom ? boxBottom : 0), // stack origin
-            // x position:
-            x = pick(defaultX, chart.xAxis[0].translate(this.x)) +
-                xOffset,
-            stackBox = defined(y) && this.getStackBox(
-                chart,
-                this,
+            options = axis.options.stackLabels || {},
+            inverted = chart.inverted,
+            isNegative = this.negativeValue !== !!axis.reversed,
+            stackBox = this.getStackBox({
+                boxBottom,
+                boxTop,
+                defaultX,
+                isNegative,
+                width,
+                xAxis,
+                xOffset
+            }),
+            {
+                align = (inverted ? (isNegative ? 'left' : 'right') : 'center'),
+                verticalAlign = (
+                    inverted ? 'middle' : isNegative ? 'bottom' : 'top'
+                ),
+                textAlign = (
+                    inverted ? (!isNegative ? 'left' : 'right') : 'center'
+                ),
+                x = 0,
+                y = 0
+            } = options,
+            alignOptions: AlignOptions = {
+                align,
+                verticalAlign,
                 x,
-                y,
-                xWidth,
-                // stack height:
-                Math.abs(y - yZero),
-                axis
-            ),
-            label = this.label,
-            isNegative = this.isNegative,
-            textAlign = this.textAlign;
+                y
+            };
 
         if (label && stackBox) {
-            const bBox = label.getBBox(),
+            const labelBox = label.getBBox(void 0, 0),
                 padding = label.padding;
-
-            let boxOffsetX,
-                isJustify =
-                    pick(this.options.overflow, 'justify') === 'justify',
+            let isJustify = (options.overflow ?? 'justify') === 'justify',
                 visible;
 
-            if (textAlign === 'left') {
-                boxOffsetX = chart.inverted ? -padding : padding;
-            } else if (textAlign === 'right') {
-                boxOffsetX = bBox.width;
-            } else {
-                if (chart.inverted && textAlign === 'center') {
-                    boxOffsetX = bBox.width / 2;
-                } else {
-                    boxOffsetX = chart.inverted ?
-                        (isNegative ? bBox.width + padding : -padding) :
-                        bBox.width / 2;
-                }
-            }
+            // Calculate the adjusted Stack position, to take into consideration
+            // the size if the labelBox and vertical alignment as well as the
+            // text alignment. It needs to be done to work with default
+            // SVGLabel.align/justify methods.
+            const { x: adjustX, y: adjustY } = this.adjustStackPosition({
+                labelBox,
+                verticalAlign,
+                textAlign
+            });
 
-            const boxOffsetY = chart.inverted ?
-                bBox.height / 2 : (isNegative ? -padding : bBox.height);
+            stackBox.x -= adjustX;
+            stackBox.y -= adjustY;
 
-            // Reset alignOptions property after justify #12337
-            this.alignOptions.x = pick(this.options.x, 0);
-            this.alignOptions.y = pick(this.options.y, 0);
+            // Align the label to the adjusted box.
+            label.align(alignOptions, false, stackBox);
 
-            // Set the stackBox position
-            stackBox.x -= boxOffsetX;
-            stackBox.y -= boxOffsetY;
+            // Check if the label is inside the plotArea #12294
+            visible = chart.isInsidePlot(
+                label.alignAttr.x + x + adjustX,
+                label.alignAttr.y + y + adjustY
+            );
 
-            // Align the label to the box
-            label.align(this.alignOptions, null as any, stackBox);
-
-            // Check if label is inside the plotArea #12294
-            if (chart.isInsidePlot(
-                label.alignAttr.x + boxOffsetX - this.alignOptions.x,
-                label.alignAttr.y + boxOffsetY - this.alignOptions.y
-            )) {
-                label.show();
-            } else {
-                // Move label away to avoid the overlapping issues
-                label.hide();
+            if (!visible) {
                 isJustify = false;
             }
 
             if (isJustify) {
-                // Justify stackLabel into the stackBox
+                // Justify stackLabel into the alignBox
                 Series.prototype.justifyDataLabel.call(
-                    this.axis,
+                    axis,
                     label,
-                    this.alignOptions,
+                    alignOptions,
                     label.alignAttr,
-                    bBox,
+                    labelBox,
                     stackBox
                 );
             }
+
+            // Add correct rotation with its rotation origin (#15129)
             label.attr({
-                x: label.alignAttr.x,
-                y: label.alignAttr.y
+                rotation: options.rotation,
+                rotationOriginX: labelBox.width *
+                    getAlignFactor(options.textAlign || 'center'),
+                rotationOriginY: labelBox.height / 2
             });
 
-            if (pick(!isJustify && this.options.crop, true)) {
+            // Check if the dataLabel should be visible.
+            if (((!isJustify && options.crop) ?? true)) {
                 visible =
                     isNumber(label.x) &&
                     isNumber(label.y) &&
                     chart.isInsidePlot(
-                        label.x - padding + label.width,
+                        label.x - padding + (label.width || 0),
                         label.y
                     ) &&
                     chart.isInsidePlot(label.x + padding, label.y);
 
-                if (!visible) {
-                    label.hide();
-                }
             }
+            label[visible ? 'show' : 'hide']();
         }
+
+        fireEvent(this, 'afterSetOffset', { xOffset, width });
     }
 
     /**
-     * @private
-     * @function Highcharts.StackItem#getStackBox
+     * Adjust the stack BBox position, to take into consideration the alignment
+     * of the dataLabel. This is necessary to make the stackDataLabel work with
+     * core methods like `SVGLabel.adjust` and `Series.justifyDataLabel`.
+     * @internal
      */
-    public getStackBox(
-        chart: Chart,
-        stackItem: StackItem,
-        x: number,
-        y: number,
-        xWidth: number,
-        h: number,
-        axis: Axis
-    ): BBoxObject {
-        const reversed = stackItem.axis.reversed,
-            inverted = chart.inverted,
-            axisPos = axis.height + (axis.pos as any) -
-                (inverted ? chart.plotLeft : chart.plotTop),
-            neg = (stackItem.isNegative && !reversed) ||
-                (!stackItem.isNegative && reversed); // #4056
-
-        return { // this is the box for the complete stack
-            x: inverted ?
-                (neg ? y - axis.right : y - h + axis.pos - chart.plotLeft) :
-                x + chart.xAxis[0].transB - chart.plotLeft,
-            y: inverted ?
-                axis.height - x - xWidth :
-                (neg ?
-                    (axisPos - y - h) :
-                    axisPos - y
-                ),
-            width: inverted ? h : xWidth,
-            height: inverted ? xWidth : h
+    public adjustStackPosition({
+        labelBox,
+        verticalAlign,
+        textAlign
+    }: AdjustStackPositionProps): {x: number, y: number} {
+        return {
+            x: labelBox.width / 2 +
+                (labelBox.width / 2) * (2 * getAlignFactor(textAlign) - 1),
+            y: (labelBox.height / 2) * 2 * (1 - getAlignFactor(verticalAlign))
         };
+    }
+    /**
+     * Get the bbox of the stack.
+     * @internal
+     * @function Highcharts.StackItem#getStackBox
+     * @return {BBoxObject}
+     * The x, y, height, width of the stack.
+     */
+    public getStackBox(stackBoxProps: StackBoxProps): BBoxObject {
+        const axis = this.axis,
+            chart = axis.chart,
+            {
+                boxBottom,
+                boxTop,
+                defaultX,
+                isNegative,
+                width,
+                xOffset
+            } = stackBoxProps,
+            totalStackValue = axis.stacking.usePercentage ?
+                100 :
+                (boxTop ?? this.total ?? 0),
+            y = axis.toPixels(totalStackValue),
+            xAxis = stackBoxProps.xAxis || chart.xAxis[0],
+            x = (defaultX ?? xAxis.translate(this.x)) + xOffset,
+            yZero = axis.toPixels(
+                boxBottom ||
+                (
+                    isNumber(axis.min) &&
+                    axis.logarithmic &&
+                    axis.logarithmic.lin2log(axis.min)
+                ) ||
+                0
+            ),
+            height = Math.abs(y - yZero),
+            inverted = chart.inverted;
+
+        return inverted ?
+            {
+                x: (isNegative ? y : y - height) - chart.plotLeft,
+                y: xAxis.height - x - width + xAxis.top - chart.plotTop,
+                width: height,
+                height: width
+            } : {
+                x: x + xAxis.transB - chart.plotLeft,
+                y: (isNegative ? y - height : y) - chart.plotTop,
+                width: width,
+                height: height
+            };
     }
 }
 
@@ -393,10 +484,6 @@ export default StackItem;
  * @name Highcharts.StackItemObject#cumulative
  * @type {number}
  *//**
- * True if on the negative side
- * @name Highcharts.StackItemObject#isNegative
- * @type {boolean}
- *//**
  * Related SVG element
  * @name Highcharts.StackItemObject#label
  * @type {Highcharts.SVGElement}
@@ -414,4 +501,4 @@ export default StackItem;
  * @type {number}
  */
 
-''; // keeps doclets above in JS file
+''; // Keeps doclets above in JS file

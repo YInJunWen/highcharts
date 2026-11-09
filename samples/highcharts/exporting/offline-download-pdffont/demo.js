@@ -5,7 +5,8 @@ Highcharts.chart('container', {
     },
 
     subtitle: {
-        text: 'беручи до уваги, що <b>народи</b> Об <i>єднаних</i> Націй <b><i>підтвердили</i></b> в Статуті'
+        text: 'беручи до уваги, що <b>народи</b> Об <i>єднаних</i> Націй <b>' +
+            '<i>підтвердили</i></b> в Статуті'
     },
 
     xAxis: {
@@ -13,18 +14,37 @@ Highcharts.chart('container', {
     },
 
     series: [{
-        data: [1, 3, 2, 4],
+        data: [123, 345, 234, 456],
         type: 'column',
         colorByPoint: true,
-        name: 'Αυτή είναι η σειρά'
+        name: 'Αυτή είναι η σειρά',
+        dataLabels: {
+            enabled: true,
+            inside: true
+        }
     }],
 
     exporting: {
+        fallbackToExportServer: false,
+        libURL: 'https://code.highcharts.com/lib/',
         pdfFont: {
             normal: 'https://www.highcharts.com/samples/data/fonts/NotoSans-Regular.ttf',
             bold: 'https://www.highcharts.com/samples/data/fonts/NotoSans-Bold.ttf',
             bolditalic: 'https://www.highcharts.com/samples/data/fonts/NotoSans-BoldItalic.ttf',
             italic: 'https://www.highcharts.com/samples/data/fonts/NotoSans-Italic.ttf'
+        },
+        buttons: {
+            contextButton: {
+                menuItems: [
+                    'viewFullscreen',
+                    'printChart',
+                    'separator',
+                    'downloadPNG',
+                    'downloadJPEG',
+                    'downloadSVG',
+                    'downloadPDF'
+                ]
+            }
         }
     }
 

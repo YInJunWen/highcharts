@@ -1,0 +1,10 @@
+---
+name: Inverted treegraph
+authors:
+  - Paweł Lysy, Torstein Hønsi
+js_wrap: b
+tags:
+  - Highcharts demo
+categories:
+  - Trees and networks
+...

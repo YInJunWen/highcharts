@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: LicenseRef-Highcharts
 /**
  * @license Highstock JS v@product.version@ (@product.date@)
  * @module highcharts/modules/heikinashi
@@ -6,9 +7,15 @@
  *
  * HeikinAshi series type for Highcharts Stock
  *
- * (c) 2010-2021 Karol Kolodziej
+ * (c) 2010-2026 Highsoft AS
+ * Author: Karol Kołodziej
  *
- * License: www.highcharts.com/license
+ * A commercial license may be required depending on use,
+ * see www.highcharts.com/license
  */
 'use strict';
-import '../../Series/HeikinAshi/HeikinAshiSeries.js';
+import Highcharts from '../../Core/Globals.js';
+import HeikinAshiSeries from '../../Series/HeikinAshi/HeikinAshiSeries.js';
+const G: AnyRecord = Highcharts;
+HeikinAshiSeries.compose(G.Series, G.Axis);
+export default Highcharts;

@@ -1,0 +1,6 @@
+---
+ name: Disabling the add component button
+ authors:
+   - Dawid Draguła
+ js_wrap: b
+...

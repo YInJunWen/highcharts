@@ -1,5 +1,8 @@
 QUnit.test('Add point without shift', function (assert) {
-    const usdeurCopy = usdeur.slice();
+    const usdeurCopy = new Array(3000).fill(1).map((item, i) => [
+        Date.UTC(2010, 0, 1) + i * 24 * 36e5,
+        Math.random()
+    ]);
     var chart = Highcharts.stockChart('container', {
             rangeSelector: {
                 selected: 1
@@ -46,8 +49,8 @@ QUnit.test('Add point without shift', function (assert) {
 
     // Move viewed area left
     chart.xAxis[0].setExtremes(
-        chart.series[0].xData[400],
-        chart.series[0].xData[500]
+        chart.series[0].getColumn('x')[400],
+        chart.series[0].getColumn('x')[500]
     );
 
     // Once the navigator is disconnected from the max, it should stay after
@@ -74,7 +77,10 @@ QUnit.test('Add point without shift', function (assert) {
 });
 
 QUnit.test('Add point with shift', function (assert) {
-    const usdeurCopy = usdeur.slice();
+    const usdeurCopy = new Array(3000).fill(1).map((item, i) => [
+        Date.UTC(2010, 0, 1) + i * 24 * 36e5,
+        Math.random()
+    ]);
     var chart = Highcharts.stockChart('container', {
             chart: {
                 width: 800
@@ -118,10 +124,8 @@ QUnit.test('Add point with shift', function (assert) {
     );
 
     // Move viewed area left
-    chart.xAxis[0].setExtremes(
-        chart.series[0].xData[300],
-        chart.series[0].xData[400]
-    );
+    const xData = chart.series[0].getColumn('x');
+    chart.xAxis[0].setExtremes(xData[300], xData[400]);
 
     // Once the navigator is disconnected from the max, it should stay after
     // adding points.

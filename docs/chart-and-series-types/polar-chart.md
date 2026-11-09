@@ -1,3 +1,11 @@
+---
+description: >-
+  Transform cartesian chart types into polar coordinates with one chart
+  option, then configure panes, angles, centers, and point placement. The
+  article explains how axes and common series features behave in this
+  layout.
+---
+
 Polar (Radar) chart
 ===================
 
@@ -9,10 +17,11 @@ We took great care to reuse existing options and patterns when designing the opt
 
 To create a polar chart set chart.polar to be true:
 
-    
-    chart: {
-        polar: true
-    }
+```js
+chart: {
+    polar: true
+}
+```
 
 Every aspect of the chart anatomy, including series types like lines, areas, splines and columns as well as features like plot bands, data labels, tooltips, click events, stacking and axis setup, are transformed to the polar coordinate system.
 
@@ -32,5 +41,5 @@ Options related to polar charts
 Polar chart examples
 --------------------
 
-*   [A polar chart with different series types](https://jsfiddle.net/highcharts/z9nyR/)
-*   [A spider web](https://jsfiddle.net/highcharts/xEAxK/)
+*   [A polar chart with different series types](https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/blog/polar-chart)
+*   [A spider web](https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/polar-spider)

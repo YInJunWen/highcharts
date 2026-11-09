@@ -1,12 +1,12 @@
 QUnit.test('Sub-millisecond tooltip(#4223)', function (assert) {
-    var chart = new Highcharts.Chart({
+    const chart = new Highcharts.Chart({
         chart: {
             renderTo: 'container'
         },
         title: {
             text:
                 'Tooltip shows only year when xAxis.closestPointRange < 1 msec',
-            x: -20 //center
+            x: -20 // center
         },
         xAxis: {
             type: 'datetime'
@@ -21,12 +21,11 @@ QUnit.test('Sub-millisecond tooltip(#4223)', function (assert) {
         ]
     });
 
-    assert.equal(
-        chart.xAxis[0].dateTime.getXDateFormat(
-            chart.series[0].points[0].x,
-            chart.options.tooltip.dateTimeLabelFormats
-        ),
-        '%A, %b %e, %H:%M:%S.%L',
-        'Milliseconds are preserved in tooltip'
+    chart.tooltip.refresh(chart.series[0].points[0]);
+
+    assert.notEqual(
+        chart.tooltip.label.text.element.textContent.indexOf('841'),
+        -1,
+        'Milliseconds should be preserved in tooltip'
     );
 });

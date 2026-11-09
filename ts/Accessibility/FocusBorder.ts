@@ -1,12 +1,14 @@
 /* *
  *
- *  (c) 2009-2021 Øystein Moseng
+ *  (c) 2009-2026 Highsoft AS
+ *  Author: Øystein Moseng
  *
  *  Extend SVG and Chart classes with focus border capabilities.
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -27,12 +29,7 @@ import type SVGAttributes from '../Core/Renderer/SVG/SVGAttributes';
 
 import Chart from '../Core/Chart/Chart.js';
 import SVGElement from '../Core/Renderer/SVG/SVGElement.js';
-import SVGLabel from '../Core/Renderer/SVG/SVGLabel.js';
-import U from '../Core/Utilities.js';
-const {
-    addEvent,
-    pick
-} = U;
+import { addEvent } from '../Shared/Utilities.js';
 
 /* *
  *
@@ -40,8 +37,9 @@ const {
  *
  * */
 
-declare module '../Core/Chart/ChartLike'{
-    interface ChartLike {
+/** @internal */
+declare module '../Core/Chart/ChartBase'{
+    interface ChartBase {
         focusElement?: SVGElement;
         /** @requires modules/accessibility */
         renderFocusBorder(): void;
@@ -53,8 +51,9 @@ declare module '../Core/Chart/ChartLike'{
     }
 }
 
-declare module '../Core/Renderer/SVG/SVGElementLike' {
-    interface SVGElementLike {
+/** @internal */
+declare module '../Core/Renderer/SVG/SVGElementBase' {
+    interface SVGElementBase {
         focusBorder?: SVGElement;
         /** @requires modules/accessibility */
         addFocusBorder(margin: number, attribs: SVGAttributes): void;
@@ -69,6 +68,7 @@ declare module '../Core/Renderer/SVG/SVGElementLike' {
  *
  * */
 
+/** @internal */
 namespace FocusBorderComposition {
 
     /* *
@@ -77,6 +77,7 @@ namespace FocusBorderComposition {
      *
      * */
 
+    /** @internal */
     export interface ChartComposition extends Accessibility.ChartComposition {
         focusElement?: SVGElement;
         renderFocusBorder(): void;
@@ -86,7 +87,8 @@ namespace FocusBorderComposition {
         ): void;
     }
 
-    export interface SVGElementCompositon extends SVGElement {
+    /** @internal */
+    export interface SVGElementComposition extends SVGElement {
         focusBorder?: SVGElement;
         addFocusBorder(margin: number, attribs: SVGAttributes): void;
         removeFocusBorder(): void;
@@ -103,8 +105,6 @@ namespace FocusBorderComposition {
      *
      * */
 
-    const composedClasses: Array<Function> = [];
-
     // Attributes that trigger a focus border update
     const svgElementBorderUpdateTriggers = [
         'x', 'y', 'transform', 'width', 'height', 'r', 'd', 'stroke-width'
@@ -116,32 +116,22 @@ namespace FocusBorderComposition {
      *
      * */
 
-    /* eslint-disable valid-jsdoc */
-
-    /**
-     * @private
-     */
+    /** @internal */
     export function compose(
         ChartClass: typeof Chart,
         SVGElementClass: typeof SVGElement
     ): void {
+        const chartProto = ChartClass.prototype as ChartComposition,
+            svgElementProto = (
+                SVGElementClass.prototype as SVGElementComposition
+            );
 
-        if (composedClasses.indexOf(ChartClass) === -1) {
-            composedClasses.push(ChartClass);
-
-            const chartProto = ChartClass.prototype as ChartComposition;
-
+        if (!chartProto.renderFocusBorder) {
             chartProto.renderFocusBorder = chartRenderFocusBorder;
             chartProto.setFocusToElement = chartSetFocusToElement;
         }
 
-        if (composedClasses.indexOf(SVGElementClass) === -1) {
-            composedClasses.push(SVGElementClass);
-
-            const svgElementProto = (
-                SVGElementClass.prototype as SVGElementCompositon
-            );
-
+        if (!svgElementProto.addFocusBorder) {
             svgElementProto.addFocusBorder = svgElementAddFocusBorder;
             svgElementProto.removeFocusBorder = svgElementRemoveFocusBorder;
         }
@@ -151,8 +141,9 @@ namespace FocusBorderComposition {
     /**
      * Redraws the focus border on the currently focused element.
      *
-     * @private
      * @function Highcharts.Chart#renderFocusBorder
+     *
+     * @internal
      */
     function chartRenderFocusBorder(
         this: ChartComposition
@@ -179,7 +170,6 @@ namespace FocusBorderComposition {
      * Set chart's focus to an SVGElement. Calls focus() on it, and draws the
      * focus border. This is used by multiple components.
      *
-     * @private
      * @function Highcharts.Chart#setFocusToElement
      *
      * @param {Highcharts.SVGElement} svgElement
@@ -188,6 +178,8 @@ namespace FocusBorderComposition {
      * @param {SVGDOMElement|HTMLDOMElement} [focusElement]
      * If supplied, it draws the border around svgElement and sets the focus to
      * focusElement.
+     *
+     * @internal
      */
     function chartSetFocusToElement(
         this: ChartComposition,
@@ -226,17 +218,24 @@ namespace FocusBorderComposition {
         }
 
         this.focusElement = svgElement;
+
+        // #22122, focus border should re-render after window is resized
+        addEvent(this, 'endResize', function (): void {
+            this.renderFocusBorder();
+        });
+
         this.renderFocusBorder();
     }
 
     /**
      * Add hook to destroy focus border if SVG element is destroyed, unless
      * hook already exists.
-     * @private
-     * @param el Element to add destroy hook to
+     * @param {object} el Element to add destroy hook to
+     *
+     * @internal
      */
     function svgElementAddDestroyFocusBorderHook(
-        el: SVGElementCompositon
+        el: SVGElementComposition
     ): void {
         if (el.focusBorderDestroyHook) {
             return;
@@ -258,15 +257,12 @@ namespace FocusBorderComposition {
      * Add focus border functionality to SVGElements. Draws a new rect on top of
      * element around its bounding box. This is used by multiple components.
      *
-     * @private
      * @function Highcharts.SVGElement#addFocusBorder
      *
-     * @param {number} margin
-     *
-     * @param {SVGAttributes} attribs
+     * @internal
      */
     function svgElementAddFocusBorder(
-        this: SVGElementCompositon,
+        this: SVGElementComposition,
         margin: number,
         attribs: SVGAttributes
     ): void {
@@ -276,13 +272,14 @@ namespace FocusBorderComposition {
         }
         // Add the border rect
         const bb = this.getBBox(),
-            pad = pick(margin, 3),
+            pad = (margin ?? 3),
             parent = this.parentGroup,
             scaleX = this.scaleX || parent && parent.scaleX,
             scaleY = this.scaleY || parent && parent.scaleY,
             oneDefined = scaleX ? !scaleY : scaleY,
             scaleBoth = oneDefined ? Math.abs(scaleX || scaleY || 1) :
-                (Math.abs(scaleX || 1) + Math.abs(scaleY || 1)) / 2;
+                (Math.abs(scaleX || 1) + Math.abs(scaleY || 1)) / 2,
+            lineHeight = this.renderer.fontMetrics(this).h;
 
         bb.x += this.translateX ? this.translateX : 0;
         bb.y += this.translateY ? this.translateY : 0;
@@ -294,7 +291,8 @@ namespace FocusBorderComposition {
 
         /**
          * For text elements, apply x and y offset, #11397.
-         * @private
+         *
+         * @internal
          */
         function getTextAnchorCorrection(
             text: SVGElement
@@ -316,7 +314,7 @@ namespace FocusBorderComposition {
             };
         }
 
-        const isLabel = this instanceof SVGLabel;
+        const isLabel = !!this.text;
         if (this.element.nodeName === 'text' || isLabel) {
             const isRotated = !!this.rotation;
             const correction = !isLabel ? getTextAnchorCorrection(this) :
@@ -331,7 +329,11 @@ namespace FocusBorderComposition {
                 borderPosX = attrX - (bb.width * correction.x) - pad;
             }
             if (!isNaN(attrY)) {
-                borderPosY = attrY - (bb.height * correction.y) - pad;
+                // Correct by line height if "text-anchor" == "start", #19335.
+                const dim = this.attr('text-anchor') === 'start' ?
+                    lineHeight :
+                    bb.height;
+                borderPosY = attrY - (dim * correction.y) - pad;
             }
 
             if (isLabel && isRotated) {
@@ -375,12 +377,13 @@ namespace FocusBorderComposition {
     /**
      * Add hooks to update the focus border of an element when the element
      * size/position is updated, unless already added.
-     * @private
-     * @param el Element to add update hooks to
-     * @param updateParams Parameters to pass through to addFocusBorder when updating.
+     * @param {object} el Element to add update hooks to
+     * @param {...*} updateParams Parameters to pass through to addFocusBorder when updating.
+     *
+     * @internal
      */
     function avgElementAddUpdateFocusBorderHooks(
-        el: SVGElementCompositon,
+        el: SVGElementComposition,
         ...updateParams: any[]
     ): void {
         if (el.focusBorderUpdateHooks) {
@@ -406,11 +409,12 @@ namespace FocusBorderComposition {
     /**
      * Remove hook from SVG element added by addDestroyFocusBorderHook, if
      * existing.
-     * @private
-     * @param el Element to remove destroy hook from
+     * @param {object} el Element to remove destroy hook from
+     *
+     * @internal
      */
     function svgElementRemoveDestroyFocusBorderHook(
-        el: SVGElementCompositon
+        el: SVGElementComposition
     ): void {
         if (!el.focusBorderDestroyHook) {
             return;
@@ -424,11 +428,12 @@ namespace FocusBorderComposition {
     /**
      * Add focus border functionality to SVGElements. Draws a new rect on top of
      * element around its bounding box. This is used by multiple components.
-     * @private
      * @function Highcharts.SVGElement#removeFocusBorder
+     *
+     * @internal
      */
     function svgElementRemoveFocusBorder(
-        this: SVGElementCompositon
+        this: SVGElementComposition
     ): void {
         svgElementRemoveUpdateFocusBorderHooks(this);
         svgElementRemoveDestroyFocusBorderHook(this);
@@ -442,11 +447,12 @@ namespace FocusBorderComposition {
     /**
      * Remove hooks from SVG element added by addUpdateFocusBorderHooks, if
      * existing.
-     * @private
-     * @param el Element to remove update hooks from
+     * @param {object} el Element to remove update hooks from
+     *
+     * @internal
      */
     function svgElementRemoveUpdateFocusBorderHooks(
-        el: SVGElementCompositon
+        el: SVGElementComposition
     ): void {
         if (!el.focusBorderUpdateHooks) {
             return;
@@ -472,4 +478,5 @@ namespace FocusBorderComposition {
  *
  * */
 
+/** @internal */
 export default FocusBorderComposition;

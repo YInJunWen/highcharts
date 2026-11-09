@@ -54,13 +54,14 @@ QUnit.test('Test Slow Stochastic calculations on data updates.', assert => {
     );
 
     assert.deepEqual(
-        series[1].yData,
-        [
-            [87.5, null], // FAST %D/SLOW %K
-            [87.5, null], // FAST %D/SLOW %K
-            [87.5, 87.5] // SLOW %D (period=3)
-        ],
-        'Correctly calculated points for Slow Stochastic'
+        series[1].getColumn('y'),
+        [87.5, 87.5, 87.5],
+        'Calculated y values for Slow Stochastic'
+    );
+    assert.deepEqual(
+        series[1].getColumn('smoothed'),
+        [null, null, 87.5],
+        'Calculated smoothed values for Slow Stochastic'
     );
 
     series[0].addPoint([100, 100, 60, 95]);
@@ -69,5 +70,51 @@ QUnit.test('Test Slow Stochastic calculations on data updates.', assert => {
         series[1].points.length,
         series[0].points.length - periods[0] - 1,
         'After addPoint number of Slow Stochastic points is correct'
+    );
+
+    series[1].setData([]);
+
+    series[0].setData([
+        [100, 100, 100, 100],
+        [100, 100, 100, 100],
+        [100, 100, 100, 100],
+        [100, 100, 100, 100],
+        [100, 100, 100, 100],
+        [100, 100, 100, 100],
+        [100, 100, 100, 100],
+        [100, 100, 100, 100],
+        [100, 100, 100, 100],
+        [100, 100, 100, 100],
+        [100, 100, 100, 100],
+        [100, 100, 100, 100],
+        [100, 100, 100, 100],
+        [100, 100, 100, 100], // 14th
+        [100, 100, 100, 100],
+        [100, 100, 100, 100], // %D
+        [100, 100, 100, 100],
+        [100, 100, 100, 100]
+    ]);
+
+    assert.strictEqual(
+        series[1].data.length,
+        0,
+        `If all values of the main series are the same, the indicator values
+        should not be calculated, #16841`
+    );
+
+    // Add next 14 points with the same values to the main series
+    for (let i = 0; i < 14; i++) {
+        series[0].addPoint([200, 200, 200, 200]);
+    }
+
+    const yData = series[1].getColumn('y'),
+        lastIndex = yData.length - 1;
+
+    assert.deepEqual(
+        [yData[lastIndex][0], yData[lastIndex][1]],
+        [yData[lastIndex - 1][0], yData[lastIndex - 1][1]],
+        `If N-period previous points of the main series have the same values,
+        the last point of the indicator should have the same values as the
+        previous one, #16841`
     );
 });

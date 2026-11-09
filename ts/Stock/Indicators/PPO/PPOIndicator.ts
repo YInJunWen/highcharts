@@ -1,8 +1,9 @@
 /* *
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -22,17 +23,10 @@ import type {
 } from './PPOOptions';
 import type PPOPoint from './PPOPoint';
 
+import EMAIndicator from '../EMA/EMAIndicator.js';
 import SeriesRegistry from '../../../Core/Series/SeriesRegistry.js';
-const {
-    ema: EMAIndicator
-} = SeriesRegistry.seriesTypes;
-import U from '../../../Core/Utilities.js';
-const {
-    correctFloat,
-    extend,
-    merge,
-    error
-} = U;
+import { correctFloat, extend, merge } from '../../../Shared/Utilities.js';
+import { error } from '../../../Core/Utilities.js';
 
 /* *
  *
@@ -43,7 +37,6 @@ const {
 /**
  * The PPO series type.
  *
- * @private
  * @class
  * @name Highcharts.seriesTypes.ppo
  *
@@ -71,19 +64,20 @@ class PPOIndicator extends EMAIndicator {
      * @excluding    allAreas, colorAxis, joinBy, keys, navigatorOptions,
      *               pointInterval, pointIntervalUnit, pointPlacement,
      *               pointRange, pointStart, showInNavigator, stacking
-     * @requires     stock/indicators/indicators
-     * @requires     stock/indicators/ppo
+     * @requires     indicators/indicators
+     * @requires     indicators/ppo
      * @optionparent plotOptions.ppo
+     * @internal
      */
     public static defaultOptions: PPOOptions = merge(EMAIndicator.defaultOptions, {
         /**
-         * Paramters used in calculation of Percentage Price Oscillator series
+         * Parameters used in calculation of Percentage Price Oscillator series
          * points.
          *
          * @excluding period
          */
         params: {
-            period: void 0, // unchangeable period, do not inherit (#15362)
+            period: void 0, // Unchangeable period, do not inherit (#15362)
             /**
              * Periods for Percentage Price Oscillator calculations.
              *
@@ -100,9 +94,9 @@ class PPOIndicator extends EMAIndicator {
      *
      * */
 
-    public data: Array<PPOPoint> = void 0 as any;
-    public options: PPOOptions = void 0 as any;
-    public points: Array<PPOPoint> = void 0 as any;
+    public data!: Array<PPOPoint>;
+    public options!: PPOOptions;
+    public points!: Array<PPOPoint>;
 
     /* *
      *
@@ -110,28 +104,18 @@ class PPOIndicator extends EMAIndicator {
      *
      * */
 
+    /** @internal */
     public getValues<TLinkedSeries extends LineSeries>(
         series: TLinkedSeries,
         params: PPOParamsOptions
     ): (IndicatorValuesObject<TLinkedSeries> | undefined) {
-        let periods: Array<number> = (params.periods as any),
+        const periods: Array<number> = (params.periods as any),
             index: number = (params.index as any),
             // 0- date, 1- Percentage Price Oscillator
             PPO: Array<Array<number>> = [],
             xData: Array<number> = [],
-            yData: Array<number> = [],
-            periodsOffset: number,
-            // Shorter Period EMA
-            SPE: (
-                IndicatorValuesObject<TLinkedSeries> |
-                undefined
-            ),
-            // Longer Period EMA
-            LPE: (
-                IndicatorValuesObject<TLinkedSeries> |
-                undefined
-            ),
-            oscillator: number,
+            yData: Array<number> = [];
+        let oscillator: number,
             i: number;
 
         // Check if periods are correct
@@ -143,12 +127,20 @@ class PPOIndicator extends EMAIndicator {
             return;
         }
 
-        SPE = EMAIndicator.prototype.getValues.call(this, series, {
+        // Shorter Period EMA
+        const SPE: (
+            IndicatorValuesObject<TLinkedSeries> |
+            undefined
+        ) = super.getValues.call(this, series, {
             index: index,
             period: periods[0]
         }) as IndicatorValuesObject<TLinkedSeries>;
 
-        LPE = EMAIndicator.prototype.getValues.call(this, series, {
+        // Longer Period EMA
+        const LPE: (
+            IndicatorValuesObject<TLinkedSeries> |
+            undefined
+        ) = super.getValues.call(this, series, {
             index: index,
             period: periods[1]
         }) as IndicatorValuesObject<TLinkedSeries>;
@@ -158,7 +150,7 @@ class PPOIndicator extends EMAIndicator {
             return;
         }
 
-        periodsOffset = periods[1] - periods[0];
+        const periodsOffset: number = periods[1] - periods[0];
 
         for (i = 0; i < LPE.yData.length; i++) {
             oscillator = correctFloat(
@@ -231,14 +223,14 @@ export default PPOIndicator;
  * option is not specified, it is inherited from [chart.type](#chart.type).
  *
  * @extends   series,plotOptions.ppo
- * @since     7.0.0
+ * @since        7.0.0
  * @product   highstock
- * @excluding allAreas, colorAxis, dataParser, dataURL, joinBy, keys,
+ * @excluding allAreas, colorAxis, joinBy, keys,
  *            navigatorOptions, pointInterval, pointIntervalUnit,
  *            pointPlacement, pointRange, pointStart, showInNavigator, stacking
- * @requires  stock/indicators/indicators
- * @requires  stock/indicators/ppo
+ * @requires  indicators/indicators
+ * @requires  indicators/ppo
  * @apioption series.ppo
  */
 
-''; // to include the above in the js output
+''; // To include the above in the js output

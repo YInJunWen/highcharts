@@ -1,3 +1,10 @@
+---
+description: >-
+  Learn how chart options use JavaScript objects and arrays, how to change
+  those objects programmatically, and how Highcharts.setOptions applies shared
+  settings across multiple charts on the same page.
+---
+
 How to set options
 ===
 
@@ -6,14 +13,12 @@ Highcharts use a JavaScript object structure to define the options or settings 
 The options object
 ------------------
 
-When you initialize the chart using its constructor [Highcharts.Chart](https://api.highcharts.com/highcharts#Highcharts.Chart()), the options object is the first parameter you pass.
+When you initialize the chart using its constructor [Highcharts.Chart](https://api.highcharts.com/highcharts#Highcharts.Chart()), the options object is the second parameter you pass:
 
-In the example below the code marked as red represents the options object:
 
 ```js
-var chart1 = Highcharts.chart({
+const chart1 = Highcharts.chart('container', {
     chart: {
-        renderTo: 'container',
         type: 'bar'
     },
     title: {
@@ -47,7 +52,6 @@ To get the most out of Highcharts, it is important to understand how the options
 var options = new Object();
 
 options.chart = new Object();
-options.chart.renderTo = 'container';
 options.chart.type = 'bar';
 
 options.series = new Array();
@@ -60,9 +64,8 @@ As JavaScript object literals, we would write it like below. Note that the two o
 
 ```js
 // Good code:
-var options = {
+const options = {
     chart: {
-        renderTo: 'container',
         type: 'bar'
     },
     series: [{
@@ -75,7 +78,7 @@ var options = {
 In the example above the options object is created by itself and can be added to the chart by passing it to the chart constructor:
 
 ```js
-var chart = new Highcharts.Chart(options);
+const chart = new Highcharts.Chart('container', options);
 ```
 
 *   After an object is created using the object literal notation, we can extend its members by the dot notation. Say we have an object like defined in the "Good code" above. The code below adds another series to it. Remember options.series is an array, so it has a push method.
@@ -88,7 +91,7 @@ options.series.push({
 ```
 
 
-*   Another fact that can come in handy when working on JavaScript objects, is that the dot notation and square bracket notation are equivalent, so you can access all members by their string names. Which in practice means that `options.charts.renderTo` is always the same as: `options['charts']['renderTo']`
+*   Another fact that can come in handy when working on JavaScript objects, is that the dot notation and square bracket notation are equivalent, so you can access all members by their string names. Which in practice means that `options.chart.type` is always the same as: `options['chart']['type']`
 
 Global Options
 --------------
@@ -97,26 +100,23 @@ If you want to apply a set of options to all charts on the same page, use `Highc
 
 ```js
 Highcharts.setOptions({
-    chart: {
-        backgroundColor: {
-            linearGradient: [0, 0, 500, 500],
-            stops: [
-                [0, 'rgb(255, 255, 255)'],
-                [1, 'rgb(240, 240, 255)']
-            ]
+    palette: {
+        light: {
+            backgroundColor: '#f8f8ff'
         },
+        dark: {
+            backgroundColor: '#141424'
+        }
+    },
+    chart: {
         borderWidth: 2,
-        plotBackgroundColor: 'rgba(255, 255, 255, .9)',
-        plotShadow: true,
+        borderRadius: 5,
+        plotBackgroundColor: 'light-dark(#ffffff, #141414)',
         plotBorderWidth: 1
     }
 });
 
-var chart1 = new Highcharts.Chart({
-    chart: {
-        renderTo: 'container',
-    },
-
+const chart1 = Highcharts.chart('container', {
     xAxis: {
         type: 'datetime'
     },
@@ -128,9 +128,8 @@ var chart1 = new Highcharts.Chart({
     }]
 });
 
-var chart2 = new Highcharts.Chart({
+const chart2 = Highcharts.chart('container2', {
     chart: {
-        renderTo: 'container2',
         type: 'column'
     },
 

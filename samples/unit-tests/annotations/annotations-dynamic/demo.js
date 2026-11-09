@@ -1,4 +1,4 @@
-QUnit.test("Annotation's dynamic methods", function (assert) {
+QUnit.test('Annotation\'s dynamic methods', function (assert) {
     var labelCollector;
     var chart = Highcharts.chart(
         'container',
@@ -70,13 +70,15 @@ QUnit.test("Annotation's dynamic methods", function (assert) {
     assert.strictEqual(
         chart.labelCollectors.indexOf(labelCollector),
         -1,
-        "Annotation label collector is not kept in the chart's label collectors (#7677)."
+        'Annotation label collector is not kept in the chart\'s label ' +
+        'collectors (#7677).'
     );
 
     assert.strictEqual(
         chart.options.annotations.length,
         0,
-        'Annotation options from the chart options are erased when the annotation is removed (#8393).'
+        'Annotation options from the chart options are erased when the ' +
+        'annotation is removed (#8393).'
     );
 
     var secondAnnotationOptions = {
@@ -122,7 +124,8 @@ QUnit.test("Annotation's dynamic methods", function (assert) {
         chart.options.annotations[0] === secondAnnotation.options &&
             chart.options.annotations[1] === thirdAnnotation.options &&
             chart.options.annotations.length === 2,
-        'Annotation options from the chart options are added when the annotations are added (#8393).'
+        'Annotation options from the chart options are added when the ' +
+        'annotations are added (#8393).'
     );
 
     thirdAnnotation.update({
@@ -202,17 +205,17 @@ QUnit.test("Annotation's dynamic methods", function (assert) {
     });
 
     assert.strictEqual(
-        fib.shapes[0].graphic.stroke,
+        fib.shapes[0].graphic.attr('stroke'),
         'blue',
         '#15424: First line should be blue (lineColors[0])'
     );
     assert.strictEqual(
-        fib.shapes[3].graphic.stroke,
+        fib.shapes[3].graphic.attr('stroke'),
         'red',
         '#15424: Third line should be red (lineColors[2])'
     );
     assert.strictEqual(
-        fib.shapes[5].graphic.stroke,
+        fib.shapes[5].graphic.attr('stroke'),
         'blue',
         '#15424: Fourth line should be blue (lineColor)'
     );
@@ -253,6 +256,35 @@ QUnit.test("Annotation's dynamic methods", function (assert) {
         rect.shapes.length,
         2,
         '#16011: Shapes should not disappear on update'
+    );
+
+    const textAnnotation = chart.addAnnotation({
+        labels: [{
+            point: {
+                xAxis: 0,
+                yAxis: 0,
+                x: 0,
+                y: 100000
+            },
+            text: 'Label text',
+            className: 'text-annotation'
+        }]
+    });
+
+    textAnnotation.update({
+        labels: {
+            style: {
+                color: 'yellow'
+            }
+        }
+    });
+
+    chart.removeAnnotation(textAnnotation);
+
+    assert.strictEqual(
+        chart.exporting.getSVG().indexOf('text-annotation'),
+        -1,
+        'Annotation is not visible in exported chart after removing (#21507).'
     );
 });
 
@@ -296,7 +328,7 @@ QUnit.test(
     }
 );
 
-QUnit.test("Annotation's update methods", function (assert) {
+QUnit.test('Annotation\'s update methods', function (assert) {
     var clock = TestUtilities.lolexInstall();
 
     try {
@@ -350,7 +382,8 @@ QUnit.test("Annotation's update methods", function (assert) {
             assert.equal(
                 isNaN(+x) || isNaN(+y) || isNaN(+width) || isNaN(+height),
                 false,
-                "Annotation's clipRect cannot have a NaN for numerical attributes"
+                'Annotation\'s clipRect cannot have a NaN for numerical ' +
+                'attributes'
             );
 
             done();

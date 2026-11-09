@@ -1,9 +1,16 @@
+---
+description: >-
+  Display proportions as pie sectors, create concentric donut rings with
+  multiple sized series, and use radial gradients for slice shading. The
+  page includes a demo and links to the pie series options.
+---
+
 Pie chart
 =========
 
 A pie chart is a circular chart divided into sectors which is proportional to the quantity it represents.
 
-<iframe style="width: 100%; height: 480px; border: none;" src="https://www.highcharts.com/samples/embed/highcharts/demo/pie-basic" allow="fullscreen"></iframe>
+<iframe style="width: 100%; height: 480px; border: none;" src="https://www.highcharts.com/samples/embed/highcharts/demo/pie-chart" allow="fullscreen"></iframe>
 
 The pie chart have the same options as a [series](https://highcharts.com/docs/chart-concepts/series). For an overview of the pie chart options see the [API reference](https://api.highcharts.com/highcharts/plotOptions.pie).
 

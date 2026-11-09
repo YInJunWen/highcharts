@@ -1,5 +1,5 @@
 QUnit.test('Range selector buttons states (#3375)', function (assert) {
-    var data = [
+    const data = [
         [1317888000000, 372.5101, 375, 372.2, 372.52],
         [1317888060000, 372.4, 373, 372.01, 372.16],
         [1317888120000, 372.16, 372.4, 371.39, 371.62],
@@ -123,41 +123,32 @@ QUnit.test('Range selector buttons states (#3375)', function (assert) {
         [1317895200000, 376.94, 377.01, 375.75, 375.98]
     ];
 
-    var chart = $('#container')
-        .highcharts('StockChart', {
-            rangeSelector: {
-                buttons: [
-                    {
-                        type: 'hour',
-                        count: 1,
-                        text: '1h'
-                    },
-                    {
-                        type: 'hour',
-                        count: 2,
-                        text: '2h'
-                    },
-                    {
-                        type: 'day',
-                        count: 1,
-                        text: '1D'
-                    },
-                    {
-                        type: 'all',
-                        count: 1,
-                        text: 'All'
-                    }
-                ],
-                inputEnabled: false,
-                selected: 0
-            },
-            series: [
-                {
-                    data: data
-                }
-            ]
-        })
-        .highcharts();
+    const chart = Highcharts.stockChart('container', {
+        rangeSelector: {
+            buttons: [{
+                type: 'hour',
+                count: 1,
+                text: '1h'
+            }, {
+                type: 'hour',
+                count: 2,
+                text: '2h'
+            }, {
+                type: 'day',
+                count: 1,
+                text: '1D'
+            }, {
+                type: 'all',
+                count: 1,
+                text: 'All'
+            }],
+            inputEnabled: false,
+            selected: 2
+        },
+        series: [{
+            data: data
+        }]
+    });
 
     /**
      * Get a string representation of the states.
@@ -174,10 +165,15 @@ QUnit.test('Range selector buttons states (#3375)', function (assert) {
             .join(',');
     }
 
-    assert.strictEqual(getStates(), '2,0,3,0', 'Initial state');
+    assert.strictEqual(
+        getStates(),
+        '0,0,3,0',
+        'Initial state. If selected range is greater than data, all should ' +
+        'be selected (#19922).'
+    );
 
     chart.rangeSelector.clickButton(1);
-    assert.strictEqual(getStates(), '0,2,3,3', 'Selected 2h');
+    assert.strictEqual(getStates(), '0,2,3,0', 'Selected 2h');
 
     chart.rangeSelector.clickButton(0);
     assert.strictEqual(getStates(), '2,0,3,0', 'Selected 1h');
@@ -186,5 +182,209 @@ QUnit.test('Range selector buttons states (#3375)', function (assert) {
     assert.strictEqual(getStates(), '0,0,3,2', 'Selected All');
 
     chart.rangeSelector.clickButton(1);
-    assert.strictEqual(getStates(), '0,2,3,3', 'Selected 2h');
+    assert.strictEqual(getStates(), '0,2,3,0', 'Selected 2h');
+
+    chart.rangeSelector.clickButton(2);
+    assert.strictEqual(
+        chart.fixedRange,
+        chart.xAxis[0].dataMax - chart.xAxis[0].dataMin,
+        'chart.fixedRange should be equal to maximum range if the clicked ' +
+        'button is outside data range, #20327'
+    );
+
+    // #19808
+    const ordinalData = [
+        [1706227200000, 2],    // 26.01
+        [1706505600000, 1],    // 29.01
+        [1706592000000, 3],    // 30.01
+        [1706678400000, 1],    // 31.01
+        [1706764800000, 2],    // 01.02
+        [1706851200000, 1],    // 02.02
+        [1707123200000, 3]     // 05.02
+    ];
+    chart.update({
+        rangeSelector: {
+            buttons: [{
+                type: 'week',
+                count: 1,
+                text: 'Week'
+            }]
+        },
+        series: [{
+            data: ordinalData
+        }],
+        xAxis: {
+            minRange: 1
+        }
+    });
+    chart.xAxis[0].setExtremes(1706592000000, 1706764800000);
+    assert.strictEqual(
+        getStates(),
+        '0', 'Week button should not be selected, #19808.'
+    );
+
+    chart.series[0].setData([
+        [1706227200000, 2],    // 26.01
+        [1706505600000, 1],    // 29.01
+        [1706678400000, 1],    // 31.01
+        [1706764800000, 2],    // 01.02
+        [1707123200000, 3]     // 05.02
+    ]);
+    assert.strictEqual(
+        getStates(),
+        '2', 'Week button should be selected, #19808.'
+    );
+
+    chart.series[0].setData([
+        [1704067200000, 0],
+        [1704153600000, 1],
+        [1704240000000, 2],
+        [1704326400000, 3],
+        [1704412800000, 4],
+        [1704672000000, 5],
+        [1704758400000, 6],
+        [1704844800000, 7],
+        [1704931200000, 8],
+        [1705017600000, 9],
+        [1705276800000, 10],
+        [1705363200000, 11],
+        [1705449600000, 12],
+        [1705536000000, 13],
+        [1705622400000, 14],
+        [1705881600000, 15],
+        [1705968000000, 16],
+        [1706054400000, 17],
+        [1706140800000, 18],
+        [1706227200000, 19],
+        [1706486400000, 20],
+        [1706572800000, 21],
+        [1706659200000, 22],
+        [1706745600000, 23],
+        [1706832000000, 24],
+        [1707091200000, 25],
+        [1707177600000, 26],
+        [1707264000000, 27],
+        [1707350400000, 28],
+        [1707436800000, 29],
+        [1707696000000, 30],
+        [1707782400000, 31],
+        [1707868800000, 32],
+        [1707955200000, 33],
+        [1708041600000, 34],
+        [1708300800000, 35],
+        [1708387200000, 36],
+        [1708473600000, 37],
+        [1708560000000, 38],
+        [1708646400000, 39],
+        [1708905600000, 40],
+        [1708992000000, 41],
+        [1709078400000, 42],
+        [1709164800000, 43],
+        [1709251200000, 44],
+        [1709510400000, 45]
+    ]);
+
+    chart.xAxis[0].setExtremes(null, null);
+
+    chart.update({
+        rangeSelector: {
+            buttons: [{
+                type: 'month',
+                count: 1,
+                text: '1m',
+                offsetMin: 24 * 3600 * 1000
+            }],
+            selected: 0
+        }
+    });
+
+    assert.strictEqual(
+        getStates(),
+        '2', 'Month button should be selected, #23521.'
+    );
+
+    chart.update({
+        rangeSelector: {
+            buttons: [{
+                type: 'month',
+                count: 1,
+                text: '1m'
+            }, {
+                type: 'month',
+                count: 3,
+                text: '3m'
+            }, {
+                type: 'month',
+                count: 6,
+                text: '6m'
+            }, {
+                type: 'all',
+                text: 'All'
+            }]
+        },
+        series: [
+            {
+                data: [
+                    [1652970600000, 55],
+                    [1660919460000, 62],
+                    [1660919520000, 61],
+                    [1660919580000, 55],
+                    [1660919640000, null],
+                    [1660919700000, null],
+                    [1660919760000, 67],
+                    [1660919820000, 61],
+                    [1660919880000, 61],
+                    [1660919940000, 60],
+                    [1668868800000, 59]
+                ]
+            }
+        ]
+    });
+
+    chart.xAxis[0].setExtremes(null, null);
+
+    assert.strictEqual(
+        chart.series[0].xIncrement,
+        null,
+        'The xIncrement should be null before setting the data, #22656.'
+    );
+
+    chart.series[0].setData([
+        [1652970600000, 555],
+        [1660919460000, 62],
+        [1660919520000, 61],
+        [1660919580000, 55],
+        [1660919640000, null],
+        [1660919700000, null],
+        [1660919760000, 67],
+        [1660919820000, 61],
+        [1660919880000, 61],
+        [1660919940000, 60],
+        [1668868800000, 59]
+    ]);
+
+    assert.strictEqual(
+        chart.series[0].xIncrement,
+        null,
+        'The xIncrement should be null after setting the data, #22656.'
+    );
+
+    assert.strictEqual(
+        getStates(),
+        '0,0,0,2',
+        'All buttons should be available after setting the data, #22656.'
+    );
+
+    /*
+    // This assertion fails since the Series.matchPoint refactor, but the logic
+    // seems to be correct.
+    chart.rangeSelector.clickButton(0);
+    chart.series[0].setData([555, 62, 61, 55, null, null, 67, 61, 61, 60, 59]);
+
+    assert.strictEqual(
+        chart.series[0].xIncrement,
+        1706227200011,
+        'The xIncrement should be 1706227200011 after setting the data, #22656.'
+    );
+    */
 });

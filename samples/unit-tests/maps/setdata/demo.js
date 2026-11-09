@@ -837,11 +837,6 @@ QUnit.test('Map set data with updated data (#3894)', function (assert) {
                 mapData: Highcharts.maps['custom/world'],
                 joinBy: 'hc-key',
                 name: 'Random data',
-                states: {
-                    hover: {
-                        color: '#a4edba'
-                    }
-                },
                 dataLabels: {
                     enabled: true,
                     format: '{point.value}'
@@ -850,16 +845,17 @@ QUnit.test('Map set data with updated data (#3894)', function (assert) {
         ]
     });
 
-    const series = chart.series[0],
-        mapView = chart.mapView;
-
-    let centerBeforeUpdate,
-        zoomBeforeUpdate;
-
-    series.setData([{
+    chart.series[0].setData([{
         'hc-key': 'us',
         value: 155
     }]);
+
+    const series = chart.series[0],
+        mapView = chart.mapView,
+        columnIds = Object.keys(series.dataTable.columns);
+
+    let centerBeforeUpdate,
+        zoomBeforeUpdate;
 
     // Check both updates: "allAreas: true" and back to "allAreas: false"
     // The view should be changed.
@@ -944,7 +940,7 @@ QUnit.test('Map set data with updated data (#3894)', function (assert) {
         zoom: undefined
     });
 
-    let ruPoint = series.points[148];
+    let ruPoint = series.points.find(p => p['hc-key'] === 'ru');
 
     assert.strictEqual(
         ruPoint['hc-key'],
@@ -952,17 +948,19 @@ QUnit.test('Map set data with updated data (#3894)', function (assert) {
         'Making sure that picked point is actually ru.'
     );
 
-    assert.strictEqual(
-        ruPoint.graphic.attr('fill'),
-        'rgb(229,234,245)',
-        `The point's color should be correct.`
+    assert.ok(
+        /color-mix/.test(ruPoint.graphic.attr('fill')),
+        'The point\'s color should be a mix color'
     );
 
+    mapView.update({
+        zoom: mapView.minZoom
+    }, false);
     // Remove ru point from data
     const removedPoint = data.splice(148, 1)[0];
     series.setData(data);
 
-    ruPoint = series.points[216]; // null point
+    ruPoint = series.points.find(p => p['hc-key'] === 'ru'); // null point
 
     assert.strictEqual(
         ruPoint['hc-key'],
@@ -973,14 +971,20 @@ QUnit.test('Map set data with updated data (#3894)', function (assert) {
     assert.strictEqual(
         ruPoint.graphic.attr('fill'),
         series.options.nullColor,
-        `The ru null point's color should be correct.`
+        'The ru null point\'s color should be correct.'
     );
 
     // #17057
     series.update({}, false);
     series.addPoint(removedPoint);
 
-    ruPoint = series.points[199];
+    assert.deepEqual(
+        Object.keys(series.dataTable.columns),
+        columnIds,
+        'The column names should not change after addPoint'
+    );
+
+    ruPoint = series.points.find(p => p['hc-key'] === 'ru');
 
     assert.strictEqual(
         ruPoint['hc-key'],
@@ -988,17 +992,16 @@ QUnit.test('Map set data with updated data (#3894)', function (assert) {
         'Making sure that picked point is actually ru.'
     );
 
-    assert.strictEqual(
-        ruPoint.graphic.attr('fill'),
-        'rgb(229,234,245)',
+    assert.ok(
+        /color-mix/.test(ruPoint.graphic.attr('fill')),
         'The ru point should be added correctly (no nullColor), #17057.'
     );
 
     // #15782 Right side
     let mapNavY = chart.mapNavigation.navButtonsGroup.getBBox().y +
         chart.mapNavigation.navButtonsGroup.translateY;
-    let expBtnEdge = chart.exportingGroup.getBBox().y +
-        chart.exportingGroup.getBBox().height;
+    let expBtnEdge = chart.exporting.group.getBBox().y +
+        chart.exporting.group.getBBox().height;
 
     assert.ok(
         mapNavY > expBtnEdge,
@@ -1024,8 +1027,8 @@ QUnit.test('Map set data with updated data (#3894)', function (assert) {
     // #15782 Left side
     mapNavY = chart.mapNavigation.navButtonsGroup.getBBox().y +
         chart.mapNavigation.navButtonsGroup.translateY;
-    expBtnEdge = chart.exportingGroup.getBBox().y +
-        chart.exportingGroup.getBBox().height;
+    expBtnEdge = chart.exporting.group.getBBox().y +
+        chart.exporting.group.getBBox().height;
 
     assert.ok(
         mapNavY > expBtnEdge,
@@ -1051,7 +1054,7 @@ QUnit.test('Map set data with updated data (#3894)', function (assert) {
 
     mapNavY = chart.mapNavigation.navButtonsGroup.getBBox().y +
         chart.mapNavigation.navButtonsGroup.getBBox().height;
-    expBtnEdge = chart.exportingGroup.getBBox().y;
+    expBtnEdge = chart.exporting.group.getBBox().y;
 
     assert.ok(
         mapNavY < expBtnEdge,
@@ -1078,7 +1081,7 @@ QUnit.test('Map set data with updated data (#3894)', function (assert) {
 
     mapNavY = chart.mapNavigation.navButtonsGroup.getBBox().y +
         chart.mapNavigation.navButtonsGroup.getBBox().height;
-    expBtnEdge = chart.exportingGroup.getBBox().y;
+    expBtnEdge = chart.exporting.group.getBBox().y;
 
     assert.ok(
         mapNavY < expBtnEdge,

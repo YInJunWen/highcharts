@@ -1,11 +1,11 @@
-function getData(n) {
-    var arr = [],
-        i,
-        a,
+function getDataTableOptions(n) {
+    const xColumn = new Float64Array(n),
+        yColumn = new Float64Array(n);
+    let a,
         b,
         c,
         spike;
-    for (i = 0; i < n; i = i + 1) {
+    for (let i = 0; i < n; i = i + 1) {
         if (i % 100 === 0) {
             a = 2 * Math.random();
         }
@@ -20,21 +20,28 @@ function getData(n) {
         } else {
             spike = 0;
         }
-        arr.push([
-            i,
-            2 * Math.sin(i / 100) + a + b + c + spike + Math.random()
-        ]);
+        xColumn[i] = i;
+        yColumn[i] = 2 * Math.sin(i / 100) + a + b + c + spike + Math.random();
     }
-    return arr;
+    return {
+        columns: {
+            x: xColumn,
+            y: yColumn
+        }
+    };
 }
-var data = getData(500000);
+const dataTable = getDataTableOptions(500000);
 
 console.time('area');
 Highcharts.chart('container', {
 
+    dataTable,
+
     chart: {
         type: 'area',
-        zoomType: 'x',
+        zooming: {
+            type: 'x'
+        },
         panning: true,
         panKey: 'shift'
     },
@@ -44,7 +51,7 @@ Highcharts.chart('container', {
     },
 
     title: {
-        text: 'Highcharts drawing ' + data.length + ' points'
+        text: 'Highcharts drawing 500000 points'
     },
 
     subtitle: {
@@ -55,9 +62,8 @@ Highcharts.chart('container', {
         valueDecimals: 2
     },
 
-    series: [{
-        data: data
-    }]
+    series: [{ colorIndex: 1 }]
 
 });
+
 console.timeEnd('area');

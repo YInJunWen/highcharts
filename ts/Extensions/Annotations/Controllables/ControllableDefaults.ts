@@ -1,6 +1,5 @@
 /* *
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -15,7 +14,15 @@
 import type AST from '../../../Core/Renderer/HTML/AST';
 
 /**
- * Options for configuring markers for annotations.
+ * A collection of SVG definitions for reusable elements such as markers,
+ * gradients, filters and patterns. Used mostly in styled mode - see
+ * [gradients, shadows and
+ * patterns](https://www.highcharts.com/docs/chart-design-and-style/gradients-shadows-and-patterns).
+ *
+ * Annotations use it to define arrow markers, referenced from a shape's
+ * [markerEnd](#annotations.shapes.markerEnd) or
+ * [markerStart](#annotations.shapes.markerStart) option. Two markers are
+ * available by default: `arrow` and `reverse-arrow`.
  *
  * An example of the arrow marker:
  * <pre>
@@ -50,6 +57,11 @@ import type AST from '../../../Core/Renderer/HTML/AST';
  */
 const defaultMarkers: Record<string, AST.Node> = {
     /**
+     * The default `arrow` marker, rendered as a filled triangle pointing
+     * towards the end of the path. Reference it by id in
+     * [markerEnd](#annotations.shapes.markerEnd) or
+     * [markerStart](#annotations.shapes.markerStart).
+     *
      * @type {Highcharts.ASTNode}
      */
     arrow: {
@@ -61,18 +73,20 @@ const defaultMarkers: Record<string, AST.Node> = {
             markerWidth: 10,
             markerHeight: 10
         },
-        /**
-         * @type {Array<Highcharts.DefsOptions>}
-         */
         children: [{
             tagName: 'path',
             attributes: {
-                d: 'M 0 0 L 10 5 L 0 10 Z', // triangle (used as an arrow)
+                d: 'M 0 0 L 10 5 L 0 10 Z', // Triangle (used as an arrow)
                 'stroke-width': 0
             }
         }]
     },
     /**
+     * The default `reverse-arrow` marker, rendered as a filled triangle
+     * pointing towards the start of the path. Reference it by id in
+     * [markerEnd](#annotations.shapes.markerEnd) or
+     * [markerStart](#annotations.shapes.markerStart).
+     *
      * @type {Highcharts.ASTNode}
      */
     'reverse-arrow': {
@@ -87,7 +101,7 @@ const defaultMarkers: Record<string, AST.Node> = {
         children: [{
             tagName: 'path',
             attributes: {
-                // reverse triangle (used as an arrow)
+                // Reverse triangle (used as an arrow)
                 d: 'M 0 5 L 10 0 L 10 10 Z',
                 'stroke-width': 0
             }
@@ -101,8 +115,10 @@ const defaultMarkers: Record<string, AST.Node> = {
  *
  * */
 
+/** @internal */
 const ControllableDefaults = {
     defaultMarkers
 };
 
+/** @internal */
 export default ControllableDefaults;

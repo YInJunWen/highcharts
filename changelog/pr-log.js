@@ -6,7 +6,6 @@ const { Octokit } = require('@octokit/rest');
 const octokit = new Octokit({
     auth: process.env.GITHUB_LIST_PRS_TOKEN
 });
-const os = require('os');
 const path = require('path');
 
 require('colors');
@@ -19,52 +18,93 @@ const log = {
     Highcharts: {},
     'Highcharts Stock': {},
     'Highcharts Maps': {},
-    'Highcharts Gantt': {}
+    'Highcharts Gantt': {},
+    'Highcharts Dashboards': {},
+    'Highcharts Grid': {}
 };
 
 // Whenever the string 'Upgrade note' appears, the next paragraph is interpreted
-// as the not
-const parseUpgradeNote = p => {
-    const paragraphs = p.body.split('\n');
-    for (let i = 0; i < paragraphs.length; i++) {
-        if (/upgrade note/i.test(paragraphs[i])) {
-            return (paragraphs[i + 1] ? paragraphs[i + 1].trim() : void 0);
+// as the note
+const parseUpgradeNotes = p => {
+    const upgradeNotes = [],
+        paragraphs = p.body.split('\n');
+
+    let look = false,
+        listItemsOnly = false;
+    for (const para of paragraphs) {
+        if (look) {
+            if (para.charAt(0) === '*') {
+                upgradeNotes.push(para.replace(/^\* /, '').trim());
+                listItemsOnly = true;
+            } else if (!listItemsOnly) {
+                upgradeNotes.push(para.trim());
+                look = false;
+            }
+        }
+        if (/upgrade note/i.test(para)) {
+            look = true;
         }
     }
-    return void 0;
+    return upgradeNotes;
 };
 
-const loadPulls = async since => {
+const loadPulls = async (
+    since,
+    branches = 'master',
+    product = 'Highcharts'
+) => {
+    const owner = 'highcharts';
+    const repo = 'highcharts';
     let page = 1;
     let pulls = [];
+    let lastTagSha;
 
-    const tags = await octokit.repos.listTags({
-        owner: 'highcharts',
-        repo: 'highcharts'
-    }).catch(error);
+    const tags = await octokit.repos.listTags({ owner, repo }).catch(error);
 
-    const commit = await octokit.repos.getCommit({
-        owner: 'highcharts',
-        repo: 'highcharts',
-        ref: since || tags.data[0].commit.sha
-    }).catch(error);
+    lastTagSha = tags.data[0].commit.sha;
+
+    if (product === 'Grid' || product === 'Dashboards') {
+        const productTags = await octokit.request(
+            `GET /repos/highcharts/highcharts/git/matching-refs/tags/${product === 'Dashboards' ? 'dash' : 'grid'}`,
+            { owner, repo }
+        );
+
+        if (productTags.data.length) {
+            const { object } = productTags.data[productTags.data.length - 1];
+
+            if (object.type === 'tag') {
+                const tagCommit = await octokit.rest.git.getTag({
+                    owner,
+                    repo,
+                    tag_sha: object.sha
+                });
+                lastTagSha = tagCommit.data.object.sha;
+            } else {
+                // Lightweight tags point directly to the commit
+                lastTagSha = object.sha;
+            }
+        }
+    }
+
+    const ref = since || lastTagSha;
+    const commit = await octokit.repos.getCommit({ owner, repo, ref }).catch(error);
 
     console.log(
-        'Generating log after latest tag'.green,
+        `Generating log since tag: ${ref}`.green,
         commit.headers['last-modified']
     );
+
     const after = Date.parse(commit.headers['last-modified']);
+    const branchesArr = branches.split(',');
+    let emptyPageCount = 0;
 
     while (page < 20) {
-        const baseBranches = [
-            'master'
-        ];
         const pageData = [];
-        for (const base of baseBranches) {
+        for (const base of branchesArr) {
 
             let { data } = await octokit.pulls.list({
-                owner: 'highcharts',
-                repo: 'highcharts',
+                owner,
+                repo,
                 state: 'closed',
                 base,
                 page,
@@ -87,7 +127,12 @@ const loadPulls = async since => {
 
         console.log(`Loaded pulls page ${page} (${pageData.length} items)`.green);
 
+        // After 3 consecutive empty pages, it's safe to assume that we have
+        // loaded all relevant PRs.
         if (pageData.length === 0) {
+            emptyPageCount++;
+        }
+        if (emptyPageCount >= 3) {
             break;
         }
 
@@ -97,18 +142,30 @@ const loadPulls = async since => {
     return pulls;
 };
 
-module.exports = async (since, fromCache) => {
-
+module.exports = async (since, fromCache, branches, productName) => {
     const included = [],
-        tmpFileName = path.join(os.tmpdir(), 'pulls.json');
+        tmpFileName = path.join(__dirname, '..', 'tmp', 'changelog-pulls.json');
 
     let pulls;
     if (fromCache) {
         pulls = await fs.readFile(tmpFileName);
         pulls = JSON.parse(pulls);
     } else {
-        pulls = await loadPulls(since);
-        await fs.writeFile(tmpFileName, JSON.stringify(pulls));
+        pulls = await loadPulls(since, branches, productName);
+        await fs.mkdir(path.dirname(tmpFileName), { recursive: true });
+        const temporaryRoot = await fs.mkdtemp(path.join(
+            path.dirname(tmpFileName), 'changelog-pulls-'
+        ));
+        try {
+            const temporaryFile = path.join(temporaryRoot, 'pulls.json');
+            await fs.writeFile(temporaryFile, JSON.stringify(pulls), {
+                mode: 0o600,
+                flag: 'wx'
+            });
+            await fs.rename(temporaryFile, tmpFileName);
+        } finally {
+            await fs.rm(temporaryRoot, { recursive: true, force: true });
+        }
     }
 
     // Simplify
@@ -116,7 +173,7 @@ module.exports = async (since, fromCache) => {
         .filter(p => Boolean(p.body))
         .map(p => ({
             description: p.body.split('\n')[0].trim(),
-            upgradeNote: parseUpgradeNote(p),
+            upgradeNotes: parseUpgradeNotes(p),
             labels: p.labels,
             number: p.number
         }));

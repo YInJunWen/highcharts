@@ -1,47 +1,267 @@
+---
+description: >-
+  Choose an installation method for Highcharts Core, Stock, Maps, or Gantt.
+  Load product bundles and optional modules in the right order using npm,
+  browser imports, script tags, or self-hosted files.
+---
+
 Installation
 ===
 
-### npm and Bower
+This article is about installing Highcharts Core, Stock, Maps, or Gantt.
 
-Highcharts is also available as packages through npm and Bower. Read more on installation with [npm](https://highcharts.com/docs/getting-started/install-from-npm) or [Bower](https://highcharts.com/docs/getting-started/install-from-bower) respectively. If you're not using these, continue reading.
+## Using a framework?
 
-### A. Include Highcharts
+If you are using an official framework integration, start with that installation guide instead:
 
-Include the JavaScript files in the `<head>` section of your web page as shown below.
+- [React](https://www.highcharts.com/docs/react/getting-started)
+- [Angular](https://www.highcharts.com/integrations/angular/)
+- [Vue](https://www.highcharts.com/integrations/vue/)
+- [Svelte](https://www.highcharts.com/integrations/svelte/)
 
-```html
-    <script src="https://code.highcharts.com/highcharts.js"></script>
+## Looking for Grid or Dashboards?
+
+If you want a data grid or a dashboard product, use one of these guides instead:
+
+- [Highcharts Grid installation](https://www.highcharts.com/docs/grid/installation)
+- [Highcharts Dashboards installation](https://www.highcharts.com/docs/dashboards/installation)
+
+## Choose an installation approach
+
+For most projects, use one of these approaches:
+
+- **npm + a bundler**: Best for React, Angular, Vue, Svelte, TypeScript, Vite, Webpack, Rollup, and most modern apps.
+- **ES modules in the browser**: Useful for modern browser-only apps, prototypes, and lightweight setups without a bundler.
+- **Script tags**: Fine for simple pages, demos, and quick experiments.
+- **AMD or CommonJS**: Legacy compatibility only. Prefer modern ESM-based setups for new projects.
+
+## Recommended: npm and a bundler
+
+Install the main package:
+
+```bash
+npm install highcharts
 ```
 
-If you need support for IE6, 7 or 8, you need to include some polyfills. See details in [System Requirements](https://www.highcharts.com/docs/getting-started/system-requirements#oldie).
+The npm package includes built-in TypeScript declarations.
 
-### B. Alternatively, load files from your own domain
+Then import the product you need:
 
-In the example above the JavaScript files are loaded from ajax.googleapis.com and [code.highcharts.com](https://code.highcharts.com). The Highcharts files can be downloaded from [highcharts.com](https://www.highcharts.com/download/) and put on your webpage. Here is an example with Highcharts served from your own server:
+```js
+import Highcharts from 'highcharts';
+```
+
+For Stock, Maps, or Gantt, import the product bundle instead:
+
+```js
+import Highcharts from 'highcharts/highstock';
+// or
+import Highcharts from 'highcharts/highmaps';
+// or
+import Highcharts from 'highcharts/highcharts-gantt';
+```
+
+Use a product bundle when your page only needs that one product. If you need to combine products on the same page, load `highcharts` once and then add the extra products as modules instead.
+
+### Loading modules with npm
+
+Many features are optional modules rather than part of the base bundle. Common examples include exporting, accessibility, data, annotations, boost, no-data-to-display, and advanced product features.
+
+Load a module by importing it after Highcharts:
+
+```js
+import Highcharts from 'highcharts';
+import 'highcharts/modules/exporting';
+import 'highcharts/modules/accessibility';
+
+Highcharts.chart('container', {
+    series: [{
+        data: [1, 2, 3, 4, 5]
+    }]
+});
+```
+
+The same pattern applies to product modules:
+
+```js
+import Highcharts from 'highcharts';
+import 'highcharts/modules/stock';
+import 'highcharts/modules/map';
+import 'highcharts/modules/gantt';
+```
+
+Use this module-based setup when you need more than one product in the same application or want finer control over what gets loaded.
+
+### When to use ESM source files
+
+Highcharts also provides lower-level ESM source files under `es-modules/`. These are mainly relevant for advanced use cases, such as custom package workflows or direct control over entry points in bundler-based setups.
+
+Most projects should start with `highcharts`, `highcharts/highstock`, or the `esm/*.js` product bundles shown above.
+
+If you use TypeScript, see [Highcharts TypeScript declarations](https://www.highcharts.com/docs/advanced-chart-features/highcharts-typescript-declarations) for IDE support, framework notes, and advanced typing details.
+
+## ES modules in the browser
+
+If you are not using a bundler, you can still use modern ESM imports directly in the browser:
+
+```html
+<script type="module">
+    import Highcharts from 'https://code.highcharts.com/esm/highcharts.js';
+    import 'https://code.highcharts.com/esm/modules/exporting.js';
+    import 'https://code.highcharts.com/esm/modules/accessibility.js';
+
+    Highcharts.chart('container', {
+        series: [{
+            data: [1, 2, 3, 4, 5]
+        }]
+    });
+</script>
+```
+
+This is a good fit for modern browser environments and simple apps without a build step.
+
+## Script tags
+
+For plain HTML pages, you can load Highcharts with script tags:
+
+```html
+<script src="https://code.highcharts.com/highcharts.js"></script>
+```
+
+Then create a chart in your page script:
+
+```html
+<script>
+    Highcharts.chart('container', {
+        series: [{
+            data: [1, 2, 3, 4, 5]
+        }]
+    });
+</script>
+```
+
+If you need optional functionality, load the required modules after the main script:
+
+```html
+<script src="https://code.highcharts.com/highcharts.js"></script>
+<script src="https://code.highcharts.com/modules/exporting.js"></script>
+<script src="https://code.highcharts.com/modules/accessibility.js"></script>
+```
+
+If you only need one product, you can use its bundle directly:
+
+```html
+<script src="https://code.highcharts.com/highstock.js"></script>
+```
+
+If you need to combine products on the same page, load `highcharts.js` first and then load the product modules:
+
+```html
+<script src="https://code.highcharts.com/highcharts.js"></script>
+<script src="https://code.highcharts.com/modules/stock.js"></script>
+<script src="https://code.highcharts.com/modules/map.js"></script>
+<script src="https://code.highcharts.com/modules/gantt.js"></script>
+```
+
+## Self-hosted files
+
+If you do not want to load files from `code.highcharts.com`, download the package from [highcharts.com/download](https://www.highcharts.com/download/) and serve the files from your own domain:
 
 ```html
 <script src="/js/highcharts.js"></script>
+<script src="/js/modules/exporting.js"></script>
 ```
 
-### C. Load Highcharts Stock or Highcharts Maps
+The same loading rules apply: start with the base product or bundle, then add any modules that your charts use.
 
-Highcharts is already included in Highcharts Stock, so it is not necessary to load both. The highstock.js file is included in the package. The highmaps.js file is also included, but unlike highstock.js, this doesn't include the complete Highcharts feature set. Highcharts Stock and Highcharts Maps can be loaded separate files like this:
+## Understanding Highcharts modules
+
+Highcharts is modular. The base library gives you standard charting, and additional functionality is added through modules.
+
+You typically need a module when:
+
+- You want optional features such as exporting, accessibility, boost, annotations, data, or no-data-to-display.
+- You need product functionality that is not part of the base `highcharts` bundle.
+- You want to combine Core with Stock, Maps, or Gantt on the same page instead of using a single product bundle.
+
+The loading order is important:
+
+1. Load Highcharts or one product bundle first.
+2. Load any additional modules after that.
+3. Create the chart after all required modules are loaded.
+
+If a chart option does not seem to work, the most common cause is that the required module has not been loaded yet.
+
+## Experimental autoload
+
+Since v13, Highcharts also includes an experimental *autoload* script. It can load required modules based on the chart configuration, which is useful when chart options are generated dynamically and you do not fully control them ahead of time.
+
+Use explicit imports or script tags when you know exactly which modules your application needs. Use autoload when convenience matters more than strict control over what gets loaded.
+
+See the [Loader API documentation](https://api.highcharts.com/class-reference/Highcharts.Loader) for usage details and examples.
+
+## CDN usage
+
+The CDN is useful for demos, prototypes, JSFiddle, CodePen, and simple static pages. For production applications, npm or self-hosted files are usually a better long-term choice.
+
+If you use files from `code.highcharts.com`, make sure your usage complies with the [Acceptable Use Policy](https://shop.highcharts.com/license-eula#2).
+
+## AMD and CommonJS
+
+Highcharts still works with AMD loaders such as RequireJS and with CommonJS-style setups, but these are now legacy installation patterns.
+
+Use them only if you are maintaining an older application that already depends on them. For new projects, prefer npm with a modern bundler or native ES modules.
+
+CommonJS example:
+
+```js
+const Highcharts = require('highcharts');
+require('highcharts/modules/exporting');
+
+Highcharts.chart('container', {
+    series: [{
+        data: [1, 2, 3, 4, 5]
+    }]
+});
+```
+
+AMD example:
 
 ```html
-<script src="/js/highstock.js"></script>
-<script src="/js/highmaps.js"></script>
+<script src="require.js"></script>
+<script>
+    require.config({
+        packages: [{
+            name: 'highcharts',
+            main: 'highcharts'
+        }],
+        paths: {
+            highcharts: 'https://code.highcharts.com'
+        }
+    });
+
+    require(['highcharts', 'highcharts/modules/exporting'], function (Highcharts) {
+        Highcharts.chart('container', {
+            series: [{
+                data: [1, 2, 3, 4, 5]
+            }]
+        });
+    });
+</script>
 ```
 
-But the separate files can't run in the same page along with each other or with highcharts.js. So if stock or maps are required in the same page as each other or with basic Highcharts, they can be loaded as modules:
+## Legacy browsers
 
-```html
-<script src="/js/highcharts.js"></script>
-<script src="/js/modules/stock.js"></script>
-<script src="/js/modules/map.js"></script>
-```
+If you need to support legacy browsers such as IE 11 or QtWeb, load files from the `es5` folder instead. See [System requirements](https://www.highcharts.com/docs/getting-started/system-requirements) for details.
 
-### D. Get started
+## Upgrading older setups
 
-You are now ready to use Highcharts, see [Your first chart](https://highcharts.com/docs/getting-started/your-first-chart) to get started.
+If you are updating an older integration, see [A wind of change with Highcharts version 12](https://www.highcharts.com/docs/getting-started/version-12) for the packaging and module-loading changes introduced in v12.
 
-*) Highcharts version 1.x relied on excanvas.js for rendering in IE. From Highcharts 2.0 (and all Highcharts Stock versions) IE VML rendering is built into the library.
+## Build your own packages
+
+If you need tighter control over file size or want to create a custom build, see [Creating custom Highcharts packages](https://www.highcharts.com/docs/getting-started/how-to-create-custom-highcharts-packages).
+
+## Get started
+
+Once Highcharts is installed, continue with [Your first chart](https://www.highcharts.com/docs/getting-started/your-first-chart).

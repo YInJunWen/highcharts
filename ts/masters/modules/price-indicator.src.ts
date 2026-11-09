@@ -1,15 +1,21 @@
+// SPDX-License-Identifier: LicenseRef-Highcharts
 /**
  * @license Highstock JS v@product.version@ (@product.date@)
  * @module highcharts/modules/price-indicator
  * @requires highcharts
  * @requires highcharts/modules/stock
  *
- * Advanced Highcharts Stock tools
+ * (c) 2018-2026 Highsoft AS
+ * Author: Sebastian Bochan
  *
- * (c) 2010-2021 Highsoft AS
- * Author: Torstein Honsi
+ * Price indicator for Highcharts Stock
  *
- * License: www.highcharts.com/license
+ * A commercial license may be required depending on use,
+ * see www.highcharts.com/license
  */
 'use strict';
-import '../../Extensions/PriceIndication.js';
+import Highcharts from '../../Core/Globals.js';
+import { composePriceIndication } from '../../Extensions/PriceIndication.js';
+const G: AnyRecord = Highcharts;
+composePriceIndication(G.Series);
+export default Highcharts;

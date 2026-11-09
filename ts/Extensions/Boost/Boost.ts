@@ -1,12 +1,11 @@
 /* *
  *
- *  Copyright (c) 2019-2021 Highsoft AS
+ *  (c) 2019-2026 Highsoft AS
  *
  *  Boost module: stripped-down renderer for higher performance
  *
  *  License: highcharts.com/license
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -18,30 +17,54 @@
  *
  * */
 
+import type Axis from '../../Core/Axis/Axis';
+import type { AxisSetExtremesEventObject } from '../../Core/Axis/AxisOptions';
 import type Chart from '../../Core/Chart/Chart';
-import type Color from '../../Core/Color/Color';
+import Color from '../../Core/Color/Color';
+import type HTMLElement from '../../Core/Renderer/HTML/HTMLElement';
 import type Series from '../../Core/Series/Series';
 import type SeriesRegistry from '../../Core/Series/SeriesRegistry';
+import type SVGElement from '../../Core/Renderer/SVG/SVGElement';
+import type Point from '../../Core/Series/Point';
 
 import BoostChart from './BoostChart.js';
 import BoostSeries from './BoostSeries.js';
 import H from '../../Core/Globals.js';
 const {
-    win,
-    doc
+    doc,
+    win
 } = H;
-import initCanvasBoost from '../../Extensions/BoostCanvas.js';
 import NamedColors from './NamedColors.js';
-import U from '../../Core/Utilities.js';
-const { error } = U;
+import { error } from '../../Core/Utilities.js';
+import { addEvent } from '../../Shared/Utilities.js';
+
+/* *
+ *
+ *  Declarations
+ *
+ * */
+
+declare module '../../Core/GlobalsBase.d.ts' {
+    interface GlobalsBase {
+        /**
+         * Returns true if the current browser supports WebGL.
+         *
+         * @requires modules/boost
+         *
+         * @function Highcharts.hasWebGLSupport
+         *
+         * @return {boolean}
+         * `true` if the browser supports WebGL.
+         */
+        hasWebGLSupport?: typeof hasWebGLSupport;
+    }
+}
 
 /* *
  *
  *  Constants
  *
  * */
-
-const composedClasses: Array<Function> = [];
 
 const contexts = [
     'webgl',
@@ -56,29 +79,27 @@ const contexts = [
  *
  * */
 
-/**
- * @private
- */
+/** @internal */
 function compose(
     ChartClass: typeof Chart,
+    AxisClass: typeof Axis,
     SeriesClass: typeof Series,
     seriesTypes: typeof SeriesRegistry.seriesTypes,
+    PointClass: typeof Point,
     ColorClass?: typeof Color
 ): void {
     const wglMode = hasWebGLSupport();
 
     if (!wglMode) {
-        if (typeof initCanvasBoost !== 'undefined') {
+        if (typeof (H as AnyRecord).initCanvasBoost !== 'undefined') {
             // Fallback to canvas boost
-            initCanvasBoost();
+            (H as AnyRecord).initCanvasBoost();
         } else {
             error(26);
         }
     }
 
-    if (ColorClass && composedClasses.indexOf(ColorClass) === -1) {
-        composedClasses.push(ColorClass);
-
+    if (ColorClass && !ColorClass.names.lightgoldenrodyellow) {
         ColorClass.names = {
             ...ColorClass.names,
             ...NamedColors.defaultHTMLColorMap
@@ -88,12 +109,80 @@ function compose(
     // WebGL support is alright, and we're good to go.
 
     BoostChart.compose(ChartClass, wglMode);
-    BoostSeries.compose(SeriesClass, seriesTypes, wglMode);
+    BoostSeries.compose(SeriesClass, seriesTypes, PointClass, wglMode);
+
+    // Handle zooming by touch/pinch or mouse wheel. Assume that boosted charts
+    // are too slow for a live preview while dragging. Instead, just scale the
+    // div while `isPanning`.
+    addEvent(AxisClass, 'setExtremes', function (
+        e: AxisSetExtremesEventObject
+    ): void {
+        // Render targets can be either chart-wide or series-specific
+        const renderTargets = [this.chart, ...this.series]
+            .map((item): SVGElement|HTMLElement|undefined => item.renderTarget)
+            .filter(Boolean);
+
+        for (const renderTarget of renderTargets) {
+            const { horiz, pos } = this,
+                scaleKey = horiz ? 'scaleX' : 'scaleY',
+                translateKey = horiz ? 'translateX' : 'translateY',
+                lastScale = renderTarget?.[scaleKey] ?? 1;
+
+            let scale = 1,
+                translate = 0,
+                opacity = 1,
+                filter = 'none';
+
+            if (this.isPanning) {
+                scale = (e.scale ?? 1) * lastScale;
+                translate = (renderTarget?.[translateKey] || 0) -
+                    scale * (e.move || 0) +
+                    lastScale * pos -
+                    scale * pos;
+
+                opacity = 0.7;
+                filter = 'blur(3px)';
+            }
+
+            renderTarget
+                ?.attr({
+                    [scaleKey]: scale,
+                    [translateKey]: translate
+                })
+                .css({
+                    transition: '250ms filter, 250ms opacity',
+                    filter,
+                    opacity
+                });
+        }
+
+        // Boosted scatter crops its data table on the Y axis, so it must be
+        // reprocessed when the axis extremes change (#24386).
+        if (!this.isPanning) {
+            for (const series of this.series) {
+                if (
+                    series.boost &&
+                    series.is('scatter') &&
+                    !series.is('bubble') &&
+                    !series.is('treemap') &&
+                    !series.is('heatmap')
+                ) {
+                    series.isDirty = true;
+                }
+            }
+        }
+    });
 }
 
 /**
- * Returns true if the current browser supports webgl
- * @private
+ * Returns true if the current browser supports WebGL.
+ *
+ * @requires modules/boost
+ *
+ * @function Highcharts.hasWebGLSupport
+ *
+ * @return {boolean}
+ * `true` if the browser supports WebGL.
  */
 function hasWebGLSupport(): boolean {
     let canvas,
@@ -108,8 +197,8 @@ function hasWebGLSupport(): boolean {
                 if (typeof gl !== 'undefined' && gl !== null) {
                     return true;
                 }
-            } catch (e) {
-                // silent error
+            } catch {
+                // Silent error
             }
         }
     }
@@ -123,11 +212,13 @@ function hasWebGLSupport(): boolean {
  *
  * */
 
+/** @internal */
 const Boost = {
     compose,
     hasWebGLSupport
 };
 
+/** @internal */
 export default Boost;
 
 /* *
@@ -162,6 +253,12 @@ export default Boost;
  *         Line chart with hundreds of series
  * @sample highcharts/boost/scatter
  *         Scatter chart
+ * @sample highcharts/boost/scatter-pointcolor
+ *         Scatter chart with colored points
+ * @sample highcharts/boost/scatter-colorbypoint
+ *         Scatter chart with colorByPoint
+ * @sample highcharts/boost/scatter-zones
+ *         Scatter chart with zones
  * @sample highcharts/boost/area
  *         Area chart
  * @sample highcharts/boost/arearange
@@ -229,7 +326,7 @@ export default Boost;
  */
 
 /**
- * Time the the WebGL setup.
+ * Time the WebGL setup.
  *
  * This outputs the time spent on setting up the WebGL context,
  * creating shaders, and textures.
@@ -280,6 +377,16 @@ export default Boost;
  */
 
 /**
+ * The number of points processed per frame when building the k-d tree for
+ * boosted series. Lower values improve responsiveness but increase the time it
+ * takes to build the tree.
+ *
+ * @type      {number}
+ * @default   3000
+ * @apioption boost.chunkSize
+ */
+
+/**
  * The pixel ratio for the WebGL content. If 0, the `window.devicePixelRatio` is
  * used. This ensures sharp graphics on high DPI displays like Apple's Retina,
  * as well as when a page is zoomed.
@@ -312,7 +419,7 @@ export default Boost;
  * Setting to e.g. 20 will cause the whole chart to enter boost mode
  * if there are 20 or more series active. When the chart is in boost mode,
  * every series in it will be rendered to a common canvas. This offers
- * a significant speed improvment in charts with a very high
+ * a significant speed improvement in charts with a very high
  * amount of series.
  *
  * @type      {number}
@@ -327,7 +434,7 @@ export default Boost;
  * This option may cause rendering issues with certain datasets.
  * Namely, if your dataset has large numbers with small increments (such as
  * timestamps), it won't work correctly. This is due to floating point
- * precission.
+ * precision.
  *
  * @type      {boolean}
  * @default   false
@@ -383,4 +490,4 @@ export default Boost;
  * @apioption  plotOptions.series.boostBlending
  */
 
-''; // adds doclets above to transpiled file
+''; // Adds doclets above to transpiled file

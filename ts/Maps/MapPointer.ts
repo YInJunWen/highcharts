@@ -1,28 +1,42 @@
 /* *
  *
- *  (c) 2010-2021 Torstein Honsi
+ *  (c) 2010-2026 Highsoft AS
+ *  Author: Torstein Hønsi
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
 'use strict';
 
-import type Chart from '../Core/Chart/Chart';
-import type MapPoint from '../Series/Map/MapPoint';
+/* *
+ *
+ *  Imports
+ *
+ * */
+
+import type MapChart from '../Core/Chart/MapChart';
+import type MapNavigation from './MapNavigation';
+import type Pointer from '../Core/Pointer';
 import type PointerEvent from '../Core/PointerEvent';
 
-import Pointer from '../Core/Pointer.js';
-import U from '../Core/Utilities.js';
-const {
+import {
     defined,
     extend,
-    pick,
+    internalClearTimeout,
     wrap
-} = U;
+} from '../Shared/Utilities.js';
 
+/* *
+ *
+ *  Declarations
+ *
+ * */
+
+/** @internal */
 declare module '../Core/PointerEvent' {
     interface PointerEvent {
         deltaY?: number;
@@ -31,63 +45,67 @@ declare module '../Core/PointerEvent' {
     }
 }
 
-/**
- * Internal types
- * @private
- */
-declare global {
-    namespace Highcharts {
-        interface MapPointer extends Pointer {
-            chart: MapPointerChart;
-            mapNavigation: MapNavigation;
-            onContainerDblClick(e: PointerEvent): void;
-            onContainerMouseWheel(e: PointerEvent): void;
-        }
-        interface MapPointerChart extends Chart {
-            hoverPoint: MapPoint;
-            mapZoom: MapNavigationChart['mapZoom'];
-        }
-    }
+/** @internal */
+interface MapPointer extends Pointer {
+    chart: MapChart;
+    mapNavigation: MapNavigation;
+    onContainerDblClick(e: PointerEvent): void;
+    onContainerMouseWheel(e: PointerEvent): void;
 }
 
-/* eslint-disable no-invalid-this */
+/* *
+ *
+ *  Composition
+ *
+ * */
 
-const normalize = Pointer.prototype.normalize;
-let totalWheelDelta = 0;
-let totalWheelDeltaTimer: number;
+/** @internal */
+namespace MapPointer {
 
-// Extend the Pointer
-extend<Pointer|Highcharts.MapPointer>(Pointer.prototype, {
+    /* *
+     *
+     *  Variables
+     *
+     * */
 
-    // Add lon and lat information to pointer events
-    normalize: function <T extends PointerEvent> (
-        e: (T|MouseEvent|PointerEvent|TouchEvent),
-        chartPosition?: Pointer.ChartPositionObject
-    ): T {
-        const chart = this.chart;
+    let totalWheelDelta = 0;
+    let totalWheelDeltaTimer: number;
 
-        e = normalize.call(this, e, chartPosition);
+    /* *
+     *
+     *  Functions
+     *
+     * */
 
-        if (chart && chart.mapView) {
-            const lonLat = chart.mapView.pixelsToLonLat({
-                x: (e as any).chartX - chart.plotLeft,
-                y: (e as any).chartY - chart.plotTop
+    /**
+     * Extend the Pointer.
+     * @internal
+     */
+    export function compose(
+        PointerClass: typeof Pointer
+    ): void {
+        const pointerProto = PointerClass.prototype as MapPointer;
+
+        if (!pointerProto.onContainerDblClick) {
+            extend(pointerProto, {
+                onContainerDblClick,
+                onContainerMouseWheel
             });
-            if (lonLat) {
-                extend(e, lonLat);
-            }
+
+            wrap(pointerProto, 'normalize', wrapNormalize);
+            wrap(pointerProto, 'zoomOption', wrapZoomOption);
         }
+    }
 
-        return e as any;
-
-    },
-
-    // The event handler for the doubleclick event
-    onContainerDblClick: function (
-        this: Highcharts.MapPointer,
+    /**
+     * The event handler for the doubleclick event.
+     * @internal
+     */
+    function onContainerDblClick(
+        this: MapPointer,
         e: PointerEvent
     ): void {
-        const chart = this.chart;
+        const chart = this.chart as MapChart;
 
         e = this.normalize(e);
 
@@ -112,11 +130,14 @@ extend<Pointer|Highcharts.MapPointer>(Pointer.prototype, {
                 e.chartY
             );
         }
-    },
+    }
 
-    // The event handler for the mouse scroll event
-    onContainerMouseWheel: function (
-        this: Highcharts.MapPointer,
+    /**
+     * The event handler for the mouse scroll event.
+     * @internal
+     */
+    function onContainerMouseWheel(
+        this: MapPointer,
         e: PointerEvent
     ): void {
         const chart = this.chart;
@@ -128,7 +149,7 @@ extend<Pointer|Highcharts.MapPointer>(Pointer.prototype, {
         const delta = (defined(e.wheelDelta) && -(e.wheelDelta as any) / 120) ||
             e.deltaY || e.detail;
 
-        // Wheel zooming on trackpads have different behaviours in Firefox vs
+        // Wheel zooming on trackpads have different behaviors in Firefox vs
         // WebKit. In Firefox the delta increments in steps by 1, so it is not
         // distinguishable from true mouse wheel. Therefore we use this timer
         // to avoid trackpad zooming going too fast and out of control. In
@@ -137,7 +158,7 @@ extend<Pointer|Highcharts.MapPointer>(Pointer.prototype, {
         if (Math.abs(delta) >= 1) {
             totalWheelDelta += Math.abs(delta);
             if (totalWheelDeltaTimer) {
-                clearTimeout(totalWheelDeltaTimer);
+                internalClearTimeout(totalWheelDeltaTimer);
             }
             totalWheelDeltaTimer = setTimeout((): void => {
                 totalWheelDelta = 0;
@@ -161,68 +182,62 @@ extend<Pointer|Highcharts.MapPointer>(Pointer.prototype, {
             );
         }
     }
-});
 
-// The pinchType is inferred from mapNavigation options.
-wrap(Pointer.prototype, 'zoomOption', function (
-    this: Pointer,
-    proceed: Function
-): void {
-
-
-    const mapNavigation = this.chart.options.mapNavigation;
-
-    // Pinch status
-    if (pick(
-        (mapNavigation as any).enableTouchZoom,
-        (mapNavigation as any).enabled)
-    ) {
-        this.chart.options.chart.zooming.pinchType = 'xy';
-    }
-
-    proceed.apply(this, [].slice.call(arguments, 1));
-
-});
-
-// Extend the pinchTranslate method to preserve fixed ratio when zooming
-wrap(
-    Pointer.prototype,
-    'pinchTranslate',
-    function (
-        this: Pointer,
+    /**
+     * Add lon and lat information to pointer events
+     * @internal
+     */
+    function wrapNormalize(
+        this: MapPointer,
         proceed: Function,
-        pinchDown: Array<any>,
-        touches: Array<any>,
-        transform: any,
-        selectionMarker: any,
-        clip: any,
-        lastValidTouch: any
-    ): void {
-        let xBigger;
+        e: PointerEvent,
+        chartPosition?: Pointer.ChartPositionObject
+    ): PointerEvent {
+        const chart = this.chart;
 
-        proceed.call(
-            this,
-            pinchDown,
-            touches,
-            transform,
-            selectionMarker,
-            clip,
-            lastValidTouch
-        );
+        e = proceed.call(this, e, chartPosition);
 
-        // Keep ratio
-        if (this.chart.options.chart.type === 'map' && this.hasZoom) {
-            xBigger = transform.scaleX > transform.scaleY;
-            this.pinchTranslateDirection(
-                !xBigger,
-                pinchDown,
-                touches,
-                transform,
-                selectionMarker,
-                clip,
-                lastValidTouch,
-                xBigger ? transform.scaleX : transform.scaleY
-            );
+        if (chart && chart.mapView) {
+            const lonLat = chart.mapView.pixelsToLonLat({
+                x: e.chartX - chart.plotLeft,
+                y: e.chartY - chart.plotTop
+            });
+            if (lonLat) {
+                extend(e, lonLat);
+            }
         }
+
+        return e;
     }
-);
+
+    /**
+     * The pinchType is inferred from mapNavigation options.
+     * @internal
+     */
+    function wrapZoomOption(
+        this: Pointer,
+        proceed: Function
+    ): void {
+        const mapNavigation = this.chart.options.mapNavigation;
+
+        // Pinch status
+        if (
+            mapNavigation &&
+            (mapNavigation.enableTouchZoom ?? mapNavigation.enabled)
+        ) {
+            this.chart.zooming.pinchType = 'xy';
+        }
+
+        proceed.apply(this, [].slice.call(arguments, 1));
+    }
+
+}
+
+/* *
+ *
+ *  Default Export
+ *
+ * */
+
+/** @internal */
+export default MapPointer;

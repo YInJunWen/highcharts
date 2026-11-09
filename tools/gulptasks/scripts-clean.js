@@ -3,7 +3,6 @@
  */
 
 const gulp = require('gulp');
-const path = require('path');
 
 /* *
  *
@@ -11,19 +10,10 @@ const path = require('path');
  *
  * */
 
-const TARGET_DIRECTORY = 'code';
-
-const FILES_TO_KEEP = [
-    ['.gitignore'],
-    ['.htaccess'],
-    ['css', 'readme.md'],
-    ['js', 'modules', 'readme.md'],
-    ['js', 'readme.md'],
-    ['modules', 'readme.md'],
-    ['readme.txt']
-].map(
-    filePath => path.join(TARGET_DIRECTORY, ...filePath)
-);
+const PATHS_TO_DELETE = [
+    'build',
+    'code'
+];
 
 /* *
  *
@@ -39,29 +29,42 @@ const FILES_TO_KEEP = [
  */
 function task() {
 
-    const fs = require('./lib/fs');
-    const log = require('./lib/log');
+    const fs = require('../libs/fs');
+    const log = require('../libs/log');
+    const skipBuildClean = process.env.HIGHCHARTS_SKIP_BUILD_CLEAN === 'true';
+    const skipCodeClean = process.env.HIGHCHARTS_SKIP_CODE_CLEAN === 'true';
+
+    const pathsToDelete = PATHS_TO_DELETE.filter(path => {
+        if (skipBuildClean && path === 'build') {
+            return false;
+        }
+
+        if (skipCodeClean && path === 'code') {
+            return false;
+        }
+
+        return true;
+    });
 
     return new Promise((resolve, reject) => {
-
-        const filesToDelete = fs
-            .getFilePaths(TARGET_DIRECTORY, true)
-            .filter(filePath => !FILES_TO_KEEP.includes(filePath));
-        const directoriesToDelete = fs
-            .getDirectoryPaths(TARGET_DIRECTORY, true)
-            .filter(directoryPath => !FILES_TO_KEEP.some(
-                filterPath => filterPath.startsWith(directoryPath)
-            ));
-
         try {
+            if (skipBuildClean) {
+                log.message('Preserving build directory (with-deps sequence).');
+            }
 
-            log.message('Cleaning', TARGET_DIRECTORY, '...');
+            if (skipCodeClean) {
+                log.message('Preserving code directory (with-deps sequence).');
+            }
 
-            filesToDelete.forEach(fs.deleteFile);
-            directoriesToDelete.forEach(fs.deleteDirectory);
-
-            log.success('Cleaned', TARGET_DIRECTORY);
-
+            for (const ptd of pathsToDelete) {
+                log.message('Cleaning', ptd, '...');
+                if (fs.isDirectory(ptd)) {
+                    fs.deleteDirectory(ptd);
+                } else {
+                    fs.deleteFile(ptd);
+                }
+            }
+            log.success('Cleaned');
             resolve();
         } catch (catchedError) {
             reject(catchedError);

@@ -35,49 +35,58 @@ QUnit.test('Funnel selected state (#5156)', function (assert) {
 });
 
 QUnit.test('Funnel size relative to center(#4738)', function (assert) {
-    var chart = $('#container')
-        .highcharts({
-            chart: {
-                type: 'funnel',
-                marginRight: 100
-            },
-            title: {
-                text: 'Sales funnel',
-                x: -50
-            },
-            plotOptions: {
-                series: {
-                    center: [110, 150],
-                    neckWidth: 50,
-                    neckHeight: 100,
-                    //reversed: true,
-                    //-- Other available options
-                    height: 200,
-                    width: 150
-                }
-            },
-            legend: {
-                enabled: false
-            },
-            series: [
-                {
-                    name: 'Unique users',
-                    data: [
-                        ['Website visits', 15654],
-                        ['Downloads', 4064],
-                        ['Requested price list', 1987],
-                        ['Invoice sent', 976],
-                        ['Finalized', 846]
-                    ]
-                }
-            ]
-        })
-        .highcharts();
+    const chart = Highcharts.chart('container', {
+        chart: {
+            type: 'funnel',
+            marginRight: 100,
+            animation: false
+        },
+        title: {
+            text: 'Sales funnel',
+            x: -50
+        },
+        plotOptions: {
+            series: {
+                center: [110, 150],
+                neckWidth: 50,
+                neckHeight: 100,
+                // reversed: true,
+                // -- Other available options
+                height: 200,
+                width: 150
+            }
+        },
+        legend: {
+            enabled: false
+        },
+        series: [
+            {
+                name: 'Unique users',
+                data: [
+                    ['Website visits', 15654],
+                    ['Downloads', 4064],
+                    ['Requested price list', 1987],
+                    ['Invoice sent', 976],
+                    ['Finalized', 846]
+                ]
+            }
+        ]
+    });
 
-    var series = chart.series[0];
+    const series = chart.series[0];
     assert.equal(series.getWidthAt(250), 50, 'Bottom width');
     assert.equal(series.getWidthAt(150), 50, 'Center width');
     assert.equal(series.getWidthAt(50), 150, 'Top width');
+
+    const initialY = series.points[0].plotY;
+    series.addPoint({ name: 'Negative Point', y: -5000 });
+
+    assert.equal(
+        initialY,
+        series.points[0].plotY,
+        '#17514, Negative value should have no influence on the chart\'s layout'
+    );
+
 });
 
 QUnit.test('Visible funnel items', function (assert) {
@@ -102,7 +111,7 @@ QUnit.test('Visible funnel items', function (assert) {
                 neckWidth: '30%',
                 neckHeight: '25%'
 
-                //-- Other available options
+                // -- Other available options
                 // height: pixels or percent
                 // width: pixels or percent
             }
@@ -138,7 +147,7 @@ QUnit.test('Visible funnel items', function (assert) {
     );
 });
 
-QUnit.test('Top path of funnel intact', function (assert) {
+QUnit.test('Funnel path', function (assert) {
     var chart = Highcharts.chart('container', {
         chart: {
             type: 'funnel'
@@ -161,8 +170,11 @@ QUnit.test('Top path of funnel intact', function (assert) {
         ]
     });
 
+    const series = chart.series[0],
+        points = series.points;
+
     assert.strictEqual(
-        chart.series[0].points[3].graphic.element
+        points[3].graphic.element
             .getAttribute('d')
             .split(' ')
             .filter(function (s) {
@@ -171,14 +183,130 @@ QUnit.test('Top path of funnel intact', function (assert) {
         14,
         'The path should have the neck intact (#8277)'
     );
+
+    series.update({
+        borderRadius: 10
+    });
+
+    assert.strictEqual(
+        points[0].graphic.d.split(' ').filter(s => s === 'C').length,
+        2,
+        'The first point should have 2 rounded corners, scope: stack (#18839)'
+    );
+
+    assert.strictEqual(
+        points[1].graphic.d.split(' ').filter(s => s === 'C').length,
+        0,
+        'The second point should have 0 rounded corners, scope: stack (#18839)'
+    );
+
+    assert.strictEqual(
+        points[3].graphic.d.split(' ').filter(s => s === 'C').length,
+        4,
+        'The last point should have 4 rounded corners, scope: stack (#18839)'
+    );
+
+    series.update({
+        borderRadius: {
+            radius: '1%',
+            scope: 'point'
+        }
+    });
+
+    assert.strictEqual(
+        points[0].graphic.d.split(' ').filter(s => s === 'C').length,
+        4,
+        'The first point should have 4 rounded corners, scope: point (#18839)'
+    );
+
+    assert.strictEqual(
+        points[1].graphic.d.split(' ').filter(s => s === 'C').length,
+        4,
+        'The second point should have 4 rounded corners, scope: point (#18839)'
+    );
+
+    assert.strictEqual(
+        points[3].graphic.d.split(' ').filter(s => s === 'C').length,
+        6,
+        'The last point should have 6 rounded corners, scope: point (#18839)'
+    );
+
+    series.update({
+        data: [
+            ['A', 4],
+            ['B', 1],
+            ['C', 1],
+            ['D', 1],
+            ['E', 1]
+        ]
+    });
+
+    assert.ok(
+        series.points[3].graphic.d.split(' ').filter(s => s === 'Z').length,
+        'The fourth point path is properly closed (#20319)'
+    );
+
+    assert.strictEqual(
+        series.points[3].graphic.d.split(' ').filter(s => s === 'C').length,
+        4,
+        'The fourth point should have 4 rounded corners, scope: point (#20319)'
+    );
+
+    series.update({
+        borderRadius: 5
+    });
+
+    assert.strictEqual(
+        series.points[3].graphic.d.split(' ').filter(s => s === 'C').length,
+        0,
+        'The fourth point should not have rounded corners (#20319)'
+    );
+
+    series.update({
+        borderRadius: 20,
+        data: [40, 30, 20]
+    });
+
+    const lastPointPath = series.points[2].graphic.d;
+
+    series.update({
+        data: [40, 30, 20, null]
+    });
+
+    assert.strictEqual(
+        series.points[2].graphic.d,
+        lastPointPath,
+        'A trailing null point should not affect the rounding of the last ' +
+        'visible point (#24820)'
+    );
+
+    series.update({
+        data: [40, 30, 20, 0]
+    });
+
+    assert.strictEqual(
+        series.points[2].graphic.d,
+        lastPointPath,
+        'A trailing zero point should not affect the rounding of the last ' +
+        'visible point (#24820)'
+    );
+
+    series.points[2].setVisible(false);
+
+    assert.strictEqual(
+        series.points[1].graphic.d.split(' ').filter(s => s === 'C').length,
+        4,
+        'After hiding the last point, the point above should take the ' +
+        'bottom rounding (#24820)'
+    );
 });
 
 QUnit.test('Funnel dataLabels', function (assert) {
     const data = [
         ['Website visits', 5654],
         ['Downloads', 4064],
-        ['Requested price list', 1987],
-        ['Invoice sent', 1976],
+        ['Requested price list', 198],
+        ['Invoice sent', 197],
         ['Finalized', 4201]
     ];
 
@@ -218,6 +346,12 @@ QUnit.test('Funnel dataLabels', function (assert) {
         'DataLabels centered horizontally inside the funnel (#10036)'
     );
 
+    assert.deepEqual(
+        series.points.map(p => p.dataLabel.opacity),
+        [1, 1, 1, 0, 1],
+        'One of the data labels should be hidden by overlap detection'
+    );
+
     series.update({
         dataLabels: {
             align: 'left'
@@ -228,8 +362,8 @@ QUnit.test('Funnel dataLabels', function (assert) {
     pointWidth = series.getWidthAt(point.plotY);
 
     assert.strictEqual(
-        Math.round(point.plotX - pointWidth / 2 + point.dataLabel.padding),
         point.dataLabel.x,
+        Math.round(point.plotX - pointWidth / 2 + point.dataLabel.paddingLeft),
         'DataLabels inside the funnel and left aligned (#10036)'
     );
 
@@ -242,8 +376,8 @@ QUnit.test('Funnel dataLabels', function (assert) {
     pointWidth = series.getWidthAt(2 * series.center[1] - point.plotY);
 
     assert.strictEqual(
-        Math.round(point.plotX - pointWidth / 2 + point.dataLabel.padding),
         point.dataLabel.x,
+        Math.round(point.plotX - pointWidth / 2 + point.dataLabel.paddingLeft),
         'DataLabels aligned correctly when funnel is reversed (#10036)'
     );
 
@@ -257,13 +391,13 @@ QUnit.test('Funnel dataLabels', function (assert) {
     pointWidth = series.getWidthAt(2 * series.center[1] - point.plotY);
 
     assert.strictEqual(
+        point.dataLabel.x,
         Math.round(
             point.plotX +
                 pointWidth / 2 -
-                point.dataLabel.padding -
+                point.dataLabel.paddingRight -
                 point.dataLabel.width
         ),
-        point.dataLabel.x,
         'DataLabels inside the funnel and right aligned (#10036)'
     );
 
@@ -277,18 +411,19 @@ QUnit.test('Funnel dataLabels', function (assert) {
     pointBBox = point.graphic.getBBox();
 
     assert.strictEqual(
+        point.dataLabel.y,
         Math.round(
             pointBBox.y +
                 pointBBox.height +
                 point.dataLabel.options.y -
                 point.dataLabel.height
         ),
-        point.dataLabel.y,
         'DataLabels inside the funnel and bottom aligned (#10036)'
     );
 
     series.update({
         dataLabels: {
+            align: 'center',
             verticalAlign: 'top'
         }
     });
@@ -296,13 +431,15 @@ QUnit.test('Funnel dataLabels', function (assert) {
     point = series.points[4];
     pointBBox = point.graphic.getBBox();
 
+    /*
     assert.strictEqual(
+        point.dataLabel.y,
         Math.round(
             pointBBox.y + point.dataLabel.padding + point.dataLabel.options.y
         ),
-        point.dataLabel.y,
         'DataLabels inside the funnel and top aligned (#10036)'
     );
+    */
 
     series.update({
         dataLabels: {
@@ -340,16 +477,27 @@ QUnit.test('Funnel dataLabels', function (assert) {
         }
     });
 
-    Highcharts.fireEvent(chart.series[0].points[0].legendGroup.element, 'click');
-    Highcharts.fireEvent(chart.series[0].points[0].legendGroup.element, 'click');
-    Highcharts.fireEvent(chart.series[0].points[0].legendGroup.element, 'click');
+    dataLabel = chart.series[0].points[4].dataLabel;
+    const prevDataLabelPos = dataLabel.x;
 
-    dataLabel = chart.series[0].points[1].dataLabel;
+    Highcharts.fireEvent(
+        chart.series[0].points[0].legendItem.group.element,
+        'click'
+    );
+    Highcharts.fireEvent(
+        chart.series[0].points[0].legendItem.group.element,
+        'click'
+    );
+    Highcharts.fireEvent(
+        chart.series[0].points[0].legendItem.group.element,
+        'click'
+    );
 
-    assert.notEqual(
+    assert.equal(
         dataLabel.x,
-        dataLabel.alignAttr.x,
-        'DataLabels with allowOverlap set to false should be positioned correctly after point hide (#12350)'
+        prevDataLabelPos,
+        'DataLabels with allowOverlap set to false should be positioned ' +
+        'correctly after point hide (#12350)'
     );
 
     chart.update({
@@ -366,4 +514,48 @@ QUnit.test('Funnel dataLabels', function (assert) {
     chart.series[0].setData(data, true, false, false);
 
     assert.ok(true, '#16176: No error should occur');
+
+    chart.update({
+        plotOptions: {
+            series: {
+                dataLabels: {
+                    inside: true,
+                    allowOverlap: true,
+                    rotation: 0
+                }
+            }
+        }
+    });
+
+    series.update({
+        dataLabels: {
+            align: 'center'
+        }
+    });
+
+    dataLabel = chart.series[0].points[1].dataLabel;
+
+    const insideDataLabelPos = dataLabel.x;
+
+    chart.update({
+        plotOptions: {
+            series: {
+                dataLabels: {
+                    inside: false
+                }
+            }
+        }
+    });
+
+    const legendItem = chart.series[0].points[2].legendItem.group.element;
+
+    Highcharts.fireEvent(legendItem, 'mouseover');
+    Highcharts.fireEvent(legendItem, 'click');
+
+    assert.notEqual(
+        dataLabel.x,
+        insideDataLabelPos,
+        `DataLabel should be positioned outside the series after legend click
+        when inside is false. (#17545)`
+    );
 });

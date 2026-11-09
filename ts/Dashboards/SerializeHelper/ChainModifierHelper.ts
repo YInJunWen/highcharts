@@ -1,0 +1,160 @@
+/* *
+ *
+ *  (c) 2009-2026 Highsoft AS
+ *
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
+ *
+ *
+ *  Authors:
+ *  - Sophie Bremer
+ *
+ * */
+
+'use strict';
+
+/* *
+ *
+ *  Imports
+ *
+ * */
+
+import type { AnyRecord } from '../../Shared/Types';
+import type ChainModifierOptions from '../../Data/Modifiers/ChainModifierOptions';
+import type DataModifier from '../../Data/Modifiers/DataModifier';
+import type { DataModifierTypeOptions } from '../../Data/Modifiers/DataModifierType';
+import type { JSONObject } from '../JSON';
+
+import ChainModifier from '../../Data/Modifiers/ChainModifier.js';
+import Serializable from '../Serializable.js';
+import type { Helper as SerializableHelper, JSON as SerializableJSON } from '../Serializable';
+
+/* *
+ *
+ *  Functions
+ *
+ * */
+
+/**
+ * Converts the given JSON to a class instance.
+ *
+ * @param {JSON} json
+ * JSON to deserialize as a class instance or object.
+ *
+ * @return {ChainModifier}
+ * Returns the class instance or object, or throws an exception.
+ */
+function fromJSON(
+    json: JSON
+): ChainModifier {
+    const chainOptions = json.options.chain,
+        jsonChain = json.chain,
+        modifiers: Array<DataModifier> = [];
+
+    // Modifiers
+
+    for (let i = 0, iEnd = jsonChain.length; i < iEnd; ++i) {
+        modifiers.push(Serializable.fromJSON(jsonChain[i]) as DataModifier);
+    }
+
+    // Apply chain options later
+
+    delete json.options.chain;
+
+    const chainModifier = new ChainModifier(json.options, ...modifiers);
+
+    chainModifier.options.chain = chainOptions;
+
+    // Done
+
+    return chainModifier;
+}
+
+/**
+ * Validates the given class instance for JSON support.
+ *
+ * @param {AnyRecord} obj
+ * Class instance or object to validate.
+ *
+ * @return {boolean}
+ * Returns true, if the function set can convert the given object, otherwise
+ * false.
+ */
+function jsonSupportFor(
+    obj: AnyRecord
+): obj is ChainModifier {
+    return obj instanceof ChainModifier;
+}
+
+/**
+ * Converts the given class instance to JSON.
+ *
+ * @param {ChainModifier} obj
+ * Class instance or object to serialize as JSON.
+ *
+ * @return {JSON}
+ * Returns the JSON of the class instance or object.
+ */
+function toJSON(
+    obj: ChainModifier
+): JSON {
+    const chain: Array<ChainJSON> = [],
+        options = obj.options as OptionsJSON;
+
+    // Modifiers
+
+    const objChain = obj.chain;
+
+    for (let i = 0, iEnd = objChain.length; i < iEnd; ++i) {
+        chain.push(
+            Serializable.toJSON(objChain[i]) as ChainJSON
+        );
+    }
+
+    // Done
+
+    return {
+        $class: 'Data.ChainModifier',
+        chain: [],
+        options
+    };
+}
+
+/* *
+ *
+ *  Declarations
+ *
+ * */
+
+export type ChainJSON = (SerializableJSON<string>&DataModifierTypeOptions);
+
+export interface JSON extends SerializableJSON<'Data.ChainModifier'> {
+    chain: Array<ChainJSON>
+    options: OptionsJSON;
+}
+
+export type OptionsJSON = (JSONObject&ChainModifierOptions);
+
+/* *
+ *
+ *  Registry
+ *
+ * */
+
+const ChainModifierHelper: SerializableHelper<ChainModifier, JSON> = {
+    $class: 'Data.ChainModifier',
+    fromJSON,
+    jsonSupportFor,
+    toJSON
+};
+
+Serializable.registerHelper(ChainModifierHelper);
+
+/* *
+ *
+ *  Default Export
+ *
+ * */
+
+export default ChainModifierHelper;

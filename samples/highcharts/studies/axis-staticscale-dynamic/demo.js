@@ -1,4 +1,4 @@
-var chart = Highcharts.chart('container', {
+const chart = Highcharts.chart('container', {
 
     chart: {
         backgroundColor: '#efe',
@@ -11,7 +11,6 @@ var chart = Highcharts.chart('container', {
 
     xAxis: {
         staticScale: 24,
-        tickInterval: true,
         title: {
             text: 'Depth (m)',
             align: 'high'

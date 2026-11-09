@@ -1,11 +1,16 @@
-const mkdirp = require('mkdirp');
 const { join } = require('path');
 const argv = require('yargs').argv;
 const fs = require('fs');
 const gulp = require('gulp');
-const { getFileSizes } = require('../compareFilesize');
-const log = require('./lib/log');
-const { createPRComment, updatePRComment, fetchPRComments } = require('./lib/github');
+const { sync: gzipSize } = require('gzip-size');
+const scriptsCompile = require('./scripts-compile');
+const log = require('../libs/log');
+
+/* *
+ *
+ *  Constants
+ *
+ * */
 
 const files = argv.files ? argv.files.split(',') : [
     'highcharts.src.js',
@@ -20,8 +25,52 @@ const files = argv.files ? argv.files.split(',') : [
     'modules/data.src.js',
     'modules/exporting.src.js',
     'modules/heatmap.src.js',
-    'modules/offline-exporting.src.js'
+    'modules/offline-exporting.src.js',
+    'dashboards/dashboards.src.js',
+    'dashboards/modules/layout.src.js',
+    'grid/grid-pro.src.js',
+    'grid/grid-lite.src.js'
 ];
+
+/* *
+ *
+ *  Functions
+ *
+ * */
+
+function getFileSizes(out) {
+    const sourceFolder = './code/';
+
+    // Finds
+    function getSizeOfSourceCompiledAndGzip(filenames) {
+        return filenames.reduce((obj, filename) => {
+            const compileName = filename.replace('.src.js', '.js');
+            const compiled = fs.readFileSync(
+                join(sourceFolder, compileName),
+                { encoding: 'utf-8' }
+            );
+            obj[filename] = {
+                gzip: gzipSize(compiled),
+                size: fs.statSync(join(sourceFolder, filename)).size,
+                compiled: compiled.length
+            };
+            return obj;
+        }, {});
+    }
+
+    return Promise.resolve()
+        .then(() => scriptsCompile(files.map(file => join('code', file))))
+        .then(() => scriptsCompile(void 0, require('./scripts-dts/dashboards/_config.json')), 'dashboards')
+        .then(() => getSizeOfSourceCompiledAndGzip(files))
+
+        // Output the result to the console, or a file if filePath is defined
+        .then(result => {
+            const str = JSON.stringify(result, null, '  ');
+            return out ?
+                fs.promises.writeFile(out, str) :
+                Promise.resolve(log.message(str));
+        });
+}
 
 /**
  * Writes file size.
@@ -37,8 +86,8 @@ const files = argv.files ? argv.files.split(',') : [
  */
 async function writeFileSize(outputFolder, outputFileName) {
     try {
-        await mkdirp(outputFolder);
-        await getFileSizes(files, join(outputFolder, outputFileName)).catch(err => log.failure(err));
+        await fs.promises.mkdir(outputFolder, { recursive: true });
+        await getFileSizes(join(outputFolder, outputFileName)).catch(err => log.failure(err));
         log.success(`Wrote to ${join(outputFolder, outputFileName)}`);
     } catch (error) {
         log.failure(error);
@@ -123,41 +172,5 @@ async function writeTable() {
     throw new Error('Please provide all required arguments');
 }
 
-/**
- * Adds or updates a comment to a pull request containing
- * a file comparison table. Pull request id is specified with `--pr <id>`.
- * Updates are limited to the user specified with `--user <username>`
- * @return {void}
- */
-async function comment() {
-    try {
-        const { pr, user } = argv;
-        if (pr) {
-            const existingComment = await fetchPRComments(pr, user || '', '### File size comparison');
-            const commentBody = fs.readFileSync('./tmp/filesizes/comparison.md').toString();
-            if (existingComment.length) {
-                await updatePRComment(existingComment[0].id, commentBody);
-            } else if (commentBody) {
-                await createPRComment(pr, commentBody);
-            }
-        } else {
-            log.failure('Please specify a a PR id with \'--pr\' and a user with \'--user\' ');
-        }
-    } catch (error) {
-        log.failure(error);
-    }
-}
-
-comment.description = 'Updates/creates file size comparison for pull requests';
-comment.flags = {
-    '--pr': 'Pull request number',
-    '--user': 'Github user',
-    '--token': 'Github token (can also be specified with GITHUB_TOKEN env var)',
-    '--fail-silently': 'Will always return exitCode 0 (success)',
-    '--dryrun': 'Just runs through the task for testing purposes without doing external requests. '
-};
-
 gulp.task('write-size-table', writeTable);
 gulp.task('write-file-sizes', writeFileSizes);
-gulp.task('pr-comment-sizes', comment);
-gulp.task('compare-size-and-comment', gulp.series(writeTable, comment));

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: LicenseRef-Highcharts
 /**
  * @license Highcharts Gantt JS v@product.version@ (@product.date@)
  * @module highcharts/modules/pathfinder
@@ -5,9 +6,20 @@
  *
  * Pathfinder
  *
- * (c) 2016-2021 Øystein Moseng
+ * (c) 2016-2026 Highsoft AS
+ * Author: Øystein Moseng
  *
- * License: www.highcharts.com/license
+ * A commercial license may be required depending on use,
+ * see www.highcharts.com/license
  */
 'use strict';
-import '../../Gantt/Pathfinder.js';
+import Highcharts from '../../Core/Globals.js';
+import Pathfinder from '../../Gantt/Pathfinder.js';
+import { composeArrowSymbols } from '../../Extensions/ArrowSymbols.js';
+
+const G: AnyRecord = Highcharts;
+G.Pathfinder = G.Pathfinder || Pathfinder;
+composeArrowSymbols(G.SVGRenderer);
+G.Pathfinder.compose(G.Chart, G.Point);
+
+export default Highcharts;

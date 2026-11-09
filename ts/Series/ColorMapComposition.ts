@@ -1,10 +1,12 @@
 /* *
  *
- *  (c) 2010-2021 Torstein Honsi
+ *  (c) 2010-2026 Highsoft AS
+ *  Author: Torstein Hønsi
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -16,20 +18,15 @@
  *
  * */
 
+import type ColorType from '../Core/Color/ColorType';
+import type DashStyleValue from '../Core/Renderer/DashStyleValue';
 import type Point from '../Core/Series/Point';
 import type ScatterPoint from './Scatter/ScatterPoint';
 import type ScatterSeries from './Scatter/ScatterSeries';
-import type SVGAttributes from '../Core/Renderer/SVG/SVGAttributes';
 
-import SeriesRegistry from '../Core/Series/SeriesRegistry.js';
-const {
-    column: { prototype: columnProto }
-} = SeriesRegistry.seriesTypes;
-import U from '../Core/Utilities.js';
-const {
-    addEvent,
-    defined
-} = U;
+import ColumnSeries from './Column/ColumnSeries.js';
+import SVGElement from '../Core/Renderer/SVG/SVGElement.js';
+import { addEvent, defined } from '../Shared/Utilities.js';
 
 /* *
  *
@@ -37,8 +34,10 @@ const {
  *
  * */
 
-declare module '../Core/Series/PointLike' {
-    interface PointLike {
+/** @internal */
+declare module '../Core/Series/PointBase' {
+    interface PointBase {
+        /** @internal */
         dataLabelOnNull?: boolean;
     }
 }
@@ -49,7 +48,18 @@ declare module '../Core/Series/PointLike' {
  *
  * */
 
-namespace ColorMapComposition {
+export namespace ColorMapComposition {
+
+    // These properties can be set as both attributes and CSS properties
+    /** @internal */
+    interface ColorAttribsType {
+        dashstyle?: DashStyleValue;
+        fill?: ColorType;
+        stroke?: ColorType;
+        'stroke-linecap'?: 'butt'|'round'|'square';
+        'stroke-linejoin'?: 'butt'|'round'|'square';
+        'stroke-width'?: number;
+    }
 
     /* *
      *
@@ -57,6 +67,7 @@ namespace ColorMapComposition {
      *
      * */
 
+    /** @internal */
     export declare class PointComposition extends ScatterPoint {
         dataLabelOnNull?: boolean;
         moveToTopOnHover?: boolean;
@@ -65,14 +76,15 @@ namespace ColorMapComposition {
         isValid(): boolean;
     }
 
+    /** @internal */
     export declare class SeriesComposition extends ScatterSeries {
-        colorProp?: string;
+        colorProp?: 'fill'|'stroke';
         data: Array<PointComposition>;
         parallelArrays: Array<string>;
         pointArrayMap: Array<string>;
         points: Array<PointComposition>;
         trackerGroups: Array<string>;
-        colorAttribs(point: PointComposition): SVGAttributes;
+        colorAttribs(point: PointComposition): ColorAttribsType;
     }
 
     /* *
@@ -81,22 +93,23 @@ namespace ColorMapComposition {
      *
      * */
 
-    const composedClasses: Array<Function> = [];
-
+    /** @internal */
     export const pointMembers = {
         dataLabelOnNull: true,
         moveToTopOnHover: true,
         isValid: pointIsValid
     };
 
+    /** @internal */
     export const seriesMembers = {
         colorKey: 'value',
-        axisTypes: ['xAxis', 'yAxis', 'colorAxis'],
+        axisTypes: ['xAxis', 'yAxis', 'colorAxis'] as
+            Array<'xAxis'|'yAxis'|'colorAxis'>,
         parallelArrays: ['x', 'y', 'value'],
         pointArrayMap: ['value'],
         trackerGroups: ['group', 'markerGroup', 'dataLabelsGroup'],
         colorAttribs: seriesColorAttribs,
-        pointAttribs: columnProto.pointAttribs
+        pointAttribs: ColumnSeries.prototype.pointAttribs
     };
 
     /* *
@@ -106,43 +119,64 @@ namespace ColorMapComposition {
      * */
 
     /**
-     * @private
+     * @internal
      */
     export function compose<T extends typeof ScatterSeries>(
         SeriesClass: T
     ): (T&typeof SeriesComposition) {
         const PointClass = SeriesClass.prototype.pointClass;
 
-        if (composedClasses.indexOf(PointClass) === -1) {
-            composedClasses.push(PointClass);
-
-            addEvent(PointClass, 'afterSetState', onPointAfterSetState);
-        }
+        addEvent(PointClass, 'afterSetState', onPointAfterSetState);
 
         return SeriesClass as (T&typeof SeriesComposition);
     }
 
     /**
      * Move points to the top of the z-index order when hovered.
-     * @private
+     * @internal
      */
     function onPointAfterSetState(
         this: Point,
         e?: Record<string, any>
     ): void {
-        const point = this as PointComposition;
+        const point = this as PointComposition,
+            series = point.series,
+            renderer = series.chart.renderer;
 
         if (point.moveToTopOnHover && point.graphic) {
-            point.graphic.attr({
-                zIndex: e && e.state === 'hover' ? 1 : 0
-            });
+            if (!series.stateMarkerGraphic) {
+                // Create a `use` element and add it to the end of the group,
+                // which would make it appear on top of the other elements. This
+                // deals with z-index without reordering DOM elements (#13049).
+                series.stateMarkerGraphic = new SVGElement(renderer, 'use')
+                    .css({
+                        pointerEvents: 'none'
+                    })
+                    .add(point.graphic.parentGroup);
+            }
+            if (e?.state === 'hover') {
+                // Give the graphic DOM element the same id as the Point
+                // instance
+                point.graphic.attr({
+                    id: this.id
+                });
+
+                series.stateMarkerGraphic.attr({
+                    href: `${renderer.url}#${this.id}`,
+                    visibility: 'visible'
+                });
+            } else {
+                series.stateMarkerGraphic.attr({
+                    href: ''
+                });
+            }
         }
     }
 
     /**
      * Color points have a value option that determines whether or not it is
      * a null point
-     * @private
+     * @internal
      */
     function pointIsValid(
         this: PointComposition
@@ -151,14 +185,14 @@ namespace ColorMapComposition {
             this.value !== null &&
             this.value !== Infinity &&
             this.value !== -Infinity &&
-            // undefined is allowed, but NaN is not (#17279)
+            // Undefined is allowed, but NaN is not (#17279)
             (this.value === void 0 || !isNaN(this.value))
         );
     }
 
     /**
-     * Get the color attibutes to apply on the graphic
-     * @private
+     * Get the color attributes to apply on the graphic
+     * @internal
      * @function Highcharts.colorMapSeriesMixin.colorAttribs
      * @param {Highcharts.Point} point
      * @return {Highcharts.SVGAttributes}
@@ -167,14 +201,14 @@ namespace ColorMapComposition {
     function seriesColorAttribs(
         this: SeriesComposition,
         point: PointComposition
-    ): SVGAttributes {
-        const ret: SVGAttributes = {};
+    ): ColorAttribsType {
+        const ret: ColorAttribsType = {};
 
         if (
             defined(point.color) &&
             (!point.state || point.state === 'normal') // #15746
         ) {
-            (ret as any)[this.colorProp || 'fill'] = point.color;
+            ret[this.colorProp || 'fill'] = point.color;
         }
         return ret;
     }
@@ -187,4 +221,5 @@ namespace ColorMapComposition {
  *
  * */
 
+/** @internal */
 export default ColorMapComposition;

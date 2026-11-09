@@ -1,15 +1,26 @@
 /* *
  *
- *  (c) 2010-2021 Torstein Honsi
+ *  (c) 2010-2026 Highsoft AS
+ *  Author: Torstein Hønsi
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
+ *
+ * */
+
+'use strict';
+
+/* *
+ *
+ *  Imports
  *
  * */
 
 import type BulletPointOptions from './BulletPointOptions';
 import type BulletSeries from './BulletSeries';
+
 import ColumnSeries from '../Column/ColumnSeries.js';
 import SVGElement from '../../Core/Renderer/SVG/SVGElement.js';
 
@@ -23,13 +34,18 @@ class BulletPoint extends ColumnSeries.prototype.pointClass {
 
     /* *
      *
-     * Properties
+     *  Properties
      *
      * */
+
+    /** @internal */
     public borderColor: BulletPointOptions['borderColor'];
-    public options: BulletPointOptions = void 0 as any;
-    public series: BulletSeries = void 0 as any;
+    public options!: BulletPointOptions;
+    /** @internal */
+    public series!: BulletSeries;
+    /** @internal */
     public target?: number;
+    /** @internal */
     public targetGraphic?: SVGElement;
 
     /* *
@@ -38,27 +54,26 @@ class BulletPoint extends ColumnSeries.prototype.pointClass {
      *
      * */
 
-    /* eslint-disable valid-jsdoc */
-
     /**
      * Destroys target graphic.
-     * @private
+     * @internal
      */
     public destroy(): undefined {
-        if (this.targetGraphic) {
-            this.targetGraphic = this.targetGraphic.destroy() as any;
+        const series = this;
+
+        if (series.targetGraphic) {
+            series.targetGraphic = series.targetGraphic.destroy();
         }
-        super.destroy.apply(this, arguments);
+        super.destroy.apply(series, arguments);
         return;
     }
-
-    /* eslint-enable valid-jsdoc */
 
 }
 
 /* *
  *
- *  Export Default
+ *  Default Export
  *
  * */
+
 export default BulletPoint;

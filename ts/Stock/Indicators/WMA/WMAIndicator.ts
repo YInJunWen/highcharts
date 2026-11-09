@@ -1,10 +1,12 @@
 /* *
  *
- *  (c) 2010-2021 Kacper Madej
+ *  (c) 2010-2026 Highsoft AS
+ *  Author: Kacper Madej
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -16,6 +18,7 @@
  *
  * */
 
+import type { IndicatorLinkedSeriesBase } from '../IndicatorBase';
 import type IndicatorValuesObject from '../IndicatorValuesObject';
 import type LineSeries from '../../../Series/Line/LineSeries';
 import type {
@@ -24,15 +27,9 @@ import type {
 } from './WMAOptions';
 import type WMAPoint from './WMAPoint';
 
+import SMAIndicator from '../SMA/SMAIndicator.js';
 import SeriesRegistry from '../../../Core/Series/SeriesRegistry.js';
-const {
-    sma: SMAIndicator
-} = SeriesRegistry.seriesTypes;
-import U from '../../../Core/Utilities.js';
-const {
-    isArray,
-    merge
-} = U;
+import { isArray, merge } from '../../../Shared/Utilities.js';
 
 /* *
  *
@@ -41,9 +38,7 @@ const {
  * */
 
 // Utils:
-/**
- * @private
- */
+/** @internal */
 function accumulateAverage(
     points: Array<[number, (number|Array<number>)]>,
     xVal: Array<number>,
@@ -57,9 +52,7 @@ function accumulateAverage(
     points.push([xValue, yValue]);
 }
 
-/**
- * @private
- */
+/** @internal */
 function weightedSumArray(
     array: Array<[(number|null), (number|Array<number>)]>,
     pLen: number
@@ -69,7 +62,7 @@ function weightedSumArray(
     // The sum is 5 + 4 + 3 + 2 + 1 = 15.
     const denominator = (pLen + 1) / 2 * pLen;
 
-    // reduce VS loop => reduce
+    // Reduce VS loop => reduce
     return (array.reduce(
         function (
             prev: [(number|null), (number|Array<number>)],
@@ -80,9 +73,7 @@ function weightedSumArray(
         })[1] as any) / denominator;
 }
 
-/**
- * @private
- */
+/** @internal */
 function populateAverage(
     points: Array<[number, (number|Array<number>)]>,
     xVal: Array<number>,
@@ -93,7 +84,7 @@ function populateAverage(
         wmaY = weightedSumArray(points, pLen),
         wmaX = xVal[i - 1];
 
-    points.shift(); // remove point until range < period
+    points.shift(); // Remove point until range < period
 
     return [wmaX, wmaY];
 }
@@ -107,7 +98,6 @@ function populateAverage(
 /**
  * The SMA series type.
  *
- * @private
  * @class
  * @name Highcharts.seriesTypes.wma
  *
@@ -125,15 +115,16 @@ class WMAIndicator extends SMAIndicator {
      * Weighted moving average indicator (WMA). This series requires `linkedTo`
      * option to be set.
      *
-     * @sample stock/indicators/wma
+     * @sample {highstock} stock/indicators/wma
      *         Weighted moving average indicator
      *
      * @extends      plotOptions.sma
      * @since        6.0.0
      * @product      highstock
-     * @requires     stock/indicators/indicators
-     * @requires     stock/indicators/wma
+     * @requires     indicators/indicators
+     * @requires     indicators/wma
      * @optionparent plotOptions.wma
+     * @internal
      */
     public static defaultOptions: WMAOptions = merge(SMAIndicator.defaultOptions, {
         params: {
@@ -148,9 +139,9 @@ class WMAIndicator extends SMAIndicator {
      *
      * */
 
-    public data: Array<WMAPoint> = void 0 as any;
-    public options: WMAOptions = void 0 as any;
-    public points: Array<WMAPoint> = void 0 as any;
+    public data!: Array<WMAPoint>;
+    public options!: WMAOptions;
+    public points!: Array<WMAPoint>;
 
     /* *
      *
@@ -158,24 +149,25 @@ class WMAIndicator extends SMAIndicator {
      *
      * */
 
+    /** @internal */
     public getValues <TLinkedSeries extends LineSeries>(
-        series: TLinkedSeries,
+        series: TLinkedSeries&IndicatorLinkedSeriesBase,
         params: WMAParamsOptions
     ): (IndicatorValuesObject<TLinkedSeries>|undefined) {
-        let period: number = params.period as any,
+        const period: number = params.period as any,
             xVal: Array<number> = (series.xData as any),
             yVal: Array<Array<number>> = (series.yData as any),
             yValLen = yVal ? yVal.length : 0,
-            range = 1,
             xValue: number = xVal[0],
-            yValue: (number|Array<number>) = yVal[0],
-            WMA: Array<Array<number>> = [],
+            wma: Array<Array<number>> = [],
             xData: Array<number> = [],
-            yData: Array<number> = [],
+            yData: Array<number> = [];
+
+        let range = 1,
             index = -1,
             i: (number|undefined),
-            points: Array<[number, (number|Array<number>)]>,
-            WMAPoint: (Array<number>|undefined);
+            wmaPoint: (Array<number>|undefined),
+            yValue: (number|Array<number>) = yVal[0];
 
         if (xVal.length < period) {
             return;
@@ -186,8 +178,10 @@ class WMAIndicator extends SMAIndicator {
             index = (params.index as any);
             yValue = yVal[0][index];
         }
+
         // Starting point
-        points = [[xValue, yValue]];
+        const points: Array<[number, (number|Array<number>)]> =
+            [[xValue, yValue]];
 
         // Accumulate first N-points
         while (range !== period) {
@@ -197,25 +191,26 @@ class WMAIndicator extends SMAIndicator {
 
         // Calculate value one-by-one for each period in visible data
         for (i = range; i < yValLen; i++) {
-            WMAPoint = populateAverage(points, xVal, yVal, i);
-            WMA.push(WMAPoint);
-            xData.push(WMAPoint[0]);
-            yData.push(WMAPoint[1]);
+            wmaPoint = populateAverage(points, xVal, yVal, i);
+            wma.push(wmaPoint);
+            xData.push(wmaPoint[0]);
+            yData.push(wmaPoint[1]);
 
             accumulateAverage(points, xVal, yVal, i, index);
         }
 
-        WMAPoint = populateAverage(points, xVal, yVal, i);
-        WMA.push(WMAPoint);
-        xData.push(WMAPoint[0]);
-        yData.push(WMAPoint[1]);
+        wmaPoint = populateAverage(points, xVal, yVal, i);
+        wma.push(wmaPoint);
+        xData.push(wmaPoint[0]);
+        yData.push(wmaPoint[1]);
 
         return {
-            values: WMA,
+            values: wma,
             xData: xData,
             yData: yData
         } as IndicatorValuesObject<TLinkedSeries>;
     }
+
 }
 
 /* *
@@ -263,10 +258,9 @@ export default WMAIndicator;
  * @extends   series,plotOptions.wma
  * @since     6.0.0
  * @product   highstock
- * @excluding dataParser, dataURL
- * @requires  stock/indicators/indicators
- * @requires  stock/indicators/wma
+ * @requires  indicators/indicators
+ * @requires  indicators/wma
  * @apioption series.wma
  */
 
-''; // adds doclet above to the transpiled file
+''; // Adds doclet above to the transpiled file

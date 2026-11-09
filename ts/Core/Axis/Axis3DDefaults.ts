@@ -1,12 +1,14 @@
 /* *
  *
- *  (c) 2010-2021 Torstein Honsi
+ *  (c) 2010-2026 Highsoft AS
+ *  Author: Torstein Hønsi
  *
- *  Extenstion for 3d axes
+ *  Extension for 3d axes
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -29,7 +31,7 @@ import type AxisOptions from './AxisOptions';
 /**
  * @optionparent xAxis
  */
-const Axis3DDefaults: DeepPartial<AxisOptions> = {
+const Axis3DDefaults = {
     labels: {
         /**
          * Defines how the labels are be repositioned according to the 3D
@@ -134,7 +136,7 @@ const Axis3DDefaults: DeepPartial<AxisOptions> = {
          */
         skew3d: null
     }
-};
+} as AxisOptions;
 
 /* *
  *

@@ -1,10 +1,12 @@
 /* *
  *
- *  (c) 2009-2021 Highsoft, Black Label
+ *  (c) 2009-2026 Highsoft AS
+ *  Author: Highsoft, Black Label
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -19,16 +21,15 @@
 import type Annotation from './Annotation';
 import type AnnotationChart from './AnnotationChart';
 import type AnnotationOptions from './AnnotationOptions';
-import type { AnnotationPointType } from './AnnotationSeries';
-import type Controllable from './Controllables/Controllable';
 import type {
     ControllableLabelType,
     ControllableShapeType
 } from './Controllables/ControllableType';
 import type { ControlPointOptionsObject } from './ControlPointOptions';
+import type ControlTarget from './ControlTarget';
 import type { CursorValue } from '../../Core/Renderer/CSSObject';
 import type DOMElementType from '../../Core/Renderer/DOMElementType';
-import type EventCallback from '../../Core/EventCallback';
+import type { EventCallback } from '../../Core/Callback';
 import type PointerEvent from '../../Core/PointerEvent';
 import type PositionObject from '../../Core/Renderer/PositionObject';
 import type SVGElement from '../../Core/Renderer/SVG/SVGElement';
@@ -38,14 +39,12 @@ const {
     doc,
     isTouchDevice
 } = H;
-import U from '../../Core/Utilities.js';
-const {
+import {
     addEvent,
     fireEvent,
     objectEach,
-    pick,
     removeEvent
-} = U;
+} from '../../Shared/Utilities.js';
 
 /* *
  *
@@ -64,9 +63,7 @@ export interface AnnotationEventObject extends PointerEvent {
  *
  * */
 
-/**
- * @private
- */
+// Internal class, but made public because Annotation extends it.
 abstract class EventEmitter {
 
     /* *
@@ -77,7 +74,7 @@ abstract class EventEmitter {
 
     /**
      * Add emitter events.
-     * @private
+     * @internal
      */
     public addEvents(): void {
         const emitter = this,
@@ -95,7 +92,11 @@ abstract class EventEmitter {
         addMouseDownEvent(this.graphic.element);
 
         (emitter.labels || []).forEach((label): void => {
-            if (label.options.useHTML && label.graphic.text) {
+            if (
+                label.options.useHTML &&
+                label.graphic.text &&
+                !label.graphic.text.foreignObject
+            ) {
                 // Mousedown event bound to HTML element (#13070).
                 addMouseDownEvent(label.graphic.text.element);
             }
@@ -109,14 +110,29 @@ abstract class EventEmitter {
                 if (type !== 'click' || !emitter.cancelClick) {
                     (event as any).call(
                         emitter,
-                        emitter.chart.pointer.normalize(e),
-                        emitter.target
+                        emitter.chart.pointer?.normalize(e),
+                        emitter.target,
+                        emitter
                     );
                 }
             };
 
             if ((emitter.nonDOMEvents || []).indexOf(type) === -1) {
-                emitter.graphic.on(type, eventHandler);
+                addEvent(
+                    emitter.graphic.element,
+                    type,
+                    eventHandler,
+                    { passive: false }
+                );
+
+                if (emitter.graphic.div) {
+                    addEvent(
+                        emitter.graphic.div,
+                        type,
+                        eventHandler,
+                        { passive: false }
+                    );
+                }
             } else {
                 addEvent(emitter, type, eventHandler, { passive: false });
             }
@@ -140,7 +156,11 @@ abstract class EventEmitter {
                 emitter.graphic.css(cssPointer);
 
                 (emitter.labels || []).forEach((label): void => {
-                    if (label.options.useHTML && label.graphic.text) {
+                    if (
+                        label.options.useHTML &&
+                        label.graphic.text &&
+                        !label.graphic.text.foreignObject
+                    ) {
                         label.graphic.text.css(cssPointer);
                     }
                 });
@@ -154,6 +174,7 @@ abstract class EventEmitter {
 
     /**
      * Destroy the event emitter.
+     * @internal
      */
     public destroy(): void {
         this.removeDocEvents();
@@ -165,7 +186,7 @@ abstract class EventEmitter {
 
     /**
      * Map mouse move event to the radians.
-     * @private
+     * @internal
      */
     public mouseMoveToRadians(
         e: AnnotationEventObject,
@@ -193,7 +214,7 @@ abstract class EventEmitter {
 
     /**
      * Map mouse move to the scale factors.
-     * @private
+     * @internal
      */
     public mouseMoveToScale(
         e: AnnotationEventObject,
@@ -222,7 +243,7 @@ abstract class EventEmitter {
 
     /**
      * Map mouse move event to the distance between two following events.
-     * @private
+     * @internal
      */
     public mouseMoveToTranslation(
         e: AnnotationEventObject
@@ -246,7 +267,7 @@ abstract class EventEmitter {
     /**
      * Drag and drop event. All basic annotations should share this
      * capability as well as the extended ones.
-     * @private
+     * @internal
      */
     public onDrag(
         e: AnnotationEventObject
@@ -270,7 +291,7 @@ abstract class EventEmitter {
                 translation.x = 0;
             }
 
-            const emitter = this as Required<EventEmitter>;
+            const emitter = this as (ControlTarget&Required<EventEmitter>);
 
             if (emitter.points.length) {
                 emitter.translate(translation.x, translation.y);
@@ -289,7 +310,7 @@ abstract class EventEmitter {
 
     /**
      * Mouse down handler.
-     * @private
+     * @internal
      */
     public onMouseDown(
         e: AnnotationEventObject
@@ -305,9 +326,14 @@ abstract class EventEmitter {
         }
 
         const emitter = this,
-            pointer = emitter.chart.pointer;
+            pointer = emitter.chart.pointer,
+            // Using experimental property on event object to check if event was
+            // created by touch on screen on hybrid device (#18122)
+            firesTouchEvents = (
+                (e as any)?.sourceCapabilities?.firesTouchEvents
+            ) || false;
 
-        e = pointer.normalize(e);
+        e = pointer?.normalize(e) || e;
 
         let prevChartX = e.chartX,
             prevChartY = e.chartY;
@@ -316,11 +342,11 @@ abstract class EventEmitter {
         emitter.chart.hasDraggedAnnotation = true;
         emitter.removeDrag = addEvent(
             doc,
-            isTouchDevice ? 'touchmove' : 'mousemove',
+            isTouchDevice || firesTouchEvents ? 'touchmove' : 'mousemove',
             function (e: AnnotationEventObject): void {
                 emitter.hasDragged = true;
 
-                e = pointer.normalize(e);
+                e = pointer?.normalize(e) || e;
                 e.prevChartX = prevChartX;
                 e.prevChartY = prevChartY;
 
@@ -329,58 +355,50 @@ abstract class EventEmitter {
                 prevChartX = e.chartX;
                 prevChartY = e.chartY;
             },
-            isTouchDevice ? { passive: false } : void 0
+            isTouchDevice || firesTouchEvents ? { passive: false } : void 0
         );
         emitter.removeMouseUp = addEvent(
             doc,
-            isTouchDevice ? 'touchend' : 'mouseup',
-            function (e: AnnotationEventObject): void {
+            isTouchDevice || firesTouchEvents ? 'touchend' : 'mouseup',
+            function (): void {
                 // Sometimes the target is the annotation and sometimes its the
                 // controllable
-                const annotation = pick(
-                    emitter.target && emitter.target.annotation,
+                const annotation = (
+                    (emitter.target && emitter.target.annotation) ??
                     emitter.target
-                );
+                ) as Annotation;
                 if (annotation) {
                     // Keep annotation selected after dragging control point
-                    (annotation as Annotation).cancelClick = emitter.hasDragged;
+                    annotation.cancelClick = emitter.hasDragged;
                 }
 
                 emitter.cancelClick = emitter.hasDragged;
-                emitter.hasDragged = false;
                 emitter.chart.hasDraggedAnnotation = false;
-                // ControlPoints vs Annotation:
-                fireEvent(pick(
-                    annotation, // #15952
-                    emitter
-                ), 'afterUpdate');
-                emitter.onMouseUp(e);
+                if (emitter.hasDragged) {
+                    // ControlPoints vs Annotation:
+                    fireEvent((annotation ?? emitter), 'afterUpdate');
+                }
+                emitter.hasDragged = false;
+                emitter.onMouseUp();
             },
-            isTouchDevice ? { passive: false } : void 0
+            isTouchDevice || firesTouchEvents ? { passive: false } : void 0
         );
     }
 
     /**
      * Mouse up handler.
+     * @internal
      */
-    public onMouseUp(
-        _e: AnnotationEventObject
-    ): void {
-        const chart = this.chart,
-            annotation = this.target as Annotation || this,
-            annotationsOptions = chart.options.annotations,
-            index = chart.annotations.indexOf(annotation);
-
+    public onMouseUp(): void {
         this.removeDocEvents();
-
-        annotationsOptions[index] = annotation.options;
     }
 
+    /** @internal */
     abstract redraw(animation?: boolean): void;
 
     /**
      * Remove emitter document events.
-     * @private
+     * @internal
      */
     public removeDocEvents(): void {
         if (this.removeDrag) {
@@ -400,22 +418,46 @@ abstract class EventEmitter {
  *
  * */
 
+/** @internal */
 interface EventEmitter {
+    /** @internal */
     cancelClick?: boolean;
+
+    /** @internal */
     chart: AnnotationChart;
+
+    /** @internal */
     graphic: SVGElement;
+
+    /** @internal */
     hasDragged?: boolean;
+
+    /** @internal */
     hcEvents?: unknown;
+
+    /** @internal */
     isUpdating?: boolean;
+
+    /** @internal */
     labels?: Array<ControllableLabelType>;
+
+    /** @internal */
     nonDOMEvents?: Array<string>;
+
+    /** @internal */
     options: Partial<(ControlPointOptionsObject|AnnotationOptions)>;
-    points?: Array<AnnotationPointType>;
+
+    /** @internal */
     removeDrag?: Function;
+
+    /** @internal */
     removeMouseUp?: Function;
+
+    /** @internal */
     shapes?: Array<ControllableShapeType>;
-    target?: (Annotation|Controllable);
-    translate?(dx: number, dy: number): void;
+
+    /** @internal */
+    target?: ControlTarget;
 }
 
 /* *

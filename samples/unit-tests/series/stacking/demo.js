@@ -150,12 +150,10 @@ QUnit.test('Date objects as X values, column', function (assert) {
         ]
     });
 
-    assert.ok(
-        parseInt(
-            chart.series[0].points[0].graphic.element.getAttribute('width'),
-            10
-        ) > 10,
-        'Column created'
+    assert.greaterThan(
+        chart.series[0].points[0].graphic.width,
+        10,
+        'Column should be created'
     );
 });
 
@@ -244,7 +242,8 @@ QUnit.test('Date objects as X values, column', function (assert) {
         chart.redraw();
 
         // Check that stacks have been removed.
-        // Note: the size of the stacks is now 10, while we would ideally have 5.
+        // Note: the size of the stacks is now 10, while we would ideally
+        // have 5.
         // It seems like the initial 5 are not removed at all.
         assert.strictEqual(
             sizeof(chart.yAxis[0].stacking.stacks[chart.series[0].stackKey]) <
@@ -254,8 +253,8 @@ QUnit.test('Date objects as X values, column', function (assert) {
         );
     });
 
-    // Highcharts 3.0.10, Issue #2813
-    // stack's labels lives their own lives when you dynamically change type of stack normal <=> percent
+    // Highcharts 3.0.10, Issue #2813. Stack's labels lives their own lives when
+    // you dynamically change type of stack normal <=> percent
     QUnit.test('stacklabels update #2813', function (assert) {
         var chart = Highcharts.chart('container', {
                 chart: {
@@ -294,7 +293,8 @@ QUnit.test('Date objects as X values, column', function (assert) {
                 tooltip: {
                     enabled: false,
                     pointFormat:
-                        '<span style="color:{series.color}">{series.name}</span>: <b>{point.y}</b><br/>',
+                        '<span style="color:{series.color}">' +
+                        '{series.name}</span>: <b>{point.y}</b><br/>',
                     shared: false
                 },
                 plotOptions: {
@@ -412,6 +412,26 @@ QUnit.test('Date objects as X values, column', function (assert) {
         changeStackingType();
         changeStackingType();
         changeStackingType();
+
+
+        chart.update({
+            yAxis: {
+                stackLabels: {
+                    formatter: ctx => (ctx && 'STACKED') || ''
+                }
+            }
+        });
+
+        assert.strictEqual(
+            chart
+                .series[0]
+                .yAxis
+                .stacking
+                .stacks['column,Baseline Marty,,']['0']
+                .label.textStr,
+            'STACKED',
+            'Arrow-function formatter should receive arguments.'
+        );
     });
 
     QUnit.test('#6546 - stacking with gapSize', function (assert) {
@@ -593,33 +613,34 @@ QUnit.test('Date objects as X values, column', function (assert) {
     );
 
     QUnit.test('Stack Labels position in bar chart (#8187)', function (assert) {
-        var chart = Highcharts.chart('container', {
+        const chart = Highcharts.chart('container', {
             chart: {
                 type: 'bar',
                 marginLeft: 200
             },
             plotOptions: {
                 series: {
-                    stacking: 'normal'
+                    stacking: 'normal',
+                    dataLabels: {
+                        enabled: true
+                    }
                 }
             },
+            xAxis: [{}, {}],
             yAxis: {
                 stackLabels: {
                     enabled: true,
                     allowOverlap: true
                 }
             },
-            series: [
-                {
-                    data: [1, 1]
-                },
-                {
-                    data: [1, 1]
-                }
-            ]
+            series: [{
+                data: [1, 1]
+            }, {
+                data: [1, 1]
+            }]
         });
 
-        var labelPos =
+        const labelPos =
             chart.yAxis[0].stacking.stacks[chart.series[0].stackKey][0].label;
 
         assert.close(
@@ -627,6 +648,33 @@ QUnit.test('Date objects as X values, column', function (assert) {
             labelPos.alignAttr.y + labelPos.getBBox().height / 2,
             1,
             'Stack labels should be properly positioned'
+        );
+
+        chart.update({
+            xAxis: [{
+                height: '50%'
+            }, {
+                height: '50%',
+                top: '50%'
+            }]
+        }, false);
+        chart.series[1].update({
+            xAxis: 1
+        });
+
+        const series = chart.series[1],
+            datalabelY = series.points[0].dataLabel.y + series.xAxis.top -
+                series.points[0].dataLabel.options.distance,
+            label = series.yAxis.stacking
+                .stacks[series.stackKey][0].label,
+            stacklabelY = label.y + chart.plotTop;
+
+        assert.close(
+            datalabelY,
+            stacklabelY,
+            1,
+            `Stack labels should be properly positioned for multiple offseted
+            x-axes for inverted charts, #21174.`
         );
     });
 
@@ -738,5 +786,32 @@ QUnit.test('Date objects as X values, column', function (assert) {
                 `Enabling centerInCategory and setting reversedStacks to false
                 should not affect the stack order.`
             );
-        });
+        }
+    );
+
+
+    QUnit.test(
+        'Disable stacking via null flag, #19033',
+        function (assert) {
+            const chart = Highcharts.chart('container', {
+                chart: {
+                    type: 'column'
+                },
+                plotOptions: {
+                    series: {
+                        stacking: null
+                    }
+                },
+                series: [{
+                    data: [1, 2, 3]
+                }]
+            });
+
+            assert.strictEqual(
+                chart.series[0].options.stacking,
+                null,
+                'Stacking should be "disabled" when set null in options.'
+            );
+        }
+    );
 }());

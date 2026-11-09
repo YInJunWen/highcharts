@@ -16,34 +16,39 @@ QUnit.test('Null points are described to screen readers', function (assert) {
     assert.ok(getPointAttr(nullPoint, 'aria-label'));
 });
 
-QUnit.test('Null points are not described to screen readers', function (assert) {
-    const chart = Highcharts.chart('container', {
-            accessibility: {
-                point: {
-                    describeNull: false
-                }
-            },
-            series: [
-                {
-                    data: [1, null, null, 2, 3, 4, 5, 6]
-                }
-            ]
-        }),
-        series = chart.series[0],
-        regularPoint = series.points[0],
-        nullPoint = series.points[1],
-        getPointAttr = (point, attr) =>
-            point.graphic && point.graphic.element.getAttribute(attr);
+QUnit.test(
+    'Null points are not described to screen readers', function (assert) {
+        const chart = Highcharts.chart('container', {
+                accessibility: {
+                    point: {
+                        describeNull: false
+                    }
+                },
+                series: [
+                    {
+                        data: [1, null, null, 2, 3, 4, 5, 6]
+                    }
+                ]
+            }),
+            series = chart.series[0],
+            regularPoint = series.points[0],
+            nullPoint = series.points[1],
+            getPointAttr = (point, attr) =>
+                point.graphic && point.graphic.element.getAttribute(attr);
 
-    assert.ok(getPointAttr(regularPoint, 'aria-label'));
-    assert.notOk(getPointAttr(nullPoint, 'aria-label'));
-});
+        assert.ok(getPointAttr(regularPoint, 'aria-label'));
+        assert.notOk(getPointAttr(nullPoint, 'aria-label'));
+    });
 
 QUnit.test('Dynamic null points', function (assert) {
     const chart = Highcharts.chart('container', {
             series: [
                 {
-                    data: [1, null, null, 2, 3, 4, 5, 6]
+                    // Explicit x, so that setData below can match the points
+                    data: [
+                        [0, 1], [1, null], [2, null], [3, 2],
+                        [4, 3], [5, 4], [6, 5], [7, 6]
+                    ]
                 }
             ]
         }),
@@ -61,7 +66,8 @@ QUnit.test('Dynamic null points', function (assert) {
     assert.strictEqual(
         nullPoint.graphic.element.tagName,
         'path',
-        'Point should not have the old dummy marker graphic, but a new marker element.'
+        'Point should not have the old dummy marker graphic, but a new ' +
+        'marker element.'
     );
 
     nullPoint.update({
@@ -75,14 +81,38 @@ QUnit.test('Dynamic null points', function (assert) {
     assert.strictEqual(
         nullPoint.graphic.element.tagName,
         'rect',
-        'Point should have a new dummy marker graphic after update to null point.'
+        'Point should have a new dummy marker graphic after update to null ' +
+        'point.'
+    );
+
+    // Without a redraw in between, so that the marker is not re-created
+    nullPoint.update({
+        y: null
+    }, false);
+
+    assert.ok(
+        nullPoint.graphic,
+        'Updating a null point to null should keep the dummy marker, #12718.'
     );
 
     nullPoint.select(true, true);
 
     assert.notStrictEqual(
         nullPoint.graphic.attr('y'),
-        "NaN",
+        'NaN',
         'Point graphic y shouldn\'t be NaN.'
+    );
+
+    series.setData([[0, 1], [1, 3], [2, 4]]);
+
+    assert.notOk(
+        nullPoint.hasMockGraphic,
+        'Point restored through setData should not keep the dummy marker, ' +
+        '#25299.'
+    );
+    assert.strictEqual(
+        nullPoint.graphic.element.tagName,
+        'path',
+        'Point restored through setData should have a marker element, #25299.'
     );
 });

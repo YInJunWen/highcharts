@@ -2,11 +2,13 @@
  *
  *  Sankey diagram module
  *
- *  (c) 2010-2021 Torstein Honsi
+ *  (c) 2010-2026 Highsoft AS
+ *  Author: Torstein Hønsi
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -19,19 +21,17 @@
 import type DataLabelOptions from '../../Core/Series/DataLabelOptions';
 import type Point from '../../Core/Series/Point';
 import type SankeyPoint from './SankeyPoint';
-import type DataLabelTextPathOptions from '../../Core/Series/DataLabelOptions';
+
 /* *
  *
  *  Declarations
  *
  * */
 
-export interface SankeyDataLabelFormatterCallback {
+export interface SankeyDataLabelsFormatterCallbackFunction {
     (
-        this: (
-            SankeyDataLabelFormatterContext|
-            Point.PointLabelObject
-        )
+        this: (SankeyPoint|Point),
+        options: SankeyDataLabelOptions
     ): (string|undefined);
 }
 
@@ -41,8 +41,14 @@ export interface SankeyDataLabelFormatterContext {
 
 export interface SankeyDataLabelOptions extends DataLabelOptions {
     nodeFormat?: string;
-    nodeFormatter?: SankeyDataLabelFormatterCallback;
-    linkTextPath?: DataLabelTextPathOptions;
+    nodeFormatter?: SankeyDataLabelsFormatterCallbackFunction;
+    linkTextPath?: DataLabelOptions['textPath'];
 }
+
+/* *
+ *
+ *  Default Export
+ *
+ * */
 
 export default SankeyDataLabelOptions;

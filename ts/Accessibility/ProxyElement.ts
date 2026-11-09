@@ -1,6 +1,7 @@
 /* *
  *
- *  (c) 2009-2021 Øystein Moseng
+ *  (c) 2009-2026 Highsoft AS
+ *  Author: Øystein Moseng
  *
  *  Proxy elements are used to shadow SVG elements in HTML for assistive
  *  technology, such as screen readers or voice input software.
@@ -8,9 +9,10 @@
  *  The ProxyElement class represents such an element, and deals with
  *  overlay positioning and mirroring events for the target.
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -36,21 +38,17 @@ import type SVGElement from '../Core/Renderer/SVG/SVGElement';
 type Nullable<T> = {
     [P in keyof T]: T[P] | null;
 };
+/** @internal */
 export type NullableHTMLAttributes = Nullable<HTMLAttributes>;
 
 import H from '../Core/Globals.js';
-const { doc } = H;
-import U from '../Core/Utilities.js';
-const {
-    attr,
-    css,
-    merge
-} = U;
+const { doc, win } = H;
 
 import EventProvider from './Utils/EventProvider.js';
 import ChartUtilities from './Utils/ChartUtilities.js';
 const { fireEventOnWrappedOrUnwrappedElement } = ChartUtilities;
 import HTMLUtilities from './Utils/HTMLUtilities.js';
+import { attr, css, merge } from '../Shared/Utilities.js';
 const {
     cloneMouseEvent,
     cloneTouchEvent,
@@ -68,8 +66,9 @@ const {
  * Represents a proxy element that overlays a target and relays events
  * to its target.
  *
- * @private
  * @class
+ *
+ * @internal
  */
 class ProxyElement {
 
@@ -80,14 +79,13 @@ class ProxyElement {
      * */
 
     /**
-     * The proxy button element, may be same as element, depending on group
-     * type.
+     * The proxy element that receives the proxied events.
      */
-    public buttonElement: HTMLButtonElement;
+    public innerElement: HTMLDOMElement;
 
     /**
-     * The entire proxy HTML element. Note: May not refer to the button element
-     * directly, see below.
+     * The entire proxy HTML element container. Note: If the proxy element is
+     * not wrapped, this refers to the same element as innerElement.
      */
     public element: HTMLDOMElement;
 
@@ -102,28 +100,27 @@ class ProxyElement {
     constructor(
         private chart: Accessibility.ChartComposition,
         public target: ProxyElement.Target,
-        public groupType: ProxyElement.GroupType,
+        proxyElementType: keyof HTMLElementTagNameMap = 'button',
+        wrapperElementType?: keyof HTMLElementTagNameMap,
         attributes?: NullableHTMLAttributes
     ) {
-        const isListItem = groupType === 'ul';
         this.eventProvider = new EventProvider();
 
-        const wrapperEl = isListItem ? doc.createElement('li') : null;
-        const btnEl = this.buttonElement = doc.createElement('button');
+        const innerEl = this.innerElement =
+                doc.createElement(proxyElementType),
+            wrapperEl = this.element = wrapperElementType ?
+                doc.createElement(wrapperElementType) : innerEl;
 
         if (!chart.styledMode) {
-            this.hideButtonVisually(btnEl);
+            this.hideElementVisually(innerEl);
         }
 
-        if (wrapperEl) {
-            if (isListItem && !chart.styledMode) {
+        if (wrapperElementType) {
+            if (wrapperElementType === 'li' && !chart.styledMode) {
                 wrapperEl.style.listStyle = 'none';
             }
-
-            wrapperEl.appendChild(btnEl);
+            wrapperEl.appendChild(innerEl);
             this.element = wrapperEl;
-        } else {
-            this.element = btnEl;
         }
 
         this.updateTarget(target, attributes);
@@ -134,8 +131,6 @@ class ProxyElement {
      *  Functions
      *
      * */
-
-    /* eslint-disable valid-jsdoc */
 
 
     /**
@@ -156,8 +151,8 @@ class ProxyElement {
     /**
      * Update the target to be proxied. The position and events are updated to
      * match the new target.
-     * @param target The new target definition
-     * @param attributes New HTML attributes to apply to the button. Set an
+     * @param {object} target The new target definition
+     * @param {object} attributes New HTML attributes to apply to the proxy. Set an
      * attribute to null to remove.
      */
     public updateTarget(
@@ -174,12 +169,13 @@ class ProxyElement {
             }
         });
 
-        attr(this.buttonElement, merge({
-            'aria-label': this.getTargetAttr(target.click, 'aria-label')
-        }, attrs as HTMLAttributes));
+        const targetAriaLabel = this.getTargetAttr(target.click, 'aria-label');
+        attr(this.innerElement, merge(targetAriaLabel ? {
+            'aria-label': targetAriaLabel
+        } : {}, attrs as HTMLAttributes));
 
         this.eventProvider.removeAddedEvents();
-        this.addProxyEventsToButton(this.buttonElement, target.click);
+        this.addProxyEventsToElement(this.innerElement, target.click);
         this.refreshPosition();
     }
 
@@ -189,7 +185,7 @@ class ProxyElement {
      */
     public refreshPosition(): void {
         const bBox = this.getTargetPosition();
-        css(this.buttonElement, {
+        css(this.innerElement, {
             width: (bBox.width || 1) + 'px',
             height: (bBox.height || 1) + 'px',
             left: (Math.round(bBox.x) || 0) + 'px',
@@ -217,10 +213,8 @@ class ProxyElement {
         const stringHasNoTooltip = (s: string): boolean => (
             s.indexOf('highcharts-no-tooltip') > -1
         );
-        const legend = this.chart.legend;
-        const groupDiv = legend.group && legend.group.div;
         const noTooltipOnGroup = stringHasNoTooltip(
-            groupDiv && groupDiv.className || ''
+            this.chart.legend?.group?.div?.className || ''
         );
         const targetClassName = this.getTargetAttr(
             this.target.click,
@@ -228,17 +222,17 @@ class ProxyElement {
         ) as string || '';
         const noTooltipOnTarget = stringHasNoTooltip(targetClassName);
 
-        this.buttonElement.className = noTooltipOnGroup || noTooltipOnTarget ?
-            'highcharts-a11y-proxy-button highcharts-no-tooltip' :
-            'highcharts-a11y-proxy-button';
+        this.innerElement.className = noTooltipOnGroup || noTooltipOnTarget ?
+            'highcharts-a11y-proxy-element highcharts-no-tooltip' :
+            'highcharts-a11y-proxy-element';
     }
 
 
     /**
-     * Mirror events for a proxy button to a target
+     * Mirror events for a proxy element to a target
      */
-    private addProxyEventsToButton(
-        button: HTMLDOMElement,
+    private addProxyEventsToElement(
+        element: HTMLDOMElement,
         target: DOMElementType|SVGElement|HTMLElement
     ): void {
         [
@@ -248,7 +242,7 @@ class ProxyElement {
             const isTouchEvent = evtType.indexOf('touch') === 0;
 
             this.eventProvider.addEvent(
-                button,
+                element,
                 evtType,
                 (e: MouseEvent | TouchEvent): void => {
                     const clonedEvent = isTouchEvent ?
@@ -264,7 +258,7 @@ class ProxyElement {
 
                     e.stopPropagation();
 
-                    // #9682, #15318: Touch scrolling didnt work when touching
+                    // #9682, #15318: Touch scrolling didn't work when touching
                     // proxy
                     if (!isTouchEvent) {
                         e.preventDefault();
@@ -277,10 +271,10 @@ class ProxyElement {
 
 
     /**
-     * Set visually hidden style on a proxy button
+     * Set visually hidden style on a proxy element
      */
-    private hideButtonVisually(button: HTMLDOMElement): void {
-        css(button, {
+    private hideElementVisually(el: HTMLDOMElement): void {
+        css(el, {
             borderWidth: 0,
             backgroundColor: 'transparent',
             cursor: 'pointer',
@@ -293,6 +287,7 @@ class ProxyElement {
             margin: 0,
             display: 'block',
             position: 'absolute',
+            'pointer-events': 'none',
             '-ms-filter': 'progid:DXImageTransform.Microsoft.Alpha(Opacity=1)'
         });
     }
@@ -308,15 +303,20 @@ class ProxyElement {
             (clickTarget as SVGElement).element :
             clickTarget as SVGDOMElement;
         const posElement = this.target.visual || clickTargetElement;
-        const chartDiv: HTMLDOMElement = this.chart.renderTo;
+        const chartDiv: HTMLDOMElement = this.chart.renderTo,
+            pointer = this.chart.pointer;
 
-        if (chartDiv && posElement && posElement.getBoundingClientRect) {
-            const rectEl = posElement.getBoundingClientRect(),
-                chartPos = this.chart.pointer.getChartPosition();
+        if (chartDiv && posElement?.getBoundingClientRect && pointer) {
+            const scrollTop = win.scrollY ||
+                doc.documentElement.scrollTop,
+                rectEl = posElement.getBoundingClientRect(),
+                chartPos = pointer.getChartPosition();
 
             return {
                 x: (rectEl.left - chartPos.left) / chartPos.scaleX,
-                y: (rectEl.top - chartPos.top) / chartPos.scaleY,
+                // #21994, Add scroll position as "getBoundingClientRect"
+                // returns the position from the viewport, not the document top.
+                y: ((rectEl.top + scrollTop) - chartPos.top) / chartPos.scaleY,
                 width: rectEl.right / chartPos.scaleX -
                     rectEl.left / chartPos.scaleX,
                 height: rectEl.bottom / chartPos.scaleY -
@@ -349,6 +349,7 @@ class ProxyElement {
  *
  * */
 
+/** @internal */
 namespace ProxyElement {
 
     /* *
@@ -357,8 +358,7 @@ namespace ProxyElement {
      *
      * */
 
-    export type GroupType = ('div'|'ul');
-
+    /** @internal */
     export interface Target {
         click: (DOMElementType|SVGElement|HTMLElement);
         visual?: DOMElementType;
@@ -372,4 +372,5 @@ namespace ProxyElement {
  *
  * */
 
+/** @internal */
 export default ProxyElement;

@@ -1,10 +1,12 @@
 /* *
  *
- *  (c) 2010-2021 Torstein Honsi
+ *  (c) 2010-2026 Highsoft AS
+ *  Author: Torstein Hønsi
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -18,13 +20,14 @@
 
 import type Axis from './Axis';
 
-import U from '../Utilities.js';
-const {
+
+import H from '../Globals.js';
+const { composed } = H;
+import {
     addEvent,
-    getMagnitude,
     normalizeTickInterval,
-    pick
-} = U;
+    pushUnique
+} from '../../Shared/Utilities.js';
 
 /* *
  *
@@ -32,12 +35,14 @@ const {
  *
  * */
 
+/** @internal */
 declare module './AxisComposition' {
     interface AxisComposition {
         logarithmic?: LogarithmicAxis.Additions;
     }
 }
 
+/** @internal */
 declare module './AxisType' {
     interface AxisTypeRegistry {
         LogarithmicAxis: LogarithmicAxis.Composition;
@@ -50,9 +55,7 @@ declare module './AxisType' {
  *
  * */
 
-/**
- * @private
- */
+/** @internal */
 namespace LogarithmicAxis {
 
     /* *
@@ -67,73 +70,48 @@ namespace LogarithmicAxis {
 
     /* *
      *
-     *  Constants
-     *
-     * */
-
-    const composedClasses: Array<Function> = [];
-
-    /* *
-     *
      *  Functions
      *
      * */
 
-    /* eslint-disable valid-jsdoc */
-
     /**
      * Provides logarithmic support for axes.
-     * @private
+     * @internal
      */
     export function compose<T extends typeof Axis>(
         AxisClass: T
     ): (T&typeof Composition) {
 
-        if (composedClasses.indexOf(AxisClass) === -1) {
-            composedClasses.push(AxisClass);
+        if (pushUnique(composed, 'Axis.Logarithmic')) {
 
-            AxisClass.keepProps.push('logarithmic');
-
-            addEvent(AxisClass, 'init', onInit);
+            addEvent(AxisClass, 'afterSetType', onAfterSetType);
             addEvent(AxisClass, 'afterInit', onAfterInit);
         }
 
         return AxisClass as (T&typeof Composition);
     }
 
-    /**
-     * @private
-     */
-    function onInit(
-        this: Axis,
-        e: { userOptions: Axis['options'] }
+    /** @internal */
+    function onAfterSetType(
+        this: Axis
     ): void {
-        const axis = this;
-        const options = e.userOptions;
-
-        let logarithmic = axis.logarithmic;
-
-        if (options.type !== 'logarithmic') {
-            axis.logarithmic = void 0;
+        if (this.type !== 'logarithmic') {
+            this.logarithmic = void 0;
         } else {
-            if (!logarithmic) {
-                logarithmic = axis.logarithmic = new Additions(
-                    axis as Composition
-                );
-            }
+            this.logarithmic ??= new Additions(
+                this as Composition
+            );
         }
     }
 
-    /**
-     * @private
-     */
+    /** @internal */
     function onAfterInit(
         this: Axis
     ): void {
         const axis = this as Composition;
         const log = axis.logarithmic;
 
-        // extend logarithmic axis
+        // Extend logarithmic axis
         if (log) {
             axis.lin2val = function (num: number): number {
                 return log.lin2log(num);
@@ -153,7 +131,7 @@ namespace LogarithmicAxis {
 
     /**
      * Provides logarithmic support for axes.
-     * @private
+     * @internal
      * @class
      */
     export class Additions {
@@ -174,7 +152,14 @@ namespace LogarithmicAxis {
         *
         * */
 
+        /**
+         * The axis instance.
+         */
         public axis: Composition;
+
+        /**
+         * The calculated minor tick interval.
+         */
         public minorAutoInterval?: number;
 
         /* *
@@ -272,12 +257,10 @@ namespace LogarithmicAxis {
                         axisLength / axis.tickPositions.length :
                         axisLength;
 
-                interval = pick(
-                    filteredTickIntervalOption,
-                    log.minorAutoInterval,
-                    (realMax - realMin) *
-                        tickPixelIntervalOption / (totalPixelLength || 1)
-                );
+                interval = filteredTickIntervalOption ??
+                    log.minorAutoInterval ??
+                    (realMax - realMin) * tickPixelIntervalOption /
+                        (totalPixelLength || 1);
 
                 interval = normalizeTickInterval(interval);
 
@@ -299,10 +282,32 @@ namespace LogarithmicAxis {
             return positions;
         }
 
+        /**
+         * Converts a linear value to a logarithmic value.
+         *
+         * @internal
+         *
+         * @param {number} num
+         * The linear value.
+         *
+         * @return {number}
+         * The logarithmic value.
+         */
         public lin2log(num: number): number {
             return Math.pow(10, num);
         }
 
+        /**
+         * Converts a logarithmic value to a linear value.
+         *
+         * @internal
+         *
+         * @param {number} num
+         * The logarithmic value.
+         *
+         * @return {number}
+         * The linear value.
+         */
         public log2lin(num: number): number {
             return Math.log(num) / Math.LN10;
         }
@@ -316,4 +321,5 @@ namespace LogarithmicAxis {
  *
  * */
 
+/** @internal */
 export default LogarithmicAxis;

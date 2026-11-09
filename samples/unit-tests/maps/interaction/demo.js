@@ -1,11 +1,24 @@
 QUnit.test('Hover color', function (assert) {
     // Cache names from Boost module
-    var colorNames = Highcharts.Color.names;
+    const colorNames = Highcharts.Color.names;
     Highcharts.Color.names = {};
 
-    var chart = Highcharts.mapChart('container', {
+    const chart = Highcharts.mapChart('container', {
+            mapNavigation: {
+                enabled: true
+            },
+            colorAxis: {
+                enabled: true,
+                dataClasses: [{
+                    to: 3
+                }, {
+                    from: 3,
+                    to: 5
+                }]
+            },
             series: [
                 {
+                    allowPointSelect: true,
                     mapData: Highcharts.maps['custom/europe'],
                     data: [
                         ['no', 5],
@@ -22,9 +35,19 @@ QUnit.test('Hover color', function (assert) {
             ]
         }),
         point1 = chart.series[0].points[0],
-        point2 = chart.series[0].points[1];
+        { top, left } = Highcharts.offset(chart.container),
+        getPageCoords = point => {
+            const [x, y] = point.pos();
+            return {
+                pageX: x + left,
+                pageY: y + top
+            };
+        },
+        p1Coords = getPageCoords(point1),
+        point2 = chart.series[0].points[1],
+        { fireEvent } = Highcharts;
 
-    Highcharts.fireEvent(point1.graphic.element, 'mouseover');
+    fireEvent(point1.graphic.element, 'mouseover', p1Coords);
 
     assert.strictEqual(
         point1.graphic.element.getAttribute('fill'),
@@ -38,8 +61,8 @@ QUnit.test('Hover color', function (assert) {
         'Point2 does not have red fill'
     );
 
-    Highcharts.fireEvent(point1.graphic.element, 'mouseout');
-    Highcharts.fireEvent(point2.graphic.element, 'mouseover');
+    fireEvent(point1.graphic.element, 'mouseout', p1Coords);
+    fireEvent(point2.graphic.element, 'mouseover', getPageCoords(point2));
 
     assert.strictEqual(
         point2.graphic.element.getAttribute('fill'),
@@ -55,4 +78,24 @@ QUnit.test('Hover color', function (assert) {
 
     // Reset
     Highcharts.Color.names = colorNames;
+
+    point1.firePointEvent('click');
+    chart.mapView.zoomBy(1);
+
+    assert.strictEqual(
+        point1.selected,
+        true,
+        'Point should be selected after zooming/panning the chart (#19175).'
+    );
+
+    fireEvent(chart.legend.allItems[1].legendItem.group.element, 'click');
+    chart.mapView.zoomBy(-1);
+
+    assert.strictEqual(
+        point2.visible,
+        false,
+        `After disabling the data class visibility and doing some map
+        interaction, the point belonging to that data class should not be
+        visible (#20441).`
+    );
 });

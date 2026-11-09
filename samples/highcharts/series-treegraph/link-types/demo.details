@@ -1,6 +1,6 @@
 ---
-name: EXPERIMENTAL - Treegraph chart
+name: Treegraph chart
 authors:
-  - Pawel Lysy
+  - Paweł Lysy
 js_wrap: b
 ...

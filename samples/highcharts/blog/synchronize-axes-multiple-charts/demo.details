@@ -1,0 +1,6 @@
+---
+ name: Synchronize the axes on multiple charts
+ authors:
+   - Karol Kołodziej
+ js_wrap: b
+...

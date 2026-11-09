@@ -1,0 +1,7 @@
+@import url("https://code.highcharts.com/dashboards/css/dashboards.css");
+
+#container {
+    min-width: 310px;
+    max-width: 800px;
+    margin: 0 auto;
+}

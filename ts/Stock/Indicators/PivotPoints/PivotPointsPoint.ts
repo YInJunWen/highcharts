@@ -1,8 +1,9 @@
 /* *
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -15,11 +16,12 @@
  * */
 
 import type SMAPointType from '../SMA/SMAPoint';
+import type PivotPointsIndicator from './PivotPointsIndicator';
 
-import PivotPointsIndicator from './PivotPointsIndicator';
+import SMAIndicator from '../SMA/SMAIndicator.js';
 import SeriesRegistry from '../../../Core/Series/SeriesRegistry.js';
 const SMAPoint: typeof SMAPointType =
-    SeriesRegistry.seriesTypes.sma.prototype.pointClass;
+    SMAIndicator.prototype.pointClass;
 
 /* *
  *
@@ -27,15 +29,13 @@ const SMAPoint: typeof SMAPointType =
  *
  * */
 
-/**
- * @private
- */
+/** @internal */
 function destroyExtraLabels(
     point: PivotPointsPoint,
     functionName: string
 ): void {
-    let props: Array<string> = point.series.pointArrayMap,
-        prop: string,
+    const props: Array<string> = point.series.pointArrayMap;
+    let prop: string,
         i: number = props.length;
 
     (SeriesRegistry.seriesTypes.sma.prototype.pointClass.prototype as any)[
@@ -66,9 +66,12 @@ class PivotPointsPoint extends SMAPoint {
      *
      * */
 
-    public P: number = void 0 as any;
-    public pivotLine: string = void 0 as any;
-    public series: PivotPointsIndicator = void 0 as any;
+    /** @internal */
+    public P!: number;
+    /** @internal */
+    public pivotLine!: string;
+    /** @internal */
+    public series!: PivotPointsIndicator;
 
     /* *
      *
@@ -76,6 +79,7 @@ class PivotPointsPoint extends SMAPoint {
      *
      * */
 
+    /** @internal */
     public destroyElements(
         this: PivotPointsPoint
     ): void {
@@ -83,6 +87,7 @@ class PivotPointsPoint extends SMAPoint {
     }
 
     // This method is called when removing points, e.g. series.update()
+    /** @internal */
     public destroy(
         this: PivotPointsPoint
     ): void {

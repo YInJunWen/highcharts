@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: LicenseRef-Highcharts
 /**
  * @license Highstock JS v@product.version@ (@product.date@)
  * @module highcharts/indicators/indicators-all
@@ -6,13 +7,16 @@
  *
  * All technical indicators for Highcharts Stock
  *
- * (c) 2010-2021 Pawel Fus
+ * (c) 2010-2026 Highsoft AS
+ * Author: Paweł Fus
  *
- * License: www.highcharts.com/license
+ * A commercial license may be required depending on use,
+ * see www.highcharts.com/license
  */
 
 'use strict';
 
+import Highcharts from '../../Core/Globals.js';
 import '../../Stock/Indicators/SMA/SMAIndicator.js';
 import '../../Stock/Indicators/EMA/EMAIndicator.js';
 import '../../Stock/Indicators/AD/ADIndicator.js';
@@ -61,3 +65,10 @@ import '../../Stock/Indicators/LinearRegressionAngle/LinearRegressionAngleIndica
 import '../../Stock/Indicators/ABands/ABandsIndicator.js';
 import '../../Stock/Indicators/TrendLine/TrendLineIndicator.js';
 import '../../Stock/Indicators/DisparityIndex/DisparityIndexIndicator.js';
+
+import MultipleLinesComposition from '../../Stock/Indicators/MultipleLinesComposition.js';
+const G: AnyRecord = Highcharts;
+G.MultipleLinesComposition =
+    G.MultipleLinesComposition || MultipleLinesComposition;
+
+export default Highcharts;

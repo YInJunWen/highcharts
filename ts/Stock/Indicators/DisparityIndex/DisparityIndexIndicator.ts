@@ -1,11 +1,13 @@
 /* *
- *  (c) 2010-2021 Rafal Sebestjanski
+ *  (c) 2010-2026 Highsoft AS
+ *  Author: Rafał Sebestjański
  *
  *  Disparity Index technical indicator for Highcharts Stock
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -22,21 +24,19 @@ import type {
     DisparityIndexParamsOptions
 } from './DisparityIndexOptions';
 import type DisparityIndexPoint from './DisparityIndexPoint';
+import type { IndicatorLinkedSeriesBase } from '../IndicatorBase';
 import type IndicatorValuesObject from '../IndicatorValuesObject';
 import type LineSeries from '../../../Series/Line/LineSeries';
 
+import SMAIndicator from '../SMA/SMAIndicator.js';
 import SeriesRegistry from '../../../Core/Series/SeriesRegistry.js';
-const {
-    sma: SMAIndicator
-} = SeriesRegistry.seriesTypes;
-import U from '../../../Core/Utilities.js';
-const {
+import {
     correctFloat,
     defined,
     extend,
     isArray,
     merge
-} = U;
+} from '../../../Shared/Utilities.js';
 
 /* *
  *
@@ -47,7 +47,6 @@ const {
 /**
  * The Disparity Index series type.
  *
- * @private
  * @class
  * @name Highcharts.seriesTypes.disparityindex
  *
@@ -66,7 +65,7 @@ class DisparityIndexIndicator extends SMAIndicator {
      * This series requires the `linkedTo` option to be set and should
      * be loaded after the `stock/indicators/indicators.js` file.
      *
-     * @sample stock/indicators/disparity-index
+     * @sample {highstock} stock/indicators/disparity-index
      *         Disparity Index indicator
      *
      * @extends      plotOptions.sma
@@ -75,9 +74,10 @@ class DisparityIndexIndicator extends SMAIndicator {
      * @excluding    allAreas, colorAxis, joinBy, keys, navigatorOptions,
      *               pointInterval, pointIntervalUnit, pointPlacement,
      *               pointRange, pointStart, showInNavigator, stacking
-     * @requires     stock/indicators/indicators
-     * @requires     stock/indicators/disparity-index
+     * @requires     indicators/indicators
+     * @requires     indicators/disparity-index
      * @optionparent plotOptions.disparityindex
+     * @internal
      */
     public static defaultOptions: DisparityIndexOptions = merge(SMAIndicator.defaultOptions, {
         params: {
@@ -107,10 +107,11 @@ class DisparityIndexIndicator extends SMAIndicator {
      *
      * */
 
-    public averageIndicator: typeof SMAIndicator = void 0 as any;
-    public data: Array<DisparityIndexPoint> = void 0 as any;
-    public options: DisparityIndexOptions = void 0 as any;
-    public points: Array<DisparityIndexPoint> = void 0 as any;
+    /** @internal */
+    public averageIndicator!: typeof SMAIndicator;
+    public data!: Array<DisparityIndexPoint>;
+    public options!: DisparityIndexOptions;
+    public points!: Array<DisparityIndexPoint>;
 
     /* *
      *
@@ -118,10 +119,11 @@ class DisparityIndexIndicator extends SMAIndicator {
      *
      * */
 
+    /** @internal */
     public init(): void {
         const args = arguments,
             ctx = this, // Disparity Index indicator
-            params = args[1].params, // options.params
+            params = args[1].params, // Options.params
             averageType = params && params.average ? params.average : void 0;
 
         ctx.averageIndicator = SeriesRegistry
@@ -129,6 +131,7 @@ class DisparityIndexIndicator extends SMAIndicator {
         ctx.averageIndicator.prototype.init.apply(ctx, args);
     }
 
+    /** @internal */
     public calculateDisparityIndex(
         curPrice: number,
         periodAverage: number
@@ -136,8 +139,9 @@ class DisparityIndexIndicator extends SMAIndicator {
         return correctFloat(curPrice - periodAverage) / periodAverage * 100;
     }
 
+    /** @internal */
     public getValues<TLinkedSeries extends LineSeries>(
-        series: TLinkedSeries,
+        series: TLinkedSeries&IndicatorLinkedSeriesBase,
         params: DisparityIndexParamsOptions
     ): (IndicatorValuesObject<TLinkedSeries>|undefined) {
         const index = params.index,
@@ -241,12 +245,12 @@ export default DisparityIndexIndicator;
  * @extends   series,plotOptions.disparityindex
  * @since 9.1.0
  * @product   highstock
- * @excluding allAreas, colorAxis,  dataParser, dataURL, joinBy, keys,
- *            navigatorOptions, pointInterval, pointIntervalUnit,
- *            pointPlacement, pointRange, pointStart, showInNavigator, stacking
- * @requires  stock/indicators/indicators
- * @requires  stock/indicators/disparity-index
+ * @excluding allAreas, colorAxis, joinBy, keys, navigatorOptions,
+ *            pointInterval, pointIntervalUnit, pointPlacement, pointRange,
+ *            pointStart, showInNavigator, stacking
+ * @requires  indicators/indicators
+ * @requires  indicators/disparity-index
  * @apioption series.disparityindex
  */
 
-''; // to include the above in the js output
+''; // To include the above in the js output

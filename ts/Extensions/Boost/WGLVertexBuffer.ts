@@ -1,12 +1,11 @@
 /* *
  *
- *  Copyright (c) 2019-2021 Highsoft AS
+ *  (c) 2019-2026 Highsoft AS
  *
  *  Boost module: stripped-down renderer for higher performance
  *
  *  License: highcharts.com/license
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -32,7 +31,7 @@ import type WGLShader from './WGLShader';
  * A vertex buffer is a set of vertices which are passed to the GPU
  * in a single call.
  *
- * @private
+ * @internal
  * @class
  * @name WGLVertexBuffer
  *
@@ -94,7 +93,7 @@ class WGLVertexBuffer {
     /**
      * Note about pre-allocated buffers:
      *     - This is slower for charts with many series
-     * @private
+     * @internal
      */
     public allocate(
         size: number
@@ -104,15 +103,15 @@ class WGLVertexBuffer {
     }
 
     /**
-     * Bind the buffer
-     * @private
+     * Bind the buffer.
+     * @internal
      */
     public bind(): (boolean|undefined) {
         if (!this.buffer) {
             return false;
         }
 
-        // gl.bindAttribLocation(shader.program(), 0, 'aVertexPosition');
+        /// gl.bindAttribLocation(shader.program(), 0, 'aVertexPosition');
         // gl.enableVertexAttribArray(vertAttribute);
         // gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
         this.gl.vertexAttribPointer(
@@ -123,18 +122,19 @@ class WGLVertexBuffer {
             0,
             0
         );
-        // gl.enableVertexAttribArray(vertAttribute);
+        /// gl.enableVertexAttribArray(vertAttribute);
     }
 
     /**
-     * Build the buffer
-     * @private
+     * Build the buffer.
+     *
+     * @internal
      * @param {Array<number>} dataIn
      * Zero padded array of indices
      * @param {string} attrib
      * Name of the Attribute to bind the buffer to
      * @param {number} dataComponents
-     * Mumber of components per. indice
+     * Number of components per. indice
      */
     public build(
         dataIn: Array<number>,
@@ -146,7 +146,7 @@ class WGLVertexBuffer {
         this.data = dataIn || [];
 
         if ((!this.data || this.data.length === 0) && !this.preAllocated) {
-            // console.error('trying to render empty vbuffer');
+            /// console.error('trying to render empty vbuffer');
             this.destroy();
             return false;
         }
@@ -169,7 +169,7 @@ class WGLVertexBuffer {
             this.gl.STATIC_DRAW
         );
 
-        // gl.bindAttribLocation(shader.program(), 0, 'aVertexPosition');
+        /// gl.bindAttribLocation(shader.program(), 0, 'aVertexPosition');
         this.vertAttribute = this.gl
             .getAttribLocation(this.shader.getProgram() as any, attrib);
         this.gl.enableVertexAttribArray(this.vertAttribute);
@@ -180,9 +180,7 @@ class WGLVertexBuffer {
         return true;
     }
 
-    /**
-     * @private
-     */
+    /** @internal */
     public destroy(): void {
         if (this.buffer) {
             this.gl.deleteBuffer(this.buffer);
@@ -197,7 +195,8 @@ class WGLVertexBuffer {
 
     /**
      * Adds data to the pre-allocated buffer.
-     * @private
+     *
+     * @internal
      * @param {number} x
      * X data
      * @param {number} y
@@ -217,9 +216,9 @@ class WGLVertexBuffer {
     }
 
     /**
-     * Render the buffer
+     * Render the buffer.
      *
-     * @private
+     * @internal
      * @param {number} from
      * Start indice.
      * @param {number} to
@@ -233,7 +232,7 @@ class WGLVertexBuffer {
         drawMode: WGLDrawModeValue
     ): boolean {
         const length = this.preAllocated ?
-            this.preAllocated.length : (this.data as any).length;
+            this.preAllocated.length : this.data?.length || 0;
 
         if (!this.buffer) {
             return false;
@@ -274,4 +273,5 @@ class WGLVertexBuffer {
  *
  * */
 
+/** @internal */
 export default WGLVertexBuffer;

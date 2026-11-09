@@ -1,33 +1,186 @@
-// 1
+QUnit.test('General tests for measure annotation', function (assert) {
+    Highcharts.setOptions({
+        annotations: {
+            labelOptions: {
+                borderColor: 'green',
+                backgroundColor: 'green',
+                style: {
+                    color: 'green'
+                }
+            },
+            controlPointOptions: {
+                style: {
+                    fill: 'green',
+                    stroke: 'green'
+                }
+            },
+            shapeOptions: {
+                stroke: 'green',
+                fill: 'green'
+            },
+            types: {
+                measure: {
+                    controlPointOptions: {
+                        style: {
+                            fill: 'lightgreen',
+                            stroke: 'lightgreen'
+                        }
+                    }
+                }
+            }
+        }
+    });
+    const chart = Highcharts.chart('container', {
+        annotations: [{
+            type: 'measure',
+            controlPointOptions: {
+                visible: true
+            },
+            typeOptions: {
+                point: {
+                    x: 0.5,
+                    y: 6
+                },
+                background: {
+                    width: 200 + 'px',
+                    height: 150 + 'px'
+                }
+            }
+        }],
+
+        series: [{
+            data: [
+                5, 2, 1.5, 5, 6, 7, 8, 3, 2, 4, 4, 4, 4, 3
+            ]
+        }]
+    });
+
+    assert.strictEqual(
+        chart.annotations[0].controlPoints[0].graphic.visibility,
+        'inherit',
+        `Control point should be visible and setting it should not throw any
+        errors (#21879).`
+    );
+
+    assert.strictEqual(
+        chart.annotations[0].average,
+        3.625,
+        'Average should be calculated correctly.'
+    );
+    assert.strictEqual(
+        chart.annotations[0].min,
+        1.5,
+        'Min should be calculated correctly.'
+    );
+    assert.strictEqual(
+        chart.annotations[0].max,
+        6,
+        'Max should be calculated correctly.'
+    );
+    assert.strictEqual(
+        chart.annotations[0].bins,
+        4,
+        'Bins should be calculated correctly.'
+    );
+
+    assert.strictEqual(
+        chart.container.querySelector(
+            '.highcharts-annotation-shapes .highcharts-measure-crosshair-x'
+        ).getAttribute('fill'),
+        'green',
+        'Shape color should be set according to global options'
+    );
+
+    assert.strictEqual(
+        chart.container.querySelector(
+            '.highcharts-control-points path'
+        ).style.fill,
+        'lightgreen',
+        'Shape color should be set according to global, type-specific options'
+    );
+
+    chart.update({
+        yAxis: {
+            type: 'logarithmic'
+        }
+    });
+    chart.removeAnnotation(chart.annotations[0]);
+
+    const measure = chart.addAnnotation({
+            type: 'measure',
+            controlPointOptions: {
+                visible: true
+            },
+            typeOptions: {
+                selectType: 'x',
+                point: {
+                    x: 1
+                },
+                background: {
+                    width: '80px'
+                }
+            }
+        }),
+        yAxis = chart.yAxis[0],
+        handle = measure.controlPoints[0],
+        handleCenter = handle.graphic.attr('y') + (handle.options.height / 2),
+        pixelMid = (
+            yAxis.toPixels(measure.yAxisMin) +
+            yAxis.toPixels(measure.yAxisMax)
+        ) / 2,
+        arithmeticMid = yAxis.toPixels(
+            (measure.yAxisMin + measure.yAxisMax) / 2
+        );
+
+    assert.close(
+        handleCenter,
+        pixelMid,
+        0.5,
+        'Measure handle y should match the pixel midpoint of the y range, ' +
+        '#24851.'
+    );
+
+    assert.ok(
+        Math.abs(handleCenter - arithmeticMid) > 20,
+        'Measure handle y should not match the arithmetic mean of the y ' +
+        'values, #24851.'
+    );
+});
+
+
 QUnit.test('#13664 - annotation measure on yAxis', function (assert) {
     var chart = Highcharts.chart('container', {
+        xAxis: {
+            labels: {
+                distance: 8
+            }
+        },
         yAxis: [
             {
                 height: '50%'
             },
             {
+                min: 3,
                 top: '50%',
                 height: '50%'
             }
         ],
-        annotations: [
-            {
-                type: 'measure',
-                typeOptions: {
-                    selectType: 'x',
-                    yAxis: 1,
-                    xAxis: 0,
-                    point: {
-                        x: 5,
-                        y: 10
-                    },
-                    background: {
-                        width: 300 + 'px',
-                        height: 150 + 'px'
-                    }
+        annotations: { // Test for single object
+            type: 'measure',
+            typeOptions: {
+                selectType: 'x',
+                yAxis: 1,
+                xAxis: 0,
+                point: {
+                    x: 5,
+                    y: 10
+                },
+                background: {
+                    width: 300 + 'px',
+                    height: 150 + 'px'
                 }
             }
-        ],
+        },
 
         series: [{
             data: [1, 2, 3, 2, 3, 4, 5, 6, 7, 8, 3, 2, 4, 4, 4, 4, 3]
@@ -36,6 +189,8 @@ QUnit.test('#13664 - annotation measure on yAxis', function (assert) {
             data: [6, 7, 8, 3, 2, 4, 4, 4, 4, 3, 3, 2, 4, 4, 4, 4, 3]
         }]
     });
+
+    var controller = new TestController(chart);
 
     let bbox = chart.annotations[0].shapesGroup.getBBox();
     assert.ok(
@@ -85,4 +240,125 @@ QUnit.test('#13664 - annotation measure on yAxis', function (assert) {
         `Annotation's label's X position should be close
         to the X position of the annotation after updates.`
     );
+
+    const axisMiddlePos = chart.yAxis[1].top + chart.yAxis[1].height / 2,
+        { y, height } = chart.annotations[0].controlPoints[0].graphic.getBBox(),
+        controlPointYPos = y + height / 2;
+
+    assert.equal(
+        Math.round(controlPointYPos),
+        Math.round(axisMiddlePos),
+        `Annotation's control points should be positioned in the middle of yAxis
+        #17995`
+    );
+
+    bbox = chart.annotations[0].shapesGroup.getBBox();
+
+    // drag the annotation to the left
+    controller.mouseDown(bbox.x + bbox.width / 2, bbox.y + bbox.height / 2);
+    controller.mouseMove(bbox.x - 50, bbox.y);
+    controller.mouseUp();
+
+    bbox = chart.annotations[0].shapesGroup.getBBox();
+
+    chart.annotations[0].update({
+        typeOptions: {
+            label: {
+                style: {
+                    color: 'red'
+                }
+            }
+        }
+    });
+
+    assert.equal(
+        bbox.x,
+        chart.annotations[0].shapesGroup.getBBox().x,
+        'The annotation should stay in the same place after update, #19121.'
+    );
 });
+
+QUnit.test('Measure annotation border', function (assert) {
+    const WIDTH = 400;
+    const chart = Highcharts.chart('container', {
+        chart: {
+            type: 'column'
+        },
+        annotations: [
+            {
+                type: 'measure',
+                typeOptions: {
+                    point: {
+                        x: 0
+                    },
+                    selectType: 'x',
+                    background: {
+                        width: `${WIDTH}px`,
+                        fill: 'lightblue',
+                        stroke: 'red',
+                        strokeWidth: 20
+                    }
+                }
+            }
+        ],
+        series: [
+            {
+                data: [1, 2, 3, 4, 5, 6, 7, 8]
+            }
+        ]
+    });
+    const measure = chart.annotations[0];
+    const { width } = measure.shapes[2].graphic.getBBox();
+    assert.equal(
+        width + measure.shapes[2].options.strokeWidth,
+        WIDTH,
+        'StrokeWidth should be taken into account when drawing annotation'
+    );
+});
+
+QUnit.test(
+    'Measure label formatter arrow function should receive ctx argument',
+    function (assert) {
+        let formatterCtx;
+
+        const chart = Highcharts.chart('container', {
+            annotations: [{
+                type: 'measure',
+                typeOptions: {
+                    point: {
+                        x: 0.5,
+                        y: 6
+                    },
+                    background: {
+                        width: 200 + 'px',
+                        height: 150 + 'px'
+                    },
+                    label: {
+                        formatter: ctx => {
+                            formatterCtx = ctx;
+                            return ctx ? 'CTX' : 'NOCTX';
+                        }
+                    }
+                }
+            }],
+
+            series: [{
+                data: [5, 2, 1.5, 5, 6, 7, 8, 3, 2, 4, 4, 4, 4, 3]
+            }]
+        });
+
+        const measure = chart.annotations[0];
+
+        assert.strictEqual(
+            formatterCtx,
+            measure,
+            'Measure formatter should receive annotation instance as ctx.'
+        );
+
+        assert.strictEqual(
+            measure.labels[0].graphic.text.textStr,
+            'CTX',
+            'Arrow-function measure formatter should return rendered text.'
+        );
+    }
+);

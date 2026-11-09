@@ -1,10 +1,12 @@
 /* *
  *
- *  (c) 2010-2021 Torstein Honsi
+ *  (c) 2010-2026 Highsoft AS
+ *  Author: Torstein Hønsi
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -14,45 +16,55 @@
  *
  * */
 
+import type BBoxObject from '../../Core/Renderer/BBoxObject';
 import type WaterfallPointOptions from './WaterfallPointOptions';
+import type WaterfallSeries from './WaterfallSeries';
+
 import ColumnSeries from '../Column/ColumnSeries.js';
 import Point from '../../Core/Series/Point.js';
-import WaterfallSeries from './WaterfallSeries';
-const { isNumber } = U;
-import U from '../../Core/Utilities.js';
-
+import { isNumber } from '../../Shared/Utilities.js';
 
 /* *
  *
- * Class
+ *  Class
  *
  * */
+
 class WaterfallPoint extends ColumnSeries.prototype.pointClass {
 
     /* *
      *
-     * Properties
+     *  Properties
      *
      * */
+
+    /** @internal */
     public below?: boolean;
 
+    /** @internal */
+    public box?: BBoxObject;
+
+    /** @internal */
     public isIntermediateSum?: boolean;
 
+    /** @internal */
     public isSum?: boolean;
 
+    /** @internal */
     public minPointLengthOffset?: number;
 
-    public options: WaterfallPointOptions = void 0 as any;
+    public options!: WaterfallPointOptions;
 
-    public series: WaterfallSeries = void 0 as any;
-
-    public y: any;
+    /** @internal */
+    public series!: WaterfallSeries;
 
     /* *
      *
-     * Functions
+     *  Functions
      *
      * */
+
+    /** @internal */
     public getClassName(): string {
         let className = Point.prototype.getClassName.call(this);
 
@@ -61,9 +73,12 @@ class WaterfallPoint extends ColumnSeries.prototype.pointClass {
         } else if (this.isIntermediateSum) {
             className += ' highcharts-intermediate-sum';
         }
+
         return className;
     }
+
     // Pass the null test in ColumnSeries.translate.
+    /** @internal */
     public isValid(): boolean {
         return (
             isNumber(this.y) ||
@@ -71,11 +86,13 @@ class WaterfallPoint extends ColumnSeries.prototype.pointClass {
             Boolean(this.isIntermediateSum)
         );
     }
+
 }
 
 /* *
  *
- * Export
+ *  Export
  *
  * */
+
 export default WaterfallPoint;

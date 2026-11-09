@@ -1,10 +1,12 @@
 /* *
  *
- *  (c) 2010-2022 Pawel Lysy Grzegorz Blachlinski
+ *  (c) 2010-2026 Highsoft AS
+ *  Authors: Paweł Lysy, Grzegorz Blachliński
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -16,16 +18,13 @@
  *
  * */
 
-import type Point from '../../Core/Series/Point';
 import type TreegraphSeriesOptions from './TreegraphSeriesOptions';
 
-import { Palette } from '../../Core/Color/Palettes';
-
 /* *
-*
-*  Constants
-*
-* */
+ *
+ *  Constants
+ *
+ * */
 
 /**
  * A treegraph series is a diagram, which shows a relation between ancestors
@@ -33,25 +32,24 @@ import { Palette } from '../../Core/Color/Palettes';
  * The best examples of the dataStructures, which best reflect this chart
  * are e.g. genealogy tree or directory structure.
  *
- * TODO change back the demo path
  * @sample highcharts/demo/treegraph-chart
- *          Treegraph Chart
+ *         Treegraph Chart
  *
  * @extends      plotOptions.treemap
  * @excluding    layoutAlgorithm, dashStyle, linecap, lineWidth,
  *               negativeColor, threshold, zones, zoneAxis, colorAxis,
- *               colorKey, compare, dataGrouping, endAgle, gapSize, gapUnit,
+ *               colorKey, compare, dataGrouping, endAngle, gapSize, gapUnit,
  *               ignoreHiddenPoint, innerSize, joinBy, legendType, linecap,
  *               minSize, navigatorOptions, pointRange, allowTraversingTree,
- *               alternateStartingDirection, borderRadius, breadcrumbs,
+ *               alternateStartingDirection, breadcrumbs,
  *               interactByLeaf, layoutStartingDirection, levelIsConstant,
- *               lineWidth, negativeColor, nodes, sortIndex, zoneAxis,
- *               zones
+ *               lineWidth, negativeColor, nodes, nodeSizeBy, sortIndex,
+ *               zoneAxis, zones, cluster
  *
- * @since        next
  * @product      highcharts
- * @requires     modules/treemap.js
- * @requires     modules/treegraph.js
+ * @since        10.3.0
+ * @requires     modules/treemap
+ * @requires     modules/treegraph
  * @optionparent plotOptions.treegraph
  */
 const TreegraphSeriesDefaults = {
@@ -59,13 +57,13 @@ const TreegraphSeriesDefaults = {
      * Flips the positions of the nodes of a treegraph along the
      * horizontal axis (vertical if chart is inverted).
      *
-     * @type {boolean}
-     * @since next
-     * @default false
-     * @product highcharts
-     *
      * @sample highcharts/series-treegraph/reversed-nodes
      *         Treegraph series with reversed nodes.
+     *
+     * @type    {boolean}
+     * @default false
+     * @product highcharts
+     * @since 10.3.0
      */
     reversed: false,
     /**
@@ -81,53 +79,79 @@ const TreegraphSeriesDefaults = {
     },
     link: {
         /**
+         * For the orthogonal link type, this defines how far down the link
+         * bends. A number defines the pixel offset from the start of the link,
+         * and a percentage defines the relative position on the link. For
+         * example, a `bendAt` of `50%` means that the link bends in the middle.
+         *
+         * @type      {number|string}
+         * @since     12.5.0
+         * @product   highcharts
+         * @default   50%
+         * @apioption plotOptions.treegraph.link.bendAt
+         */
+
+        /**
          * The color of the links between nodes.
          *
          * @type {Highcharts.ColorString}
-         * @private
          */
-        color: Palette.neutralColor60,
+        color: 'var(--highcharts-neutral-color-60)',
+
+        cursor: 'default',
+
+        /**
+         * Modifier of the shape of the curved link. Works best for
+         * values between 0 and 1, where 0 is a straight line, and 1 is
+         * a shape close to the default one.
+         *
+         * @type      {number}
+         * @default   0.5
+         * @product   highcharts
+         * @since     10.3.0
+         * @apioption plotOptions.treegraph.link.curveFactor
+         */
+
         /**
          * The line width of the links connecting nodes, in pixels.
-         * @type {number}
-         *
-         * @private
          */
         lineWidth: 1,
+
         /**
          * Radius for the rounded corners of the links between nodes.
-         * Works for `default` link type.
-         *
-         * @private
+         * Works for the `orthogonal` link type.
          */
         radius: 10,
-        cursor: 'default',
+
         /**
          * Type of the link shape.
          *
          * @sample   highcharts/series-treegraph/link-types
          *           Different link types
          *
-         * @type {'default' | 'curved' | 'straight'}
+         * @type {'orthogonal' | 'curved' | 'straight'}
          * @product highcharts
-         *
          */
         type: 'curved'
-        /**
-         * Modifier of the shape of the curved link. Works best for
-         * values between 0 and 1, where 0 is a straight line, and 1 is
-         * a shape close to the default one.
-         *
-         * @default 0.5
-         * @type {number}
-         * @since next
-         * @product highcharts
-         * @apioption series.treegraph.link.curveFactor
-         *
-         */
     },
     /**
-     * Options applied to collapse Button. The collape button is the
+     * Can set the options of dataLabels on each point which lies on the
+     * level.
+     * [plotOptions.treegraph.dataLabels](#plotOptions.treegraph.dataLabels)
+     * for possible values.
+     *
+     * @extends   plotOptions.treegraph.dataLabels
+     * @product   highcharts
+     * @apioption plotOptions.treegraph.levels.dataLabels
+     */
+    /**
+     * Set marker options for nodes at the level.
+     *
+     * @extends   plotOptions.treegraph.marker
+     * @apioption plotOptions.treegraph.levels.marker
+     */
+    /**
+     * Options applied to collapse Button. The collapse button is the
      * small button which indicates, that the node is collapsable.
      */
     collapseButton: {
@@ -142,6 +166,10 @@ const TreegraphSeriesDefaults = {
          */
         enabled: true,
         /**
+         * The line width of the button in pixels
+         */
+        lineWidth: 1,
+        /**
          * Offset of the button in the x direction.
          */
         x: 0,
@@ -152,47 +180,43 @@ const TreegraphSeriesDefaults = {
         /**
          * Height of the button.
          */
-        height: 10,
+        height: 18,
         /**
          * Width of the button.
          */
-        width: 10,
+        width: 18,
         /**
          * The symbol of the collapse button.
          */
-        shape: 'circle'
+        shape: 'circle',
         /**
          * CSS styles for the collapse button.
          *
          * In styled mode, the collapse button style is given in the
          * `.highcharts-collapse-button` class.
-         *
-         *
-         * @type      {Highcharts.CSSObject}
-         * @apioption series.treegraph.collapseButton.style
          */
+        style: {
+            cursor: 'pointer',
+            fontWeight: 'bold',
+            fontSize: '1em'
+        }
     },
     /**
+     * Whether the treegraph series should fill the entire plot area in the X
+     * axis direction, even when there are collapsed points.
+     *
+     * @sample  highcharts/series-treegraph/fillspace
+     *          Fill space demonstrated
+     *
+     * @product highcharts
+     */
+    fillSpace: false,
+    /**
      * @extends plotOptions.series.tooltip
+     * @excluding clusterFormat
      */
     tooltip: {
-        /**
-         * The HTML of the point's line in the tooltip. Variables are
-         * enclosed by curly brackets. Available variables are
-         * `point.id`,  `point.fromNode.id`, `point.toNode.id`,
-         * `series.name`, `series.color` and other properties on the
-         * same form. Furthermore, This can also be overridden for each
-         * series, which makes it a good hook for displaying units. In
-         * styled mode, the dot is colored by a class name rather than
-         * the point color.
-         *
-         * @type {string}
-         * @since next
-         * @product highcharts
-         *
-         */
-        linkFormat: '{point.fromNode.id} \u2192 {point.toNode.id}',
-        pointFormat: '{point.id}'
+
         /**
          * A callback function for formatting the HTML output for a
          * single link in the tooltip. Like the `linkFormat` string,
@@ -202,6 +226,22 @@ const TreegraphSeriesDefaults = {
          * @apioption series.treegraph.tooltip.linkFormatter
          *
          */
+
+        /**
+         * The HTML of the point's line in the tooltip. Variables are enclosed
+         * by curly brackets. Available variables are `point.id`,
+         * `point.fromNode.id`, `point.toNode.id`, `series.name`, `series.color`
+         * and other properties on the same form. Furthermore, This can also be
+         * overridden for each series, which makes it a good hook for displaying
+         * units. In styled mode, the dot is colored by a class name rather than
+         * the point color.
+         *
+         * @type {string}
+         * @since 10.3.0
+         * @product highcharts
+         */
+        linkFormat: '{point.fromNode.id} \u2192 {point.toNode.id}',
+        pointFormat: '{point.id}'
     },
     /**
      * Options for the data labels appearing on top of the nodes and
@@ -211,10 +251,9 @@ const TreegraphSeriesDefaults = {
      * links and is an empty string by default.
      *
      * @declare Highcharts.SeriesTreegraphDataLabelsOptionsObject
-     *
-     * @private
      */
     dataLabels: {
+        defer: true,
         /**
          * Options for a _link_ label text which should follow link
          * connection. Border and background are disabled for a label
@@ -223,24 +262,91 @@ const TreegraphSeriesDefaults = {
          * **Note:** Only SVG-based renderer supports this option.
          * Setting `useHTML` to true will disable this option.
          *
-         * @extends plotOptions.treegraph.dataLabels.linkTextPath
-         * @since   next
-         *
-         *
          * @sample highcharts/series-treegraph/link-text-path
          *         Treegraph series with link text path dataLabels.
+         *
+         * @extends plotOptions.treegraph.dataLabels.textPath
+         * @since 10.3.0
          */
         linkTextPath: {
+            /**
+             * @default { startOffset: '50%' }
+             */
             attributes: {
+                /** @ignore */
                 startOffset: '50%'
             }
         },
         enabled: true,
         linkFormatter: (): string => '',
-        formatter: function (this: Point.PointLabelObject): string {
-            return this.point.id;
+
+        /**
+         * Callback function to format data labels for _nodes_ in the
+         * treegraph, when `pointFormat` is not sufficient.
+         *
+         * @type {function}
+         * @apioption series.treegraph.dataLabels.pointFormatter
+         */
+
+        /**
+         * The
+         * [format string](https://www.highcharts.com/docs/chart-concepts/labels-and-string-formatting)
+         * specifying what to show for _nodes_ in the treegraph. Overrides
+         * `format`. Use `pointFormat` and `linkFormat` to differentiate between
+         * node and link data labels.
+         *
+         * @type {string}
+         */
+        pointFormat: void 0,
+        padding: 5,
+        style: {
+            textOverflow: 'none'
         }
-    }
+    },
+    /**
+     * The distance between nodes in a tree graph in the longitudinal direction.
+     * The longitudinal direction means the direction that the chart flows - in
+     * a horizontal chart the distance is horizontal, in an inverted chart
+     * (vertical), the distance is vertical.
+     *
+     * If a number is given, it denotes pixels. If a percentage string is given,
+     * the distance is a percentage of the rendered node width. A `nodeDistance`
+     * of `100%` will render equal widths for the nodes and the gaps between
+     * them.
+     *
+     * This option applies only when the `nodeWidth` option is `auto`, making
+     * the node width respond to the number of columns.
+     *
+     * @since 11.4.0
+     * @sample highcharts/series-treegraph/node-distance
+     *         Node distance of 100% means equal to node width
+     * @type   {number|string}
+     */
+    nodeDistance: 30,
+
+    /**
+     * The pixel width of each node in a, or the height in case the chart is
+     * inverted. For tree graphs, the node width is only applied if the marker
+     * symbol is `rect`, otherwise the `marker` sizing options apply.
+     *
+     * Can be a number or a percentage string, or `auto`. If `auto`, the nodes
+     * are sized to fill up the plot area in the longitudinal direction,
+     * regardless of the number of levels.
+     *
+     * @since 11.4.0
+     * @see    [treegraph.nodeDistance](#nodeDistance)
+     * @sample highcharts/series-treegraph/node-distance
+     *         Node width is auto and combined with node distance
+     *
+     * @type {number|string}
+     */
+    nodeWidth: void 0
 } as TreegraphSeriesOptions;
+
+/* *
+ *
+ *  Default Export
+ *
+ * */
 
 export default TreegraphSeriesDefaults;

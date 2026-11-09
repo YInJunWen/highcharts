@@ -1,6 +1,7 @@
 /* *
  *
- *  (c) 2009-2021 Øystein Moseng
+ *  (c) 2009-2026 Highsoft AS
+ *  Author: Øystein Moseng
  *
  *  Proxy elements are used to shadow SVG elements in HTML for assistive
  *  technology, such as screen readers or voice input software.
@@ -8,9 +9,10 @@
  *  The ProxyProvider keeps track of all proxy elements of the a11y module,
  *  and updating their order and positioning.
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -29,21 +31,16 @@ import type { NullableHTMLAttributes } from './ProxyElement';
 
 import H from '../Core/Globals.js';
 const { doc } = H;
-import U from '../Core/Utilities.js';
-const {
-    attr,
-    css
-} = U;
 
 import CU from './Utils/ChartUtilities.js';
 const { unhideChartElementFromAT } = CU;
 import DOMElementProvider from './Utils/DOMElementProvider.js';
 import HU from './Utils/HTMLUtilities.js';
 const {
-    removeElement,
     removeChildNodes
 } = HU;
 import ProxyElement from './ProxyElement.js';
+import { attr, css } from '../Shared/Utilities.js';
 
 
 /**
@@ -52,10 +49,11 @@ import ProxyElement from './ProxyElement.js';
  *
  * */
 
+/** @internal */
 interface ProxyGroup {
     proxyContainerElement: HTMLDOMElement;
     groupElement: HTMLDOMElement;
-    type: ProxyElement.GroupType;
+    type: keyof HTMLElementTagNameMap;
     proxyElements: ProxyElement[];
 }
 
@@ -69,8 +67,9 @@ interface ProxyGroup {
 /**
  * Keeps track of all proxy elements and proxy groups.
  *
- * @private
  * @class
+ *
+ * @internal
  */
 class ProxyProvider {
 
@@ -121,6 +120,7 @@ class ProxyProvider {
     public addProxyElement(
         groupKey: string,
         target: ProxyElement.Target,
+        proxyElementType: keyof HTMLElementTagNameMap = 'button',
         attributes?: NullableHTMLAttributes
     ): ProxyElement {
         const group = this.groups[groupKey];
@@ -128,7 +128,12 @@ class ProxyProvider {
             throw new Error('ProxyProvider.addProxyElement: Invalid group key ' + groupKey);
         }
 
-        const proxy = new ProxyElement(this.chart, target, group.type, attributes);
+        const wrapperElementType = group.type === 'ul' || group.type === 'ol' ?
+                'li' : void 0,
+            proxy = new ProxyElement(
+                this.chart, target, proxyElementType,
+                wrapperElementType, attributes
+            );
 
         group.proxyContainerElement.appendChild(proxy.element);
         group.proxyElements.push(proxy);
@@ -140,12 +145,12 @@ class ProxyProvider {
     /**
      * Create a group that will contain proxy elements. The group order is
      * automatically updated according to the last group order keys.
-     * 
+     *
      * Returns the added group.
      */
     public addGroup(
         groupKey: string,
-        groupType: ProxyElement.GroupType,
+        groupElementType: keyof HTMLElementTagNameMap = 'div',
         attributes?: HTMLAttributes
     ): HTMLElement {
         const existingGroup = this.groups[groupKey];
@@ -153,12 +158,14 @@ class ProxyProvider {
             return existingGroup.groupElement;
         }
 
-        const proxyContainer = this.domElementProvider.createElement(groupType);
+        const proxyContainer = this.domElementProvider
+            .createElement(groupElementType);
 
         // If we want to add a role to the group, and still use e.g.
-        // a list group, we need a wrapper div.
+        // a list group, we need a wrapper div around the proxyContainer.
+        // Used for setting region role on legend.
         let groupElement;
-        if (attributes && attributes.role && groupType !== 'div') {
+        if (attributes && attributes.role && groupElementType !== 'div') {
             groupElement = this.domElementProvider.createElement('div');
             groupElement.appendChild(proxyContainer);
         } else {
@@ -171,13 +178,13 @@ class ProxyProvider {
         this.groups[groupKey] = {
             proxyContainerElement: proxyContainer,
             groupElement,
-            type: groupType,
+            type: groupElementType,
             proxyElements: []
         };
 
         attr(groupElement, attributes || {});
 
-        if (groupType === 'ul') {
+        if (groupElementType === 'ul') {
             proxyContainer.setAttribute('role', 'list'); // Needed for webkit
         }
 
@@ -280,7 +287,13 @@ class ProxyProvider {
     public removeGroup(groupKey: string): void {
         const group = this.groups[groupKey];
         if (group) {
-            removeElement(group.groupElement);
+            // Remove detached HTML elements to prevent memory leak (#20329).
+            this.domElementProvider.removeElement(group.groupElement);
+            // Sometimes groupElement is a wrapper around the proxyContainer, so
+            // the real one proxyContainer needs to be removed also.
+            if (group.groupElement !== group.proxyContainerElement) {
+                this.domElementProvider.removeElement(group.proxyContainerElement);
+            }
             delete this.groups[groupKey];
         }
     }
@@ -335,15 +348,14 @@ class ProxyProvider {
         const el = this.domElementProvider.createElement('div');
         el.setAttribute('aria-hidden', 'false');
         el.className = 'highcharts-a11y-proxy-container' + (classNamePostfix ? '-' + classNamePostfix : '');
+        // Position inline so the container stays out of flow even when
+        // `highcharts.css` is missing in styled mode
         css(el, {
+            position: 'absolute',
             top: '0',
-            left: '0'
+            left: '0',
+            whiteSpace: 'nowrap'
         });
-
-        if (!this.chart.styledMode) {
-            el.style.whiteSpace = 'nowrap';
-            el.style.position = 'absolute';
-        }
 
         return el;
     }
@@ -413,7 +425,7 @@ class ProxyProvider {
 
         // If exporting, don't add these containers to the DOM.
         if (chart.renderer.forExport) {
-            return; 
+            return;
         }
 
         const rendererSVGEl = chart.renderer.box;
@@ -436,4 +448,5 @@ class ProxyProvider {
  *
  * */
 
+/** @internal */
 export default ProxyProvider;

@@ -20,7 +20,7 @@ QUnit.test('Set basemap on chart object', function (assert) {
     });
 
     const series = chart.series[0],
-        nullColor = Highcharts.seriesTypes.map.defaultOptions.nullColor;
+        nullColor = Highcharts.Series.types.map.defaultOptions.nullColor;
 
     assert.strictEqual(
         series.mapData.length,
@@ -40,7 +40,7 @@ QUnit.test('Set basemap on chart object', function (assert) {
     );
 
     series.update({
-        data: [{ 'hc-key': 'ad-6407' }, { 'hc-key': 'ad-6406', value: null }],
+        data: [{ 'hc-key': 'ad-07' }, { 'hc-key': 'ad-06', value: null }],
         mapData: Highcharts.maps['countries/ad/ad-all']
     });
 
@@ -54,13 +54,13 @@ QUnit.test('Set basemap on chart object', function (assert) {
     assert.strictEqual(
         series.points[0].graphic.attr('fill'),
         series.color,
-        `undefined value is allowed, so the point should be colored, #17279.`
+        'undefined value is allowed, so the point should be colored, #17279.'
     );
 
     assert.strictEqual(
         series.points[1].graphic.attr('fill'),
         nullColor,
-        `Data point with null value should not be colored, #17279.`
+        'Data point with null value should not be colored, #17279.'
     );
 
     series.update({
@@ -102,7 +102,6 @@ QUnit.test('Set basemap on chart object', function (assert) {
         `The first point from a map source should be bn-te, its name should
         be taken from a map source.`
     );
-
     chart.series[0].setData(
         [{
             'hc-key': 'bn-be',

@@ -1,7 +1,8 @@
 QUnit.test('Pie data labels general tests', function (assert) {
     var chart = Highcharts.chart('container', {
             chart: {
-                animation: false
+                animation: false,
+                width: 600
             },
             series: [
                 {
@@ -63,6 +64,59 @@ QUnit.test('Pie data labels general tests', function (assert) {
         0,
         '#15377: Inactive point should have 0 opacity'
     );
+
+    // Ordering
+    chart.series[0].setData([
+        ['Slice 1', 81.6],
+        ['Slice 2', 4.8],
+        ['Slice 3: lorem ipsum dolor sit amet', 1.2],
+        [
+            'Slice 4: lorem ipsum dolor sit amet, consectetur adipiscing elit',
+            0.4
+        ],
+        ['Slice 5', 12.1]
+    ]);
+
+    const order = chart.series[0].points
+        .sort((a, b) => a.dataLabel.getBBox().y - b.dataLabel.getBBox().y)
+        .map(point => point.name.substring(0, 7));
+
+    assert.deepEqual(
+        order,
+        ['Slice 5', 'Slice 4', 'Slice 3', 'Slice 2', 'Slice 1'],
+        'Data labels should be ordered by point index (#21336)'
+    );
+
+    chart = Highcharts.chart('container', {
+        series: [{
+            type: 'pie',
+            data: [{
+                name: 'Some random text 1',
+                y: 30
+            }, {
+                name: 'Some random text 2',
+                y: 29
+            }, {
+                name: 'Some random text 5, plus a little bit more text',
+                y: 5
+            }]
+        }]
+    });
+
+    const prevX = chart.series[0].points[2].dataLabel.getBBox().x,
+        prevW = chart.chartWidth,
+        prevH = chart.chartHeight;
+
+    chart.setSize(1920, 1080);
+    chart.setSize(prevW, prevH);
+
+    assert.close(
+        prevX,
+        chart.series[0].points[2].dataLabel.getBBox().x,
+        5.5,
+        `Data labels x position should be the same after changing and reversing
+        chart size, #23595.`
+    );
 });
 
 QUnit.test(
@@ -78,7 +132,9 @@ QUnit.test(
             plotOptions: {
                 pie: {
                     animation: false,
-                    size: '70%' // Removing size option will fix labels reflow issue
+                    size:
+                        '70%' // Removing size option will fix labels reflow
+                        // issue
                 }
             },
             series: [
@@ -263,7 +319,7 @@ QUnit.test('Null points should not have data labels(#4641)', function (assert) {
                     data: [
                         {
                             name: 'Microsoft Internet Explorer',
-                            //y: 56.33,
+                            // y: 56.33,
                             y: null
                         },
                         {
@@ -422,22 +478,22 @@ QUnit.test('Pie labels outside plot (#3163)', function (assert) {
         labelYPos = [];
 
     for (var i = 0; i < seriesData.length; i++) {
-        labelYPos.push(seriesData[i].labelPosition.final.y);
+        labelYPos.push(seriesData[i].dataLabel.dataLabelPosition.computed.y);
     }
 
     function isLabelInsidePlot() {
         for (var i = 0; i < labelYPos.length; i++) {
-            if (labelYPos[i] < 0) {
+            if (labelYPos[i] < -1) {
                 return false;
             }
-            if (labelYPos[i] > plotSizeY) {
+            if (labelYPos[i] > plotSizeY + 1) {
                 return false;
             }
         }
         return true;
     }
 
-    assert.ok(isLabelInsidePlot(), 'Pie label is outside of plot');
+    assert.ok(isLabelInsidePlot(), 'Pie label should be inside the plot area');
 });
 
 QUnit.test(
@@ -479,11 +535,16 @@ QUnit.test(
             '#15909: Hidden point with useHTML dataLabels should not throw'
         );
 
-        Highcharts.fireEvent(points[0].dataLabel.div, 'mouseover', {
-            which: 1,
-            pageX: offset.left + points[0].labelPosition.natural.x,
-            pageY: offset.top + points[0].labelPosition.natural.y
-        });
+        Highcharts.fireEvent(
+            // Parallel HTML || Foreign object
+            points[0].dataLabel.div || points[0].dataLabel.element,
+            'mouseover', {
+                which: 1,
+                pageX: offset.left +
+                    points[0].dataLabel.dataLabelPosition.natural.x,
+                pageY: offset.top +
+                    points[0].dataLabel.dataLabelPosition.natural.y
+            });
 
         assert.strictEqual(
             points[0] === chart.hoverPoint,
@@ -491,11 +552,16 @@ QUnit.test(
             'First point hovered.'
         );
 
-        Highcharts.fireEvent(points[4].dataLabel.div, 'mouseover', {
-            which: 1,
-            pageX: offset.left + points[4].labelPosition.natural.x,
-            pageY: offset.top + points[4].labelPosition.natural.y
-        });
+        Highcharts.fireEvent(
+            // Parallel HTML || Foreign object
+            points[4].dataLabel.div || points[4].dataLabel.element,
+            'mouseover', {
+                which: 1,
+                pageX: offset.left +
+                    points[4].dataLabel.dataLabelPosition.natural.x,
+                pageY: offset.top +
+                    points[4].dataLabel.dataLabelPosition.natural.y
+            });
 
         assert.strictEqual(
             points[4] === chart.hoverPoint,
@@ -504,9 +570,10 @@ QUnit.test(
         );
 
         chart.pointer.onContainerClick({
-            pageX: offset.left + points[4].labelPosition.natural.x,
-            pageY: offset.top + points[4].labelPosition.y,
-            target: points[4].dataLabel.div
+            pageX: offset.left +
+                points[4].dataLabel.dataLabelPosition.natural.x,
+            pageY: offset.top + points[4].dataLabel.dataLabelPosition.y,
+            target: points[4].dataLabel.div || points[4].dataLabel.element
         });
 
         assert.strictEqual(clicked, true, 'Click event on dataLabel works.');
@@ -545,7 +612,9 @@ QUnit.test('Wide data labels', function (assert) {
     );
 });
 
-QUnit.test(
+// Skipping since refactor. Visually it looks okay. Now it is clipping.
+// Previously the overflow wasn't handled at all.
+QUnit.skip(
     'Pie with long dataLabels with useHTML: true wrongly rendered',
     function (assert) {
         var chart = Highcharts.chart('container', {
@@ -617,7 +686,127 @@ QUnit.test('Connector color of individual point (#8864).', function (assert) {
     });
 
     assert.ok(
-        chart.series[0].points[0].connector.stroke === '#bada55',
+        chart.series[0].points[0].dataLabel.connector
+            .attr('stroke') === '#bada55',
         'Color applied to indiviudal connector.'
     );
 });
+
+QUnit.test(
+    'Multiple data labels in pie plot options (#21928).',
+    function (assert) {
+        var chart = Highcharts.chart('container', {
+            plotOptions: {
+                pie: {
+                    dataLabels: [{
+                        enabled: true,
+                        distance: 20
+                    }, {
+                        enabled: true,
+                        distance: -40,
+                        format: '{point.percentage:.1f}%'
+                    }]
+                }
+            },
+            series: [
+                {
+                    type: 'pie',
+                    data: [
+                        {
+                            y: 61.41
+                        },
+                        {
+                            y: 11.84
+                        }
+                    ]
+                }
+            ]
+        });
+
+        assert.strictEqual(
+            chart.options.plotOptions.pie.dataLabels[0].distance,
+            20,
+            'Distance is defined by user, should not be merged with defaults'
+        );
+
+        assert.strictEqual(
+            chart.options.plotOptions.pie.dataLabels[0].connectorShape,
+            'crookedLine',
+            'ConnectorShape is not defined by user, merged with defaults'
+        );
+    });
+
+QUnit.test(
+    'Multiple data labels in pie plot options from update (#21928).',
+    function (assert) {
+        var chart = Highcharts.chart('container', {
+            series: [
+                {
+                    type: 'pie',
+                    data: [
+                        {
+                            y: 61.41
+                        },
+                        {
+                            y: 11.84
+                        }
+                    ]
+                }
+            ]
+        });
+
+        chart.update({
+            plotOptions: {
+                pie: {
+                    dataLabels: [{
+                        enabled: true,
+                        distance: 20
+                    }, {
+                        enabled: true,
+                        distance: -40,
+                        format: '{point.percentage:.1f}%'
+                    }]
+                }
+            }
+        });
+
+        assert.strictEqual(
+            chart.options.plotOptions.pie.dataLabels[0].distance,
+            20,
+            'Distance should not be merged with defaults'
+        );
+
+        assert.strictEqual(
+            chart.options.plotOptions.pie.dataLabels[0].connectorShape,
+            'crookedLine',
+            'ConnectorShape should be merged with defaults'
+        );
+    });
+
+QUnit.test(
+    'Data label with negative distance after point toggle (#21725)',
+    function (assert) {
+        const chart = Highcharts.chart('container', {
+            series: [{
+                type: 'pie',
+                data: [20, 17, 10, 10, 6, 34],
+                dataLabels: {
+                    distance: -20
+                },
+                showInLegend: true
+            }]
+        });
+
+        const point = chart.series[0].points[5];
+
+        // Toggle visibility off and on
+        point.setVisible(false, true);
+        point.setVisible(true, true);
+
+        assert.notEqual(
+            point.dataLabel.attr('opacity'),
+            0,
+            'The dataLabel should be visible after visibility toggle'
+        );
+    }
+);

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: LicenseRef-Highcharts
 /**
  * @license Highcharts JS v@product.version@ (@product.date@)
  * @module highcharts/modules/networkgraph
@@ -5,12 +6,15 @@
  *
  * Force directed graph module
  *
- * (c) 2010-2021 Torstein Honsi
+ * (c) 2010-2026 Highsoft AS
+ * Author: Torstein Hønsi
  *
- * License: www.highcharts.com/license
+ * A commercial license may be required depending on use,
+ * see www.highcharts.com/license
  */
 'use strict';
 import Highcharts from '../../Core/Globals.js';
 import NetworkgraphSeries from '../../Series/Networkgraph/NetworkgraphSeries.js';
 const G: AnyRecord = Highcharts;
 NetworkgraphSeries.compose(G.Chart);
+export default Highcharts;

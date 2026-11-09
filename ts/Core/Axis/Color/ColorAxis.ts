@@ -1,10 +1,12 @@
 /* *
  *
- *  (c) 2010-2021 Torstein Honsi
+ *  (c) 2010-2026 Highsoft AS
+ *  Author: Torstein Hønsi
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -16,39 +18,39 @@
  *
  * */
 
-import type AnimationOptions from '../../Animation/AnimationOptions';
-import type AxisLike from '../AxisLike';
-import type AxisOptions from '../AxisOptions';
-import type Chart from '../../Chart/Chart.js';
-import type ColorString from '../../Color/ColorString';
-import type ColorType from '../../Color/ColorType';
+import type Chart from '../../Chart/Chart';
+import type {
+    ColorAxisDataClassOptions,
+    ColorAxisOptions
+} from './ColorAxisOptions';
+import type { DeepPartial } from '../../../Shared/Types';
 import type Fx from '../../Animation/Fx';
 import type GradientColor from '../../Color/GradientColor';
-import type LegendOptions from '../../Legend/LegendOptions';
-import type Point from '../../Series/Point.js';
+import type Legend from '../../Legend/Legend';
+import type { LegendItemObject } from '../../Legend/LegendItem';
+import type Point from '../../Series/Point';
 import type PointerEvent from '../../PointerEvent';
 import type { StatesOptionsKey } from '../../Series/StatesOptions';
-import type SVGElement from '../../Renderer/SVG/SVGElement';
 import type SVGPath from '../../Renderer/SVG/SVGPath';
+import type SVGElement from '../../Renderer/SVG/SVGElement';
+import type PositionObject from '../../Renderer/PositionObject';
 
 import Axis from '../Axis.js';
-import Color from '../../Color/Color.js';
-const { parse: color } = Color;
+import ColorAxisBase from './ColorAxisBase.js';
 import ColorAxisComposition from './ColorAxisComposition.js';
 import ColorAxisDefaults from './ColorAxisDefaults.js';
-import H from '../../Globals.js';
-const { noop } = H;
-import Legend from '../../Legend/Legend.js';
-import LegendSymbol from '../../Legend/LegendSymbol.js';
-import SeriesRegistry from '../../Series/SeriesRegistry.js';
-const { series: Series } = SeriesRegistry;
-import U from '../../Utilities.js';
-const {
+import D from '../../Defaults.js';
+const { defaultOptions } = D;
+import Series from '../../Series/Series.js';
+import {
+    defined,
     extend,
+    fireEvent,
+    isArray,
     isNumber,
     merge,
-    pick
-} = U;
+    relativeLength
+} from '../../../Shared/Utilities.js';
 
 /* *
  *
@@ -56,15 +58,15 @@ const {
  *
  * */
 
-declare module '../../Axis/AxisLike' {
-    interface AxisLike {
+declare module '../../Axis/AxisBase' {
+    interface AxisBase {
         labelLeft?: number;
         labelRight?: number;
     }
 }
 
-declare module '../../Chart/ChartLike' {
-    interface ChartLike {
+declare module '../../Chart/ChartBase' {
+    interface ChartBase {
         colorAxis?: Array<ColorAxis>;
     }
 }
@@ -72,20 +74,20 @@ declare module '../../Chart/ChartLike' {
 declare module '../../../Core/Options'{
     interface Options {
         colorAxis?: (
-            DeepPartial<ColorAxis.Options>|
-            Array<DeepPartial<ColorAxis.Options>>
+            DeepPartial<ColorAxisOptions>|
+            Array<DeepPartial<ColorAxisOptions>>
         );
     }
 }
 
-declare module '../../Series/PointLike' {
-    interface PointLike {
+declare module '../../Series/PointBase' {
+    interface PointBase {
         dataClass?: number;
     }
 }
 
-declare module '../../Series/SeriesLike' {
-    interface SeriesLike {
+declare module '../../Series/SeriesBase' {
+    interface SeriesBase {
         axisTypes?: Array<string>;
         colorAxis?: ColorAxis;
         colorKey?: string;
@@ -94,19 +96,13 @@ declare module '../../Series/SeriesLike' {
     }
 }
 
-declare module '../../Series/SeriesOptions' {
-    interface SeriesOptions {
-        colorKey?: string;
-    }
-}
+defaultOptions.colorAxis = merge(defaultOptions.xAxis, ColorAxisDefaults);
 
 /* *
  *
  *  Class
  *
  * */
-
-/* eslint-disable no-invalid-this, valid-jsdoc */
 
 /**
  * The ColorAxis object for inclusion in gradient legends.
@@ -121,7 +117,7 @@ declare module '../../Series/SeriesOptions' {
  * @param {Highcharts.ColorAxisOptions} userOptions
  * The color axis options for initialization.
  */
-class ColorAxis extends Axis implements AxisLike {
+class ColorAxis extends Axis implements ColorAxisBase {
 
     /* *
      *
@@ -129,20 +125,9 @@ class ColorAxis extends Axis implements AxisLike {
      *
      * */
 
-    public static defaultColorAxisOptions = ColorAxisDefaults;
 
+    /** @internal */
     public static defaultLegendLength: number = 200;
-
-    /**
-     * @private
-     */
-    public static keepProps: Array<string> = [
-        'legendGroup',
-        'legendItemHeight',
-        'legendItemWidth',
-        'legendItem',
-        'legendSymbol'
-    ];
 
     /* *
      *
@@ -150,6 +135,8 @@ class ColorAxis extends Axis implements AxisLike {
      *
      * */
 
+
+    /** @internal */
     public static compose(
         ChartClass: typeof Chart,
         FxClass: typeof Fx,
@@ -171,12 +158,10 @@ class ColorAxis extends Axis implements AxisLike {
      *
      * */
 
-    /**
-     * @private
-     */
+    /** @internal */
     public constructor(
         chart: Chart,
-        userOptions: DeepPartial<ColorAxis.Options>
+        userOptions: Partial<ColorAxisOptions>
     ) {
         super(chart, userOptions);
         this.init(chart, userOptions);
@@ -188,22 +173,38 @@ class ColorAxis extends Axis implements AxisLike {
      *
      * */
 
+
+    /** @internal */
     public added?: boolean;
-    // Prevents unnecessary padding with `hc-more`
-    public beforePadding = false as any;
-    public chart: Chart = void 0 as any;
-    public coll: 'colorAxis' = 'colorAxis';
-    public dataClasses: Array<ColorAxis.DataClassesOptions> = void 0 as any;
+
+    /** @internal */
+    public chart!: Chart;
+
+    /** @internal */
+    public clippable = false;
+
+    /** @internal */
+    public coll = 'colorAxis' as const;
+
+    /** @internal */
+    public dataClasses?: Array<ColorAxisDataClassOptions>;
+
+    /** @internal */
     public legendColor?: GradientColor;
-    public legendGroup?: SVGElement;
-    public legendItemHeight?: number;
-    public legendItem: ColorAxis.LegendItemObject = void 0 as any;
-    public legendItems: Array<ColorAxis.LegendItemObject> = void 0 as any;
-    public legendItemWidth?: number;
-    public legendSymbol?: SVGElement;
-    public name: string = ''; // Prevents 'undefined' in legend in IE8
-    public options: ColorAxis.Options = void 0 as any;
-    public stops: GradientColor['stops'] = void 0 as any;
+
+    /** @internal */
+    public legendItem?: LegendItemObject;
+
+    /** @internal */
+    public name?: string;
+
+    /** @internal */
+    public options!: ColorAxisOptions;
+
+    /** @internal */
+    public stops!: GradientColor['stops'];
+
+    /** @internal */
     public visible: boolean = true;
 
     /* *
@@ -225,97 +226,39 @@ class ColorAxis extends Axis implements AxisLike {
      */
     public init(
         chart: Chart,
-        userOptions: DeepPartial<ColorAxis.Options>
+        userOptions: Partial<ColorAxisOptions>
     ): void {
         const axis = this;
-        const legend = chart.options.legend || {},
-            horiz = userOptions.layout ?
-                userOptions.layout !== 'vertical' :
-                legend.layout !== 'vertical',
-            visible = userOptions.visible;
+        const horiz = userOptions.layout ?
+            userOptions.layout !== 'vertical' :
+            chart.options.legend?.layout !== 'vertical';
 
-        const options = merge(
-            ColorAxis.defaultColorAxisOptions,
-            userOptions,
-            {
-                showEmpty: false,
-                title: null,
-                visible: legend.enabled && visible !== false
-            }
-        );
-
-        axis.coll = 'colorAxis';
-        axis.side = userOptions.side || horiz ? 2 : 1;
-        axis.reversed = userOptions.reversed || !horiz;
+        axis.reversed = userOptions.reversed;
         axis.opposite = !horiz;
 
-        super.init(chart, options);
+        super.init(chart, userOptions, 'colorAxis');
 
-        // #16053: Restore the actual userOptions.visible so the color axis
-        // doesnt stay hidden forever when hiding and showing legend
-        axis.userOptions.visible = visible;
+        axis.side = userOptions.side || horiz ? 2 : 1;
 
-        // Base init() pushes it to the xAxis array, now pop it again
-        // chart[this.isXAxis ? 'xAxis' : 'yAxis'].pop();
+
+        // `super.init` saves the extended user options, now replace it with the
+        // originals
+        this.userOptions = userOptions;
+        if (isArray(chart.userOptions.colorAxis)) {
+            chart.userOptions.colorAxis[this.index] = userOptions;
+        }
 
         // Prepare data classes
         if (userOptions.dataClasses) {
             axis.initDataClasses(userOptions);
+        } else {
+            delete axis.dataClasses;
         }
         axis.initStops();
 
         // Override original axis properties
         axis.horiz = horiz;
         axis.zoomEnabled = false;
-    }
-
-    /**
-     * @private
-     */
-    public initDataClasses(userOptions: DeepPartial<ColorAxis.Options>): void {
-        const axis = this,
-            chart = axis.chart,
-            options = axis.options,
-            len = (userOptions.dataClasses as any).length;
-
-        let dataClasses,
-            colorCounter = 0,
-            colorCount = chart.options.chart.colorCount;
-
-        axis.dataClasses = dataClasses = [] as Array<ColorAxis.DataClassesOptions>;
-        axis.legendItems = [] as Array<ColorAxis.LegendItemObject>;
-
-        (userOptions.dataClasses || []).forEach(function (dataClass, i): void {
-            let colors: any;
-
-            dataClass = merge(dataClass);
-            dataClasses.push(dataClass);
-
-            if (!chart.styledMode && dataClass.color) {
-                return;
-            }
-
-            if (options.dataClassColor === 'category') {
-                if (!chart.styledMode) {
-                    colors = chart.options.colors;
-                    colorCount = colors.length;
-                    dataClass.color = colors[colorCounter];
-                }
-
-                dataClass.colorIndex = colorCounter;
-
-                // increase and loop back to zero
-                colorCounter++;
-                if (colorCounter === colorCount) {
-                    colorCounter = 0;
-                }
-            } else {
-                dataClass.color = color(options.minColor).tweenTo(
-                    color(options.maxColor),
-                    len < 2 ? 0.5 : i / (len - 1) // #3219
-                );
-            }
-        });
     }
 
     /**
@@ -332,7 +275,7 @@ class ColorAxis extends Axis implements AxisLike {
 
     /**
      * Override so that ticks are not added in data class axes (#6914)
-     * @private
+     * @internal
      */
     public setTickPositions(): void {
         if (!this.dataClasses) {
@@ -341,165 +284,98 @@ class ColorAxis extends Axis implements AxisLike {
     }
 
     /**
-     * @private
+     * Extend the setOptions method to process title, extreme colors and
+     * color stops.
+     * @internal
      */
-    public initStops(): void {
-        const axis = this;
+    public setOptions(userOptions: DeepPartial<ColorAxisOptions>): void {
+        const legend = this.chart.options.legend,
+            theme = defaultOptions.colorAxis as ColorAxisOptions,
+            layout = userOptions.layout || legend?.layout || theme.layout,
+            horiz = layout !== 'vertical';
 
-        axis.stops = axis.options.stops || [
-            [0, axis.options.minColor as any],
-            [1, axis.options.maxColor as any]
-        ];
-        axis.stops.forEach(function (
-            stop: GradientColor['stops'][0]
-        ): void {
-            stop.color = color(stop[1]);
-        });
-    }
+        const sideSpecific = horiz ? { title: { rotation: 0 } } :
+            {
+                title: {
+                    rotation: 90,
+                    margin: 10
+                }
+            };
 
-    /**
-     * Extend the setOptions method to process extreme colors and color stops.
-     * @private
-     */
-    public setOptions(userOptions: DeepPartial<ColorAxis.Options>): void {
-        const axis = this;
+        const options = merge(
+            sideSpecific,
+            theme,
+            userOptions,
+            // Forced options
+            {
+                showEmpty: false,
+                visible: legend?.enabled &&
+                    userOptions.visible !== false
+            }
+        );
 
-        super.setOptions(userOptions);
+        const marker = options.marker || {};
 
-        axis.options.crosshair = axis.options.marker;
-    }
+        super.setOptions(options);
 
-    /**
-     * @private
-     */
-    public setAxisSize(): void {
-        const axis = this;
-        const symbol = axis.legendSymbol;
-        const chart = axis.chart;
-        const legendOptions = chart.options.legend || {};
-
-        let x,
-            y,
-            width,
-            height;
-
-        if (symbol) {
-            this.left = x = symbol.attr('x') as any;
-            this.top = y = symbol.attr('y') as any;
-            this.width = width = symbol.attr('width') as any;
-            this.height = height = symbol.attr('height') as any;
-            this.right = chart.chartWidth - x - width;
-            this.bottom = chart.chartHeight - y - height;
-
-            this.len = this.horiz ? width : height;
-            this.pos = this.horiz ? x : y;
-        } else {
-            // Fake length for disabled legend to avoid tick issues
-            // and such (#5205)
-            this.len = (
-                this.horiz ?
-                    legendOptions.symbolWidth :
-                    legendOptions.symbolHeight
-            ) || ColorAxis.defaultLegendLength;
-        }
-    }
-
-    /**
-     * @private
-     */
-    public normalizedValue(value: number): number {
-        const axis = this;
-
-        if (axis.logarithmic) {
-            value = axis.logarithmic.log2lin(value);
-        }
-
-        return 1 - (
-            ((axis.max as any) - value) /
-            (((axis.max as any) - (axis.min as any)) || 1)
+        // Translate marker options to crosshair options
+        this.options.crosshair = merge(
+            marker, {
+                color: marker.lineColor,
+                width: marker.lineWidth
+            }
         );
     }
 
     /**
-     * Translate from a value to a color.
-     * @private
+     * Set the axis sizing properties based on the legend symbol
+     * @internal
      */
-    public toColor(value: number, point: Point): (ColorType|undefined) {
-        const axis = this;
-        const dataClasses = axis.dataClasses;
-        const stops = axis.stops;
+    public setAxisSize(): void {
+        const axis = this,
+            chart = axis.chart,
+            bBox = axis.legendItem?.symbolBBox;
 
-        let pos,
-            from,
-            to,
-            color: (ColorString|undefined),
-            dataClass,
-            i;
+        let {
+            width,
+            height
+        } = axis.getSize();
 
-        if (dataClasses) {
-            i = dataClasses.length;
-            while (i--) {
-                dataClass = dataClasses[i];
-                from = dataClass.from;
-                to = dataClass.to;
-                if ((typeof from === 'undefined' || value >= from) &&
-                    (typeof to === 'undefined' || value <= to)
-                ) {
-
-                    color = dataClass.color as any;
-
-                    if (point) {
-                        point.dataClass = i;
-                        point.colorIndex = dataClass.colorIndex as any;
-                    }
-                    break;
-                }
-            }
-
-        } else {
-
-            pos = axis.normalizedValue(value);
-            i = stops.length;
-            while (i--) {
-                if (pos > stops[i][0]) {
-                    break;
-                }
-            }
-            from = stops[i] || stops[i + 1];
-            to = stops[i + 1] || from;
-
-            // The position within the gradient
-            pos = 1 - (to[0] - pos) / ((to[0] - from[0]) || 1);
-
-            color = (from.color as any).tweenTo(
-                to.color,
-                pos
-            );
+        if (bBox) {
+            this.left = bBox.x;
+            this.top = bBox.y;
         }
+        this.width = width = bBox?.width ?? width;
+        this.height = height = bBox?.height ?? height;
+        this.right = chart.chartWidth - this.left - width;
+        this.bottom = chart.chartHeight - this.top - height;
+        this.pos = this.horiz ? this.left : this.top;
 
-        return color;
+        // Fake length for disabled legend to avoid tick issues
+        // and such (#5205)
+        this.len = (this.horiz ? width : height) ||
+            ColorAxis.defaultLegendLength;
     }
 
     /**
      * Override the getOffset method to add the whole axis groups inside the
      * legend.
-     * @private
+     * @internal
      */
     public getOffset(): void {
-        const axis = this;
-        const group = axis.legendGroup;
-        const sideOffset = axis.chart.axisOffset[axis.side];
+        const axis = this,
+            chart = axis.chart,
+            group = axis.legendItem?.group,
+            sideOffset = chart.axisOffset[axis.side],
+            { clipOffset, legend } = chart;
 
         if (group) {
 
-            // Hook for the getOffset method to add groups to this parent
-            // group
+            // Hook for the getOffset method to add groups to this parent group
             axis.axisParent = group;
 
             // Call the base
             super.getOffset();
-
-            const legend = this.chart.legend;
 
             // Adds `maxLabelLength` needed for label padding corrections done
             // by `render()` and `getMargins()` (#15551).
@@ -510,24 +386,37 @@ class ColorAxis extends Axis implements AxisLike {
             });
 
             legend.render();
-            this.chart.getMargins(true);
+            chart.getMargins(true);
 
             // First time only
             if (!axis.added) {
-
                 axis.added = true;
-
-                axis.labelLeft = 0;
-                axis.labelRight = axis.width;
             }
+
+            axis.labelLeft = 0;
+            axis.labelRight = axis.width;
             // Reset it to avoid color axis reserving space
-            axis.chart.axisOffset[axis.side] = sideOffset;
+            chart.axisOffset[axis.side] = sideOffset;
+            chart.clipOffset = clipOffset;
+        }
+    }
+
+    /**
+     * @internal
+     */
+    public createGroups(): void {
+        const axisParent = this.axisParent;
+        super.createGroups();
+        if (this.axisGroup?.parentGroup !== axisParent) {
+            this.gridGroup?.add(axisParent);
+            this.axisGroup?.add(axisParent);
+            this.labelGroup?.add(axisParent);
         }
     }
 
     /**
      * Create the color gradient.
-     * @private
+     * @internal
      */
     public setLegendColor(): void {
         const axis = this;
@@ -550,62 +439,136 @@ class ColorAxis extends Axis implements AxisLike {
 
     /**
      * The color axis appears inside the legend and has its own legend symbol.
-     * @private
+     * @internal
      */
     public drawLegendSymbol(
         legend: Legend,
         item: ColorAxis
     ): void {
-        const axis = this;
-        const padding = legend.padding;
-        const legendOptions = legend.options;
-        const horiz = axis.horiz;
-        const width = pick(
-            legendOptions.symbolWidth,
-            horiz ? ColorAxis.defaultLegendLength : 12
-        );
-        const height = pick(
-            legendOptions.symbolHeight,
-            horiz ? 12 : ColorAxis.defaultLegendLength
-        );
-        const labelPadding = pick(
-            // @todo: This option is not documented, nor implemented when
-            // vertical
-            (legendOptions as any).labelPadding,
-            horiz ? 16 : 30
-        );
-        const itemDistance = pick(legendOptions.itemDistance, 10);
+        const axis = this,
+            legendItem = item.legendItem || {},
+            padding = legend.padding,
+            legendOptions = legend.options,
+            labelOptions = axis.options.labels,
+            itemDistance = (legendOptions.itemDistance ?? 10),
+            horiz = axis.horiz,
+            {
+                width,
+                height
+            } = axis.getSize(),
+            labelPadding = (legendOptions as any).labelPadding ??
+                (horiz ? 16 : 30);
 
         this.setLegendColor();
 
-        // Create the gradient
-        if (!item.legendSymbol) {
-            item.legendSymbol = this.chart.renderer.rect(
-                0,
-                (legend.baseline as any) - 11,
-                width,
-                height
-            ).attr({
-                zIndex: 1
-            }).add(item.legendGroup);
+        let titleHeight = 0;
+        let titleWidth = 0;
+
+        if (axis.options.title?.text && !axis.axisTitle) {
+            if (!axis.axisGroup) {
+                axis.axisParent = legendItem.group;
+                axis.createGroups();
+            }
+            // --- THE SVG TRANSFORM FIX ---
+            // Provide mock dimensions so getTitlePosition returns valid numbers
+            // on Pass 1. This ensures the rotation transform succeeds, allowing
+            // getBBox() to read the true ROTATED dimensions!
+            const tempLen = axis.len,
+                tempTop = axis.top,
+                tempLeft = axis.left,
+                tempWidth = axis.width;
+
+            axis.len = horiz ? width : height;
+            axis.top = 0;
+            axis.left = 0;
+            axis.width = width;
+
+            axis.addTitle(true);
+
+            // Restore the original undefined values
+            // (setAxisSize will overwrite them later)
+            axis.len = tempLen;
+            axis.top = tempTop;
+            axis.left = tempLeft;
+            axis.width = tempWidth;
+            // -----------------------------
         }
 
+        if (axis.axisTitle) {
+            const titleBBox = axis.axisTitle.getBBox();
+            titleHeight = titleBBox.height;
+            titleWidth = titleBBox.width;
+        }
+
+        const titleOptions = axis.options.title || {},
+            titleMargin = axis.axisTitle ? (titleOptions.margin ?? 0) : 0,
+            yShift = horiz ? (titleHeight + titleMargin) : 0,
+            verb = legendItem.symbol ? 'animate' : 'attr';
+
+        // Create the gradient
+        if (!legendItem.symbol) {
+            legendItem.symbol = this.chart.renderer.symbol('roundedRect')
+                .attr({
+                    r: legendOptions.symbolRadius ?? 3,
+                    zIndex: 1
+                }).add(legendItem.group);
+        }
+
+        legendItem.symbolBBox = {
+            x: 0,
+            y: (legend.baseline || 0) - 11 + yShift,
+            width,
+            height
+        };
+        legendItem.symbol[verb](legendItem.symbolBBox);
+
         // Set how much space this legend item takes up
-        axis.legendItemWidth = (
-            width +
-            padding +
-            (
-                horiz ?
-                    itemDistance :
-                    this.options.labels.x + this.maxLabelLength
-            )
-        );
-        axis.legendItemHeight = height + padding + (horiz ? labelPadding : 0);
+        if (horiz) {
+            legendItem.labelWidth = Math.max(
+                width + padding + itemDistance,
+                titleWidth || 0
+            );
+            legendItem.labelHeight = height + padding + labelPadding +
+            titleHeight + titleMargin;
+        } else {
+            legendItem.labelWidth = width + padding +
+                (labelOptions.x ?? labelOptions.distance ?? 15) +
+                (this.maxLabelLength || 0) +
+                (titleWidth || 0) + titleMargin;
+
+            legendItem.labelHeight = Math.max(
+                height + padding,
+                titleHeight || 0
+            );
+        }
+    }
+
+    /**
+     * Override the title position to place it above the color bar
+     * for horizontal layouts, or outside the labels for vertical layouts.
+     * @internal
+     */
+    public getTitlePosition(axisTitle: SVGElement): PositionObject {
+        // Pass the argument down to the base class
+        const pos = super.getTitlePosition(axisTitle),
+            titleMargin = this.options.title?.margin ?? 0;
+
+        if (this.horiz && axisTitle) {
+            pos.y = this.top - titleMargin;
+        } else if (!this.horiz && axisTitle) {
+            const labelOptions = this.options.labels || {},
+                labelDistance = labelOptions.x ?? labelOptions.distance ?? 0;
+
+            pos.x = this.left + this.width + labelDistance +
+            (this.maxLabelLength || 0) + titleMargin;
+        }
+
+        return pos;
     }
 
     /**
      * Fool the legend.
-     * @private
+     * @internal
      */
     public setState(state?: StatesOptionsKey): void {
         this.series.forEach(function (series): void {
@@ -613,70 +576,45 @@ class ColorAxis extends Axis implements AxisLike {
         });
     }
 
-    /**
-     * @private
-     */
+    /** @internal */
     public setVisible(): void {
     }
 
-    /**
-     * @private
-     */
+    /** @internal */
     public getSeriesExtremes(): void {
         const axis = this;
         const series = axis.series;
 
         let colorValArray,
             colorKey,
-            colorValIndex: any,
-            pointArrayMap,
             calculatedExtremes,
             cSeries,
-            i = series.length,
-            yData,
-            j;
+            i = series.length;
 
         this.dataMin = Infinity;
         this.dataMax = -Infinity;
 
-        while (i--) { // x, y, value, other
+        while (i--) { // X, y, value, other
             cSeries = series[i];
-            colorKey = cSeries.colorKey = pick(
-                cSeries.options.colorKey,
-                cSeries.colorKey,
-                cSeries.pointValKey,
-                cSeries.zoneAxis,
-                'y'
-            );
+            colorKey = cSeries.colorKey =
+                cSeries.options.colorKey ??
+                cSeries.colorKey ??
+                cSeries.pointValKey ??
+                cSeries.zoneAxis ??
+                'y';
 
-            pointArrayMap = cSeries.pointArrayMap;
             calculatedExtremes = (cSeries as any)[colorKey + 'Min'] &&
                 (cSeries as any)[colorKey + 'Max'];
 
-            if ((cSeries as any)[colorKey + 'Data']) {
-                colorValArray = (cSeries as any)[colorKey + 'Data'];
-
-            } else {
-                if (!pointArrayMap) {
-                    colorValArray = cSeries.yData;
-
-                } else {
-                    colorValArray = [];
-                    colorValIndex = pointArrayMap.indexOf(colorKey);
-                    yData = cSeries.yData;
-
-                    if (colorValIndex >= 0 && yData) {
-                        for (j = 0; j < yData.length; j++) {
-                            colorValArray.push(
-                                pick(
-                                    (yData[j] as any)[colorValIndex],
-                                    yData[j]
-                                )
-                            );
-                        }
-                    }
+            // Find the first column that has values
+            for (const key of [colorKey, 'value', 'y']) {
+                colorValArray = cSeries.getColumn(key);
+                if (colorValArray.length) {
+                    break;
                 }
             }
+
+
             // If color key extremes are already calculated, use them.
             if (calculatedExtremes) {
                 cSeries.minColorValue = (cSeries as any)[colorKey + 'Min'];
@@ -692,11 +630,14 @@ class ColorAxis extends Axis implements AxisLike {
                 cSeries.maxColorValue = cExtremes.dataMax;
             }
 
-            if (typeof cSeries.minColorValue !== 'undefined') {
+            if (
+                defined(cSeries.minColorValue) &&
+                defined(cSeries.maxColorValue)
+            ) {
                 this.dataMin =
-                    Math.min(this.dataMin, cSeries.minColorValue as any);
+                    Math.min(this.dataMin, cSeries.minColorValue);
                 this.dataMax =
-                    Math.max(this.dataMax, cSeries.maxColorValue as any);
+                    Math.max(this.dataMax, cSeries.maxColorValue);
             }
 
             if (!calculatedExtremes) {
@@ -724,11 +665,12 @@ class ColorAxis extends Axis implements AxisLike {
         e?: PointerEvent,
         point?: ColorAxisComposition.PointComposition
     ): void {
-        const axis = this;
-        const plotX = point && point.plotX;
-        const plotY = point && point.plotY;
-        const axisPos = axis.pos;
-        const axisLen = axis.len;
+        const axis = this,
+            legendItem = axis.legendItem || {},
+            plotX = point?.plotX,
+            plotY = point?.plotY,
+            axisPos = axis.pos,
+            axisLen = axis.len;
 
         let crossPos;
 
@@ -736,10 +678,10 @@ class ColorAxis extends Axis implements AxisLike {
             crossPos = axis.toPixels(point.getNestedProperty(
                 point.series.colorKey
             ) as number);
-            if (crossPos < (axisPos as any)) {
-                crossPos = (axisPos as any) - 2;
-            } else if (crossPos > (axisPos as any) + axisLen) {
-                crossPos = (axisPos as any) + axisLen + 2;
+            if (crossPos < axisPos) {
+                crossPos = axisPos - 2;
+            } else if (crossPos > axisPos + axisLen) {
+                crossPos = axisPos + axisLen + 2;
             }
 
             point.plotX = crossPos;
@@ -750,42 +692,55 @@ class ColorAxis extends Axis implements AxisLike {
             point.plotX = plotX;
             point.plotY = plotY;
 
-            if (
-                axis.cross &&
-                !axis.cross.addedToColorAxis &&
-                axis.legendGroup
-            ) {
-                axis.cross
-                    .addClass('highcharts-coloraxis-marker')
-                    .add(axis.legendGroup);
-
-                axis.cross.addedToColorAxis = true;
-
+            if (axis.cross && typeof axis.crosshair === 'object') {
                 if (
-                    !axis.chart.styledMode &&
-                    typeof axis.crosshair === 'object'
+                    !axis.cross.addedToColorAxis &&
+                    legendItem.group
                 ) {
-                    axis.cross.attr({
-                        fill: axis.crosshair.color
-                    });
+                    axis.cross
+                        .addClass('highcharts-coloraxis-marker')
+                        .add(legendItem.group);
+
+                    axis.cross.addedToColorAxis = true;
                 }
 
+                if (!axis.chart.styledMode) {
+                    axis.cross.attr({
+                        fill: axis.options.marker?.color
+                    });
+                }
             }
         }
     }
 
-    /**
-     * @private
-     */
-    public getPlotLinePath(options: Axis.PlotLinePathOptions): (SVGPath|null) {
+    /** @internal */
+    public getPlotLinePath(
+        options: Axis.PlotLinePathOptions
+    ): (SVGPath|undefined) {
         const axis = this,
             left = axis.left,
             pos = options.translatedValue,
+            { symbol } = this.options.marker || {},
             top = axis.top;
 
-        // crosshairs only
-        return isNumber(pos) ? // pos can be 0 (#3969)
-            (
+        // Crosshairs only
+        if (isNumber(pos)) {
+
+            if (symbol) {
+                let w = axis.height,
+                    x = pos - w / 2,
+                    y = top;
+
+                if (!axis.horiz) {
+                    w = axis.width;
+                    x = left;
+                    y = pos - w / 2;
+                }
+                return this.chart.renderer.symbols[symbol](x, y, w, w);
+            }
+
+            // Default to a triangle pointing to the value
+            return (
                 axis.horiz ? [
                     ['M', pos - 4, top - 6],
                     ['L', pos + 4, top - 6],
@@ -797,8 +752,10 @@ class ColorAxis extends Axis implements AxisLike {
                     ['L', left - 6, pos - 6],
                     ['Z']
                 ]
-            ) :
-            super.getPlotLinePath(options);
+            );
+        }
+
+        return super.getPlotLinePath(options);
     }
 
     /**
@@ -818,14 +775,14 @@ class ColorAxis extends Axis implements AxisLike {
      * and call {@link Highcharts.Chart#redraw} after.
      */
     public update(
-        newOptions: DeepPartial<ColorAxis.Options>,
+        newOptions: DeepPartial<ColorAxisOptions>,
         redraw?: boolean
     ): void {
         const axis = this,
             chart = axis.chart,
             legend = chart.legend;
 
-        this.series.forEach(function (series): void {
+        this.series.forEach((series): void => {
             // Needed for Axis.update when choropleth colors change
             series.isDirtyData = true;
         });
@@ -836,9 +793,11 @@ class ColorAxis extends Axis implements AxisLike {
             axis.destroyItems();
         }
 
+        delete axis.legendItem?.symbolBBox;
+
         super.update(newOptions, redraw);
 
-        if (axis.legendItem) {
+        if (axis.legendItem?.label) {
             axis.setLegendColor();
             legend.colorizeItem(this as any, true);
         }
@@ -846,30 +805,34 @@ class ColorAxis extends Axis implements AxisLike {
 
     /**
      * Destroy color axis legend items.
-     * @private
+     * @internal
      */
     public destroyItems(): void {
-        const axis = this;
-        const chart = axis.chart;
+        const { chart, legendItem = {} } = this;
 
-        if (axis.legendItem) {
-            chart.legend.destroyItem(axis);
+        if (chart) { // Means axis not destroyed yet
+            if (legendItem.label) {
+                chart.legend.destroyItem(this);
 
-        } else if (axis.legendItems) {
-            axis.legendItems.forEach(function (item): void {
-                chart.legend.destroyItem(item as any);
-            });
+            } else if (legendItem.labels) {
+                for (const item of legendItem.labels) {
+                    chart.legend.destroyItem(item as any);
+                }
+            }
+
+            chart.isDirtyLegend = true;
         }
-
-        chart.isDirtyLegend = true;
     }
 
-    //   Removing the whole axis (#14283)
+    /**
+     * Removing the whole axis (#14283)
+     * @internal
+     */
     public destroy(): void {
         this.chart.isDirtyLegend = true;
 
         this.destroyItems();
-        super.destroy(...[].slice.call(arguments));
+        super.destroy();
     }
 
     /**
@@ -887,20 +850,32 @@ class ColorAxis extends Axis implements AxisLike {
 
     /**
      * Get the legend item symbols for data classes.
-     * @private
+     * @internal
      */
     public getDataClassLegendSymbols(): Array<ColorAxis.LegendItemObject> {
         const axis = this,
             chart = axis.chart,
-            legendItems = axis.legendItems,
+            legendItems = (
+                axis.legendItem &&
+                axis.legendItem.labels as Array<ColorAxis.LegendItemObject> ||
+                []
+            ),
             legendOptions = chart.options.legend,
-            valueDecimals = pick(legendOptions.valueDecimals, -1),
-            valueSuffix = pick(legendOptions.valueSuffix, '');
+            valueDecimals = (legendOptions?.valueDecimals ?? -1),
+            valueSuffix = (legendOptions?.valueSuffix ?? '');
+
+        const getPointsInDataClass = (i: number): Array<Point> =>
+            axis.series.reduce((points, s): Point[] => {
+                points.push(...s.points.filter((point): boolean =>
+                    point.dataClass === i
+                ));
+                return points;
+            }, [] as Point[]);
 
         let name;
 
         if (!legendItems.length) {
-            axis.dataClasses.forEach((dataClass, i): void => {
+            axis.dataClasses?.forEach((dataClass, i): void => {
                 const from = dataClass.from,
                     to = dataClass.to,
                     { numberFormatter } = chart;
@@ -925,29 +900,54 @@ class ColorAxis extends Axis implements AxisLike {
                     name += numberFormatter(to, valueDecimals) + valueSuffix;
                 }
                 // Add a mock object to the legend items
-                legendItems.push(extend(
+                legendItems.push(extend<ColorAxis.LegendItemObject>(
                     {
-                        chart: chart,
-                        name: name,
+                        chart,
+                        name,
                         options: {},
-                        drawLegendSymbol: LegendSymbol.drawRectangle,
+                        drawLegendSymbol: Series.prototype.drawLegendSymbol,
                         visible: true,
-                        setState: noop,
                         isDataClass: true,
+
+                        // Override setState to set either normal or inactive
+                        // state to all points in this data class
+                        setState: (state?: (StatesOptionsKey|'')): void => {
+                            for (const point of getPointsInDataClass(i)) {
+                                point.setState(state);
+                            }
+                        },
+
+                        // Override setState to show or hide all points in this
+                        // data class
                         setVisible: function (
                             this: ColorAxis.LegendItemObject
                         ): void {
                             this.visible = vis = axis.visible = !vis;
-                            axis.series.forEach(function (series): void {
-                                series.points.forEach(function (
-                                    point: Point
-                                ): void {
-                                    if (point.dataClass === i) {
-                                        (point as any).setVisible(vis);
-                                    }
-                                });
-                            });
+                            const affectedSeries: Series[] = [];
+                            for (const point of getPointsInDataClass(i)) {
+                                point.setVisible(vis);
+                                point.hiddenInDataClass = !vis; // #20441
+                                if (
+                                    affectedSeries.indexOf(point.series) === -1
+                                ) {
+                                    affectedSeries.push(point.series);
+                                }
+                            }
                             chart.legend.colorizeItem(this as any, vis);
+
+                            const redraw = vis && this.isDirtyPoints;
+                            affectedSeries.forEach((series): void => {
+                                fireEvent(series, 'afterDataClassLegendClick');
+
+                                // Points hidden in a data class have no
+                                // graphic or data label yet (#25083)
+                                if (redraw) {
+                                    series.isDirty = true;
+                                }
+                            });
+                            if (redraw) {
+                                chart.redraw(false);
+                            }
                         }
                     },
                     dataClass
@@ -957,7 +957,54 @@ class ColorAxis extends Axis implements AxisLike {
         return legendItems;
     }
 
+    /**
+     * Get size of color axis symbol.
+     * @internal
+     */
+    public getSize(): ({
+        width: number,
+        height: number
+    }) {
+        const axis = this,
+            {
+                chart,
+                horiz
+            } = axis,
+            {
+                height: colorAxisHeight,
+                width: colorAxisWidth
+            } = axis.options,
+            {
+                legend: legendOptions
+            } = chart.options,
+            width = defined(colorAxisWidth) ?
+                relativeLength(colorAxisWidth, chart.chartWidth) :
+                (legendOptions?.symbolWidth ??
+                    (horiz ? ColorAxis.defaultLegendLength : 12)),
+            height = defined(colorAxisHeight) ?
+                relativeLength(colorAxisHeight, chart.chartHeight) :
+                (legendOptions?.symbolHeight ??
+                    (horiz ? 12 : ColorAxis.defaultLegendLength));
+
+        return {
+            width,
+            height
+        };
+    }
 }
+
+/* *
+ *
+ *  Class Properties
+ *
+ * */
+
+interface ColorAxis extends ColorAxisBase {
+    coll: 'colorAxis';
+    options: ColorAxisOptions;
+}
+
+extend(ColorAxis.prototype, ColorAxisBase);
 
 /* *
  *
@@ -973,54 +1020,20 @@ namespace ColorAxis {
      *
      * */
 
-    export interface DataClassesOptions {
-        color?: ColorType;
-        colorIndex?: number;
-        from?: number;
-        name?: string;
-        to?: number;
-    }
-
-    export interface LegendItemObject extends DataClassesOptions {
+    export interface LegendItemObject extends ColorAxisDataClassOptions {
         [key: string]: any;
         chart: Chart;
         name: string;
         options: object;
-        drawLegendSymbol: typeof LegendSymbol['drawRectangle'];
+        drawLegendSymbol: Function;
         visible: boolean;
-        setState: Function;
+        setState: Point['setState'];
         isDataClass: true;
-        setVisible: () => void;
-    }
-
-    export interface MarkerOptions {
-        animation?: (boolean|Partial<AnimationOptions>);
-        color?: ColorType;
-        width?: number;
-    }
-
-    export interface Options extends AxisOptions {
-        dataClassColor?: string;
-        dataClasses?: Array<DataClassesOptions>;
-        layout?: string;
-        legend?: LegendOptions;
-        marker?: MarkerOptions;
-        maxColor?: ColorType;
-        minColor?: ColorType;
-        showInLegend?: boolean;
-        stops?: GradientColor['stops'];
+        isDirtyPoints?: boolean;
+        setVisible: Function;
     }
 
 }
-
-/* *
- *
- *  Registry
- *
- * */
-
-// Properties to preserve after destroy, for Axis.update (#5881, #6025).
-Array.prototype.push.apply(Axis.keepProps, ColorAxis.keepProps);
 
 /* *
  *
@@ -1042,4 +1055,4 @@ export default ColorAxis;
  * @typedef {"linear"|"logarithmic"} Highcharts.ColorAxisTypeValue
  */
 
-''; // detach doclet above
+''; // Detach doclet above

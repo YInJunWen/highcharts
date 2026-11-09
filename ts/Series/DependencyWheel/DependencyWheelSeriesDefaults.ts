@@ -2,11 +2,13 @@
  *
  *  Dependency wheel module
  *
- *  (c) 2018-2021 Torstein Honsi
+ *  (c) 2018-2026 Highsoft AS
+ *  Author: Torstein Hønsi
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -22,7 +24,7 @@ import type DependencyWheelSeriesOptions from './DependencyWheelSeriesOptions';
 
 /* *
  *
- *  Constants
+ *  API Options
  *
  * */
 
@@ -34,13 +36,26 @@ import type DependencyWheelSeriesOptions from './DependencyWheelSeriesOptions';
  *         Dependency wheel
  *
  * @extends      plotOptions.sankey
- * @exclude      dataSorting
+ * @exclude      dataSorting, nodeAlignment, nodeDistance
  * @since        7.1.0
  * @product      highcharts
+ * @requires     modules/sankey
  * @requires     modules/dependency-wheel
  * @optionparent plotOptions.dependencywheel
  */
 const DependencyWheelSeriesDefaults: DependencyWheelSeriesOptions = {
+
+    /**
+     * The corner radius of the border surrounding each node. A number
+     * signifies pixels. A percentage string, like for example `50%`, signifies
+     * a relative size. For nodes this is relative to the node width.
+     *
+     * @type    {number|string|Highcharts.BorderRadiusOptionsObject}
+     * @default 3
+     * @product highcharts
+     * @since   11.0.0
+     * @apioption plotOptions.dependencywheel.borderRadius
+    */
 
     /**
      * Distance between the data label and the center of the node.
@@ -93,7 +108,7 @@ const DependencyWheelSeriesDefaults: DependencyWheelSeriesOptions = {
 
     /**
      * The center of the wheel relative to the plot area. Can be
-     * percentages or pixel values. The default behaviour is to
+     * percentages or pixel values. The default behavior is to
      * center the wheel inside the plot area.
      *
      * @type    {Array<number|string|null>}
@@ -107,23 +122,29 @@ const DependencyWheelSeriesDefaults: DependencyWheelSeriesOptions = {
     /**
      * The start angle of the dependency wheel, in degrees where 0 is up.
      */
-    startAngle: 0
+    startAngle: 0,
 
+    dataLabels: {
+        allowOverlap: true,
+        textPath: {
+            enabled: false,
+            /**
+             * @default { dy: 5 }
+            */
+            attributes: {
+                /** @ignore */
+                dy: 5
+            }
+        }
+    },
+
+    tooltip: {
+        pointFormat: '{point.fromNode.name} \u2192 ' +
+            '{point.toNode.name}: <b>{point.weight}</b><br/>' +
+            '{#if point.weightTo}{point.toNode.name} \u2192 ' +
+            '{point.fromNode.name}: <b>{point.weightTo}</b><br/>{/if}'
+    }
 };
-
-/* *
- *
- *  Default Export
- *
- * */
-
-export default DependencyWheelSeriesDefaults;
-
-/* *
- *
- *  API Options
- *
- * */
 
 /**
  * A `dependencywheel` series. If the [type](#series.dependencywheel.type)
@@ -162,14 +183,31 @@ export default DependencyWheelSeriesDefaults;
  *     data: [{
  *         from: 'Category1',
  *         to: 'Category2',
- *         weight: 2
+ *         weight: 2,
+ *         weightTo: 3
  *     }, {
  *         from: 'Category1',
  *         to: 'Category3',
- *         weight: 5
+ *         weight: 5,
+ *         weightTo: 6
  *     }]
  *  ```
+ *  When you provide the data as tuples, the keys option has to be set as well.
  *
+ *  ```js
+ *     keys: ['from', 'to', 'weight', 'weightTo'],
+ *     data: [
+ *         ['Category1', 'Category2', 2, 4],
+ *         ['Category1', 'Category3', 5, 2]
+ *     ]
+ *  ```
+ *
+ * @sample {highcharts} highcharts/demo/dependency-wheel
+ *         Dependency wheel
+ * @sample {highcharts} highcharts/demo/chord-diagram
+ *         Chord diagram
+ *
+ * @basic
  * @type      {Array<Array<string,string,number>|*>}
  * @extends   series.sankey.data
  * @product   highcharts
@@ -184,4 +222,30 @@ export default DependencyWheelSeriesDefaults;
  * @apioption series.dependencywheel.nodes.dataLabels
  */
 
-''; // adds doclets above to the transpiled file
+/**
+ * The weight of the link from the node.
+ *
+ * @type      {number|null}
+ * @product   highcharts
+ * @apioption series.dependencywheel.data.weight
+ */
+
+/**
+ * The weight of the link to the node.
+ * When not specified, the `weight` is used.
+ *
+ * @type      {number|null}
+ * @product   highcharts
+ * @since     13.0.0
+ * @apioption series.dependencywheel.data.weightTo
+ */
+
+''; // Keeps doclets above separate
+
+/* *
+ *
+ *  Default Export
+ *
+ * */
+
+export default DependencyWheelSeriesDefaults;

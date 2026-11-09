@@ -1,8 +1,9 @@
 /* *
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -19,19 +20,13 @@ import type {
     DEMAParamsOptions
 } from './DEMAOptions';
 import type DEMAPoint from './DEMAPoint';
+import type { IndicatorLinkedSeriesBase } from '../IndicatorBase';
 import type IndicatorValuesObject from '../IndicatorValuesObject';
 import type LineSeries from '../../../Series/Line/LineSeries';
 
+import EMAIndicator from '../EMA/EMAIndicator.js';
 import SeriesRegistry from '../../../Core/Series/SeriesRegistry.js';
-const {
-    ema: EMAIndicator
-} = SeriesRegistry.seriesTypes;
-import U from '../../../Core/Utilities.js';
-const {
-    correctFloat,
-    isArray,
-    merge
-} = U;
+import { correctFloat, isArray, merge } from '../../../Shared/Utilities.js';
 
 /* *
  *
@@ -42,7 +37,6 @@ const {
 /**
  * The DEMA series Type
  *
- * @private
  * @class
  * @name Highcharts.seriesTypes.dema
  *
@@ -71,9 +65,10 @@ class DEMAIndicator extends EMAIndicator {
      *               navigatorOptions, pointInterval, pointIntervalUnit,
      *               pointPlacement, pointRange, pointStart, showInNavigator,
      *               stacking
-     * @requires     stock/indicators/indicators
-     * @requires     stock/indicators/dema
+     * @requires     indicators/indicators
+     * @requires     indicators/dema
      * @optionparent plotOptions.dema
+     * @internal
      */
     public static defaultOptions: DEMAOptions = merge(EMAIndicator.defaultOptions);
 
@@ -83,10 +78,11 @@ class DEMAIndicator extends EMAIndicator {
      *
      * */
 
-    public EMApercent: number = void 0 as any;
-    public data: Array<DEMAPoint> = void 0 as any;
-    public options: DEMAOptions = void 0 as any;
-    public points: Array<DEMAPoint> = void 0 as any;
+    /** @internal */
+    public EMApercent!: number;
+    public data!: Array<DEMAPoint>;
+    public options!: DEMAOptions;
+    public points!: Array<DEMAPoint>;
 
     /* *
      *
@@ -94,6 +90,7 @@ class DEMAIndicator extends EMAIndicator {
      *
      * */
 
+    /** @internal */
     public getEMA(
         yVal: (Array<number>|Array<Array<number>>),
         prevEMA: (number|undefined),
@@ -103,7 +100,7 @@ class DEMAIndicator extends EMAIndicator {
         xVal?: Array<number>
     ): [number, number] {
 
-        return EMAIndicator.prototype.calculateEma(
+        return super.calculateEma(
             xVal || [],
             yVal,
             typeof i === 'undefined' ? 1 : i,
@@ -114,21 +111,21 @@ class DEMAIndicator extends EMAIndicator {
         );
     }
 
+    /** @internal */
     public getValues<TLinkedSeries extends LineSeries>(
-        series: TLinkedSeries,
+        series: TLinkedSeries&IndicatorLinkedSeriesBase,
         params: DEMAParamsOptions
     ): (IndicatorValuesObject<TLinkedSeries>|undefined) {
-        let period: number = (params.period as any),
+        const period: number = (params.period as any),
+            EMAvalues: Array<number> = [],
             doubledPeriod: number = 2 * period,
             xVal: Array<number> = (series.xData as any),
             yVal: Array<Array<number>> = (series.yData as any),
             yValLen: number = yVal ? yVal.length : 0,
-            index = -1,
-            accumulatePeriodPoints = 0,
-            SMA = 0,
             DEMA: Array<Array<number>> = [],
             xDataDema: Array<number> = [],
-            yDataDema: Array<number> = [],
+            yDataDema: Array<number> = [];
+        let accumulatePeriodPoints = 0,
             EMA = 0,
             // EMA(EMA)
             EMAlevel2: number,
@@ -136,9 +133,10 @@ class DEMAIndicator extends EMAIndicator {
             prevEMA: (number|undefined),
             prevEMAlevel2: (number|undefined),
             // EMA values array
-            EMAvalues: Array<number> = [],
             i: number,
-            DEMAPoint: [number, number];
+            index = -1,
+            DEMAPoint: [number, number],
+            SMA = 0;
 
         this.EMApercent = (2 / (period + 1));
 
@@ -154,13 +152,13 @@ class DEMAIndicator extends EMAIndicator {
 
         // Accumulate first N-points
         accumulatePeriodPoints =
-            EMAIndicator.prototype.accumulatePeriodPoints(
+            super.accumulatePeriodPoints(
                 period,
                 index,
                 yVal
             );
 
-        // first point
+        // First point
         SMA = accumulatePeriodPoints / period;
         accumulatePeriodPoints = 0;
 
@@ -256,12 +254,12 @@ export default DEMAIndicator;
  * @extends   series,plotOptions.dema
  * @since     7.0.0
  * @product   highstock
- * @excluding allAreas, colorAxis, compare, compareBase, dataParser, dataURL,
+ * @excluding allAreas, colorAxis, compare, compareBase,
  *            joinBy, keys, navigatorOptions, pointInterval, pointIntervalUnit,
  *            pointPlacement, pointRange, pointStart, showInNavigator, stacking
- * @requires  stock/indicators/indicators
- * @requires  stock/indicators/dema
+ * @requires  indicators/indicators
+ * @requires  indicators/dema
  * @apioption series.dema
  */
 
-''; // adds doclet above to the transpiled file
+''; // Adds doclet above to the transpiled file

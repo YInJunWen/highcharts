@@ -7,19 +7,35 @@
     function drawChart(data) {
         return Highcharts.mapChart('container', {
             chart: {
-                map: topology,
-                borderWidth: 1
+                map: topology
             },
 
-            colors: ['rgba(19,64,117,0.05)', 'rgba(19,64,117,0.2)', 'rgba(19,64,117,0.4)',
-                'rgba(19,64,117,0.5)', 'rgba(19,64,117,0.6)', 'rgba(19,64,117,0.8)', 'rgba(19,64,117,1)'],
-
             title: {
-                text: 'Population density by country (/km²)'
+                text: 'Population density by country (/km²)',
+                align: 'left'
             },
 
             mapNavigation: {
-                enabled: true
+                enabled: true,
+                buttonOptions: {
+                    align: 'right'
+                }
+            },
+
+            mapView: {
+                fitToGeometry: {
+                    type: 'MultiPoint',
+                    coordinates: [
+                        // Alaska west
+                        [-164, 54],
+                        // Greenland north
+                        [-35, 84],
+                        // New Zealand east
+                        [179, -38],
+                        // Chile south
+                        [-68, -55]
+                    ]
+                }
             },
 
             legend: {
@@ -40,35 +56,41 @@
                 floating: true,
                 layout: 'vertical',
                 valueDecimals: 0,
-                backgroundColor: ( // theme
-                    Highcharts.defaultOptions &&
-                    Highcharts.defaultOptions.legend &&
-                    Highcharts.defaultOptions.legend.backgroundColor
-                ) || 'rgba(255, 255, 255, 0.85)',
+                backgroundColor: `color-mix(
+                    in srgb,
+                    var(--highcharts-background-color, white),
+                    transparent 15%
+                )`,
                 symbolRadius: 0,
                 symbolHeight: 14
             },
-
             colorAxis: {
                 dataClasses: [{
-                    to: 3
+                    to: 3,
+                    color: '#440154'
                 }, {
                     from: 3,
-                    to: 10
+                    to: 10,
+                    color: '#443983'
                 }, {
                     from: 10,
-                    to: 30
+                    to: 30,
+                    color: '#31688e'
                 }, {
                     from: 30,
-                    to: 100
+                    to: 100,
+                    color: '#21918c'
                 }, {
                     from: 100,
-                    to: 300
+                    to: 300,
+                    color: '#35b779'
                 }, {
                     from: 300,
-                    to: 1000
+                    to: 1000,
+                    color: '#90d743'
                 }, {
-                    from: 1000
+                    from: 1000,
+                    color: '#fde725'
                 }]
             },
 
@@ -77,11 +99,6 @@
                 joinBy: ['iso-a2', 'code'],
                 animation: true,
                 name: 'Population density',
-                states: {
-                    hover: {
-                        color: '#a4edba'
-                    }
-                },
                 tooltip: {
                     valueSuffix: '/km²'
                 },
@@ -91,10 +108,10 @@
     }
 
     // Load the data from a Google Spreadsheet
-    // https://docs.google.com/spreadsheets/d/1WBx3mRqiomXk_ks1a5sEAtJGvYukguhAkcCuRDrY1L0/pubhtml
+    // https://docs.google.com/spreadsheets/d/1WBx3mRqiomXk_ks1a5sEAtJGvYukguhAkcCuRDrY1L0
     Highcharts.data({
         googleAPIKey: 'AIzaSyCQ0Jh8OFRShXam8adBbBcctlbeeA-qJOk',
-        googleSpreadsheetKey: '1gXzu9TYT3UvDMcoxj_kS7PUXMmC1MNVSfewccOs2dkA',
+        googleSpreadsheetKey: '1eSoQeilFp0HI-qgqr9-oXdCh5G_trQR2HBaWt_U_n78',
 
         // Custom handler when the spreadsheet is parsed
         parsed: function (columns) {

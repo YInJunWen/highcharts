@@ -1,10 +1,12 @@
 /* *
  *
- *  (c) 2010-2021 Torstein Honsi
+ *  (c) 2010-2026 Highsoft AS
+ *  Author: Torstein Hønsi
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -16,43 +18,45 @@
  *
  * */
 
-import type AxisOptions from '../../Core/Axis/AxisOptions';
+import type {
+    AxisOptions,
+    AxisSetExtremesEventObject
+} from '../../Core/Axis/AxisOptions';
 import type CSSObject from '../../Core/Renderer/CSSObject';
+import type { DeepPartial } from '../../Shared/Types';
 import type { HTMLDOMElement } from '../../Core/Renderer/DOMElementType';
 import type {
     RangeSelectorButtonOptions,
     RangeSelectorOptions,
     RangeSelectorPositionOptions
 } from './RangeSelectorOptions';
-import type SVGAttributes from '../../Core/Renderer/SVG/SVGAttributes';
 import type Time from '../../Core/Time';
+import type { ButtonThemeStatesObject } from '../../Core/Renderer/SVG/ButtonThemeObject';
 
 import Axis from '../../Core/Axis/Axis.js';
 import Chart from '../../Core/Chart/Chart.js';
-import H from '../../Core/Globals.js';
-import D from '../../Core/DefaultOptions.js';
+import D from '../../Core/Defaults.js';
 const { defaultOptions } = D;
-import { Palette } from '../../Core/Color/Palettes.js';
+import H from '../../Core/Globals.js';
 import RangeSelectorComposition from './RangeSelectorComposition.js';
 import SVGElement from '../../Core/Renderer/SVG/SVGElement.js';
-import U from '../../Core/Utilities.js';
-const {
-    addEvent,
+import T from '../../Core/Templating.js';
+const { format } = T;
+import {
     createElement,
-    css,
     defined,
-    destroyObjectProperties,
-    discardElement,
     extend,
-    fireEvent,
+    isString,
     isNumber,
     merge,
     objectEach,
-    pad,
-    pick,
-    pInt,
-    splat
-} = U;
+    splat,
+    discardElement,
+    destroyObjectProperties,
+    css,
+    addEvent,
+    fireEvent
+} from '../../Shared/Utilities.js';
 
 /* *
  *
@@ -60,15 +64,17 @@ const {
  *
  * */
 
-declare module '../../Core/Axis/AxisLike' {
-    interface AxisLike {
+/** @internal */
+declare module '../../Core/Axis/AxisBase' {
+    interface AxisBase {
         newMax?: number;
-        range?: (null|number|RangeSelectorButtonOptions);
+        range?: (number|RangeSelectorButtonOptions);
     }
 }
 
-declare module '../../Core/Chart/ChartLike'{
-    interface ChartLike {
+/** @internal */
+declare module '../../Core/Chart/ChartBase'{
+    interface ChartBase {
         extraBottomMargin?: boolean;
         extraTopMargin?: boolean;
         fixedRange?: number;
@@ -76,6 +82,7 @@ declare module '../../Core/Chart/ChartLike'{
     }
 }
 
+/** @internal */
 declare module './RangeSelectorOptions' {
     export interface RangeSelectorButtonOptions {
         _offsetMax?: number;
@@ -93,20 +100,29 @@ declare module './RangeSelectorOptions' {
 /**
  * Get the preferred input type based on a date format string.
  *
- * @private
+ * @internal
  * @function preferredInputType
  */
-function preferredInputType(format: string): string {
-    const ms = format.indexOf('%L') !== -1;
+function preferredInputType(format: Time.DateTimeFormat): string {
+    const hasTimeKey = (char: string): boolean =>
+        new RegExp(`%[[a-zA-Z]*${char}`).test(format as string);
+    const ms = isString(format) ?
+        format.indexOf('%L') !== -1 :
+        // Implemented but not typed as of 2024
+        format.fractionalSecondDigits;
 
     if (ms) {
         return 'text';
     }
 
-    const date = ['a', 'A', 'd', 'e', 'w', 'b', 'B', 'm', 'o', 'y', 'Y']
-        .some((char: string): boolean => format.indexOf('%' + char) !== -1);
-    const time = ['H', 'k', 'I', 'l', 'M', 'S']
-        .some((char: string): boolean => format.indexOf('%' + char) !== -1);
+    const date = isString(format) ?
+        ['a', 'A', 'd', 'e', 'w', 'b', 'B', 'm', 'o', 'y', 'Y']
+            .some(hasTimeKey) :
+        format.dateStyle || format.day || format.month || format.year;
+
+    const time = isString(format) ?
+        ['H', 'k', 'I', 'l', 'M', 'S'].some(hasTimeKey) :
+        format.timeStyle || format.hour || format.minute || format.second;
 
     if (date && time) {
         return 'datetime-local';
@@ -129,12 +145,13 @@ function preferredInputType(format: string): string {
 /**
  * The range selector.
  *
- * @private
+ * @internal
  * @class
  * @name Highcharts.RangeSelector
  * @param {Highcharts.Chart} chart
  */
 class RangeSelector {
+    public isDirty: boolean = false;
 
     /* *
      *
@@ -142,9 +159,7 @@ class RangeSelector {
      *
      * */
 
-    /**
-     * @private
-     */
+    /** @internal */
     public static compose(
         AxisClass: typeof Axis,
         ChartClass: typeof Chart
@@ -159,7 +174,6 @@ class RangeSelector {
      * */
 
     public constructor(chart: Chart) {
-        this.chart = chart;
         this.init(chart);
     }
 
@@ -169,14 +183,16 @@ class RangeSelector {
      *
      * */
 
-    public buttons: Array<SVGElement> = void 0 as any;
+
+    public buttons!: Array<SVGElement>;
+    public isCollapsed?: boolean;
     public buttonGroup?: SVGElement;
-    public buttonOptions: Array<RangeSelectorButtonOptions> =
-        RangeSelector.prototype.defaultButtons;
-    public chart: Chart;
+    public buttonOptions: Array<RangeSelectorButtonOptions> = [];
+    public chart!: Chart;
     public deferredYTDClick?: number;
     public div?: HTMLDOMElement;
     public dropdown?: HTMLSelectElement;
+    public dropdownLabel!: SVGElement;
     public eventsToUnbind?: Array<Function>;
     public forcedDataGrouping?: boolean;
     public frozenStates?: boolean;
@@ -191,10 +207,10 @@ class RangeSelector {
     public minDateBox?: SVGElement;
     public minInput?: HTMLInputElement;
     public minLabel?: SVGElement;
-    public options: RangeSelectorOptions = void 0 as any;
+    public options!: RangeSelectorOptions;
     public rendered?: boolean;
     public selected?: number;
-    public zoomText?: SVGElement;
+    public zoomText!: SVGElement;
 
     /* *
      *
@@ -206,7 +222,7 @@ class RangeSelector {
      * The method to run when one of the buttons in the range selectors is
      * clicked
      *
-     * @private
+     * @internal
      * @function Highcharts.RangeSelector#clickButton
      * @param {number} i
      *        The index of the button
@@ -229,27 +245,20 @@ class RangeSelector {
         let dataMin = unionExtremes.dataMin,
             dataMax = unionExtremes.dataMax,
             newMin,
-            newMax = baseAxis && Math.round(
-                Math.min(
-                    baseAxis.max as any, pick(dataMax, baseAxis.max as any)
-                )
-            ), // #1568
-            baseXAxisOptions: AxisOptions,
+            newMax = isNumber(baseAxis?.max) ? Math.round(
+                Math.min(baseAxis.max, dataMax ?? baseAxis.max)
+            ) : void 0, // #1568
+            baseXAxisOptions: DeepPartial<AxisOptions>,
             range = rangeOptions._range,
-            rangeMin,
-            minSetting: (number|null|undefined),
-            rangeSetting: (number|undefined),
+            rangeMin: (number|undefined),
             ctx: Axis,
             ytdExtremes,
             addOffsetMin = true;
 
-        // chart has no data, base series is removed
+        // Chart has no data, base series is removed
         if (dataMin === null || dataMax === null) {
             return;
         }
-
-        // Set the fixed range before range is altered
-        chart.fixedRange = range;
 
         rangeSelector.setSelected(i);
 
@@ -290,9 +299,11 @@ class RangeSelector {
 
         // Fixed times like minutes, hours, days
         } else if (range) {
-            newMin = Math.max(newMax - range, dataMin as any);
-            newMax = Math.min(newMin + range, dataMax as any);
-            addOffsetMin = false;
+            if (isNumber(newMax)) {
+                newMin = Math.max(newMax - range, dataMin as any);
+                newMax = Math.min(newMin + range, dataMax as any);
+                addOffsetMin = false;
+            }
 
         } else if (type === 'ytd') {
 
@@ -305,15 +316,17 @@ class RangeSelector {
                 // the chart is rendered, we have access to the xData array
                 // (#942).
                 if (
-                    typeof dataMax === 'undefined' ||
-                    typeof dataMin === 'undefined'
+                    baseAxis.hasData() && (
+                        !isNumber(dataMax) ||
+                        !isNumber(dataMin)
+                    )
                 ) {
                     dataMin = Number.MAX_VALUE;
-                    dataMax = Number.MIN_VALUE;
+                    dataMax = -Number.MAX_VALUE;
                     chart.series.forEach((series): void => {
-                        // reassign it to the last item
-                        const xData = series.xData;
-                        if (xData) {
+                        // Reassign it to the last item
+                        const xData = series.getColumn('x');
+                        if (xData.length) {
                             dataMin = Math.min(xData[0], dataMin as any);
                             dataMax = Math.max(
                                 xData[xData.length - 1],
@@ -323,14 +336,15 @@ class RangeSelector {
                     });
                     redraw = false;
                 }
-                ytdExtremes = rangeSelector.getYTDExtremes(
-                    dataMax,
-                    dataMin,
-                    chart.time.useUTC
-                );
-                newMin = rangeMin = ytdExtremes.min;
-                newMax = ytdExtremes.max;
 
+                if (isNumber(dataMax) && isNumber(dataMin)) {
+                    ytdExtremes = rangeSelector.getYTDExtremes(
+                        dataMax,
+                        dataMin
+                    );
+                    newMin = rangeMin = ytdExtremes.min;
+                    newMax = ytdExtremes.max;
+                }
             // "ytd" is pre-selected. We don't yet have access to processed
             // point and extremes data (things like pointStart and pointInterval
             // are missing), so we delay the process (#942)
@@ -362,29 +376,39 @@ class RangeSelector {
 
         // Update the chart
         if (!baseAxis) {
-            // Axis not yet instanciated. Temporarily set min and range
-            // options and remove them on chart load (#4317).
-            baseXAxisOptions = splat(chart.options.xAxis)[0];
-            rangeSetting = baseXAxisOptions.range;
-            baseXAxisOptions.range = range;
-            minSetting = baseXAxisOptions.min;
-            baseXAxisOptions.min = rangeMin;
+            // Axis not yet instantiated. Temporarily set min and range
+            // options and axes once defined and remove them on
+            // chart load (#4317 & #20529).
+            baseXAxisOptions = splat(chart.options.xAxis || {})[0];
+            const axisRangeUpdateEvent = addEvent(
+                chart,
+                'afterCreateAxes',
+                function (): void {
+                    const xAxis = chart.xAxis[0];
+                    xAxis.range = xAxis.options.range = range;
+                    xAxis.min = xAxis.options.min = rangeMin;
+                }
+            );
             addEvent(chart, 'load', function resetMinAndRange(): void {
-                baseXAxisOptions.range = rangeSetting;
-                baseXAxisOptions.min = minSetting;
+                const xAxis = chart.xAxis[0];
+                chart.setFixedRange(rangeOptions._range);
+                xAxis.options.range = baseXAxisOptions.range;
+                xAxis.options.min = baseXAxisOptions.min;
+                axisRangeUpdateEvent(); // Remove event
             });
-        } else {
+        } else if (isNumber(newMin) || isNumber(newMax)) {
             // Existing axis object. Set extremes after render time.
             baseAxis.setExtremes(
                 newMin,
                 newMax,
-                pick(redraw, true),
-                void 0, // auto animation
+                (redraw ?? true),
+                void 0, // Auto animation
                 {
                     trigger: 'rangeSelectorButton',
                     rangeSelectorButton: rangeOptions
                 }
             );
+            chart.setFixedRange(rangeOptions._range);
         }
 
         fireEvent(this, 'afterBtnClick');
@@ -394,7 +418,7 @@ class RangeSelector {
      * Set the selected option. This method only sets the internal flag, it
      * doesn't update the buttons or the actual zoomed range.
      *
-     * @private
+     * @internal
      * @function Highcharts.RangeSelector#setSelected
      * @param {number} [selected]
      */
@@ -407,7 +431,7 @@ class RangeSelector {
     /**
      * Initialize the range selector
      *
-     * @private
+     * @internal
      * @function Highcharts.RangeSelector#init
      * @param {Highcharts.Chart} chart
      */
@@ -418,19 +442,17 @@ class RangeSelector {
             options = (
                 chart.options.rangeSelector as RangeSelectorOptions
             ),
-            buttonOptions = (
-                options.buttons || rangeSelector.defaultButtons.slice()
-            ),
+            langOptions = chart.options.lang,
+            buttonOptions = options.buttons,
             selectedOption = options.selected,
             blurInputs = function (): void {
                 const minInput = rangeSelector.minInput,
                     maxInput = rangeSelector.maxInput;
-
                 // #3274 in some case blur is not defined
-                if (minInput && (minInput.blur)) {
+                if (minInput && !!minInput.blur) {
                     fireEvent(minInput, 'blur');
                 }
-                if (maxInput && (maxInput.blur)) {
+                if (maxInput && !!maxInput.blur) {
                     fireEvent(maxInput, 'blur');
                 }
             };
@@ -439,7 +461,22 @@ class RangeSelector {
         rangeSelector.options = options;
         rangeSelector.buttons = [];
 
-        rangeSelector.buttonOptions = buttonOptions;
+        rangeSelector.buttonOptions = buttonOptions
+            .map((opt): RangeSelectorButtonOptions => {
+                if (opt.type && langOptions.rangeSelector) {
+                    opt.text ??= langOptions.rangeSelector[`${opt.type}Text`];
+                    opt.title ??= langOptions.rangeSelector[`${opt.type}Title`];
+                }
+
+                opt.text = format(opt.text, {
+                    count: opt.count || 1
+                });
+                opt.title = format(opt.title, {
+                    count: opt.count || 1
+                });
+
+                return opt;
+            });
 
         this.eventsToUnbind = [];
         this.eventsToUnbind.push(addEvent(
@@ -452,7 +489,7 @@ class RangeSelector {
         // Extend the buttonOptions with actual range
         buttonOptions.forEach(rangeSelector.computeButtonRange);
 
-        // zoomed range based on a pre-selected button index
+        // Zoomed range based on a pre-selected button index
         if (
             typeof selectedOption !== 'undefined' &&
             buttonOptions[selectedOption]
@@ -467,10 +504,11 @@ class RangeSelector {
                 addEvent(
                     chart.xAxis[0],
                     'setExtremes',
-                    function (e: any): void {
+                    function (e: AxisSetExtremesEventObject): void {
                         if (
-                            (this.max as any) - (this.min as any) !==
-                                chart.fixedRange &&
+                            isNumber(this.max) &&
+                            isNumber(this.min) &&
+                            this.max - this.min !== chart.fixedRange &&
                             e.trigger !== 'rangeSelectorButton' &&
                             e.trigger !== 'updatedData' &&
                             rangeSelector.forcedDataGrouping &&
@@ -482,19 +520,21 @@ class RangeSelector {
                 );
             }
         }));
+        this.createElements();
     }
 
     /**
      * Dynamically update the range selector buttons after a new range has been
      * set
      *
-     * @private
+     * @internal
      * @function Highcharts.RangeSelector#updateButtonStates
      */
     public updateButtonStates(): void {
         const rangeSelector = this,
             chart = this.chart,
             dropdown = this.dropdown,
+            dropdownLabel = this.dropdownLabel,
             baseAxis = chart.xAxis[0],
             actualRange = Math.round(
                 (baseAxis.max as any) - (baseAxis.min as any)
@@ -509,17 +549,19 @@ class RangeSelector {
             dataMax = unionExtremes.dataMax,
             ytdExtremes = rangeSelector.getYTDExtremes(
                 dataMax as any,
-                dataMin as any,
-                chart.time.useUTC
+                dataMin as any
             ),
             ytdMin = ytdExtremes.min,
             ytdMax = ytdExtremes.max,
             selected = rangeSelector.selected,
             allButtonsEnabled = rangeSelector.options.allButtonsEnabled,
+            buttonStates = new Array(rangeSelector.buttonOptions.length)
+                .fill(0),
+            selectedExists = isNumber(selected),
             buttons = rangeSelector.buttons;
 
-        let selectedExists = isNumber(selected);
-
+        let isSelectedTooGreat = false,
+            selectedIndex = null;
         rangeSelector.buttonOptions.forEach((
             rangeOptions: RangeSelectorButtonOptions,
             i: number
@@ -527,12 +569,11 @@ class RangeSelector {
             const range = rangeOptions._range,
                 type = rangeOptions.type,
                 count = rangeOptions.count || 1,
-                button = buttons[i],
                 offsetRange =
                     (rangeOptions._offsetMax as any) -
                     (rangeOptions._offsetMin as any),
                 isSelected = i === selected,
-                // Disable buttons where the range exceeds what is allowed in
+                // Disable buttons where the range exceeds what is allowed i;
                 // the current view
                 isTooGreatRange = (range as any) >
                     (dataMax as any) - (dataMin as any),
@@ -540,15 +581,28 @@ class RangeSelector {
                 // range
                 isTooSmallRange = (range as any) < (baseAxis.minRange as any);
 
-            let state = 0,
-                // Do not select the YTD button if not explicitly told so
-                isYTDButNotSelected = false,
+            // Do not select the YTD button if not explicitly told so
+            let isYTDButNotSelected = false,
                 // Disable the All button if we're already showing all
-                isAllButAlreadyShowingAll = false,
                 isSameRange = range === actualRange;
 
-            // Months and years have a variable range so we check the extremes
+            if (isSelected && isTooGreatRange) {
+                isSelectedTooGreat = true;
+            }
+
             if (
+                baseAxis.isOrdinal &&
+                baseAxis.ordinal?.positions &&
+                range &&
+                actualRange < range
+            ) {
+                // Handle ordinal ranges
+                const positions = baseAxis.ordinal.positions;
+                if (positions[positions.length - 1] - positions[0] > range) {
+                    isSameRange = true;
+                }
+            } else if (
+                // Months and years have variable range so we check the extremes
                 (type === 'month' || type === 'year') &&
                 (
                     actualRange + 36e5 >=
@@ -568,11 +622,6 @@ class RangeSelector {
                     (baseAxis.max as any) - (baseAxis.min as any) >=
                     (dataMax as any) - (dataMin as any)
                 );
-                isAllButAlreadyShowingAll = (
-                    !isSelected &&
-                    selectedExists &&
-                    isSameRange
-                );
             }
 
             // The new zoom area happens to match the range for a button - mark
@@ -581,50 +630,86 @@ class RangeSelector {
             // across the night gap.
             const disable = (
                 !allButtonsEnabled &&
+                !(isSelectedTooGreat && type === 'all') &&
                 (
                     isTooGreatRange ||
                     isTooSmallRange ||
-                    isAllButAlreadyShowingAll ||
                     hasNoData
                 )
             );
+
             const select = (
-                (isSelected && isSameRange) ||
-                (isSameRange && !selectedExists && !isYTDButNotSelected) ||
+                (isSelectedTooGreat && type === 'all') ||
+                (isYTDButNotSelected ? false : isSameRange) ||
                 (isSelected && rangeSelector.frozenStates)
             );
 
+
             if (disable) {
-                state = 3;
+                buttonStates[i] = 3;
             } else if (select) {
-                selectedExists = true; // Only one button can be selected
-                state = 2;
+                if (!selectedExists || i === selected) {
+                    selectedIndex = i;
+                }
             }
 
-            // If state has changed, update the button
+        });
+
+        if (selectedIndex !== null) {
+            buttonStates[selectedIndex] = 2;
+            rangeSelector.setSelected(selectedIndex);
+            if (this.dropdown) {
+                this.dropdown.selectedIndex = selectedIndex + 1;
+            }
+        } else {
+            rangeSelector.setSelected();
+
+            if (this.dropdown) {
+                this.dropdown.selectedIndex = -1;
+            }
+            if (dropdownLabel) {
+                dropdownLabel.setState(0);
+                dropdownLabel.attr({
+                    text: (defaultOptions.lang.rangeSelectorZoom || '') + ' ▾'
+                });
+
+            }
+        }
+
+        for (let i = 0; i < buttonStates.length; i++) {
+            const state = buttonStates[i];
+            const button = buttons[i];
+
             if (button.state !== state) {
                 button.setState(state);
 
                 if (dropdown) {
-                    dropdown.options[i + 1].disabled = disable;
+                    dropdown.options[i + 1].disabled = (state === 3);
 
                     if (state === 2) {
+
+                        if (dropdownLabel) {
+                            dropdownLabel.setState(2);
+                            dropdownLabel.attr({
+                                text: rangeSelector.buttonOptions[i].text + ' ▾'
+                            });
+                        }
                         dropdown.selectedIndex = i + 1;
                     }
-                }
-
-                // Reset (#9209)
-                if (state === 0 && selected === i) {
-                    rangeSelector.setSelected();
+                    const bbox = dropdownLabel.getBBox();
+                    css(dropdown, {
+                        width: `${bbox.width}px`,
+                        height: `${bbox.height}px`
+                    });
                 }
             }
-        });
+        }
     }
 
     /**
      * Compute and cache the range for an individual button
      *
-     * @private
+     * @internal
      * @function Highcharts.RangeSelector#computeButtonRange
      * @param {Highcharts.RangeSelectorButtonsOptions} rangeOptions
      */
@@ -634,7 +719,7 @@ class RangeSelector {
         const type = rangeOptions.type as string,
             count = rangeOptions.count || 1,
 
-            // these time intervals have a fixed number of milliseconds, as
+            // These time intervals have a fixed number of milliseconds, as
             // opposed to month, ytd and year
             fixedTimes = ({
                 millisecond: 1,
@@ -655,8 +740,8 @@ class RangeSelector {
             } as Record<string, number>)[type] * 24 * 36e5 * count;
         }
 
-        rangeOptions._offsetMin = pick(rangeOptions.offsetMin, 0);
-        rangeOptions._offsetMax = pick(rangeOptions.offsetMax, 0);
+        rangeOptions._offsetMin = (rangeOptions.offsetMin ?? 0);
+        rangeOptions._offsetMax = (rangeOptions.offsetMax ?? 0);
         (rangeOptions._range as any) +=
             (rangeOptions._offsetMax as any) - (rangeOptions._offsetMin as any);
     }
@@ -664,7 +749,7 @@ class RangeSelector {
     /**
      * Get the unix timestamp of a HTML input for the dates
      *
-     * @private
+     * @internal
      * @function Highcharts.RangeSelector#getInputValue
      */
     public getInputValue(name: string): number {
@@ -677,7 +762,7 @@ class RangeSelector {
             return (
                 (input.type === 'text' && options.inputDateParser) ||
                 this.defaultInputDateParser
-            )(input.value, time.useUTC, time);
+            )(input.value, time.timezone === 'UTC', time);
         }
         return 0;
     }
@@ -685,7 +770,7 @@ class RangeSelector {
     /**
      * Set the internal and displayed value of a HTML input for the dates
      *
-     * @private
+     * @internal
      * @function Highcharts.RangeSelector#setInputValue
      */
     public setInputValue(
@@ -698,6 +783,10 @@ class RangeSelector {
             dateBox = name === 'min' ? this.minDateBox : this.maxDateBox;
 
         if (input) {
+            input.setAttribute(
+                'type',
+                preferredInputType(options.inputDateFormat || '%e %b %Y')
+            );
             const hcTimeAttr = input.getAttribute('data-hc-time');
             let updatedTime = defined(hcTimeAttr) ? Number(hcTimeAttr) : void 0;
 
@@ -731,7 +820,7 @@ class RangeSelector {
     /**
      * Set the min and max value of a HTML input for the dates
      *
-     * @private
+     * @internal
      * @function Highcharts.RangeSelector#setInputExtremes
      */
     public setInputExtremes(
@@ -758,30 +847,31 @@ class RangeSelector {
     }
 
     /**
-     * @private
+     * @internal
      * @function Highcharts.RangeSelector#showInput
      * @param {string} name
      */
     public showInput(name: ('min'|'max')): void {
-        const dateBox = name === 'min' ? this.minDateBox : this.maxDateBox;
-        const input = name === 'min' ? this.minInput : this.maxInput;
+        const dateBox = name === 'min' ? this.minDateBox : this.maxDateBox,
+            input = name === 'min' ? this.minInput : this.maxInput;
 
         if (input && dateBox && this.inputGroup) {
-            const isTextInput = input.type === 'text';
-            const { translateX, translateY } = this.inputGroup;
-            const { inputBoxWidth } = this.options;
+            const isTextInput = input.type === 'text',
+                { translateX = 0, translateY = 0 } = this.inputGroup,
+                { x = 0, width = 0, height = 0 } = dateBox,
+                { inputBoxWidth } = this.options;
 
             css(input, {
                 width: isTextInput ?
-                    ((dateBox.width + (inputBoxWidth ? -2 : 20)) + 'px') :
+                    ((width + (inputBoxWidth ? -2 : 20)) + 'px') :
                     'auto',
-                height: isTextInput ? ((dateBox.height - 2) + 'px') : 'auto',
+                height: (height - 2) + 'px',
                 border: '2px solid silver'
             });
 
             if (isTextInput && inputBoxWidth) {
                 css(input, {
-                    left: (translateX + dateBox.x) + 'px',
+                    left: (translateX + x) + 'px',
                     top: translateY + 'px'
                 });
 
@@ -791,14 +881,14 @@ class RangeSelector {
                 css(input, {
                     left: Math.min(
                         Math.round(
-                            dateBox.x +
+                            x +
                             translateX -
-                            (input.offsetWidth - dateBox.width) / 2
+                            (input.offsetWidth - width) / 2
                         ),
                         this.chart.chartWidth - input.offsetWidth
                     ) + 'px',
                     top: (
-                        translateY - (input.offsetHeight - dateBox.height) / 2
+                        translateY - (input.offsetHeight - height) / 2
                     ) + 'px'
                 });
             }
@@ -806,7 +896,7 @@ class RangeSelector {
     }
 
     /**
-     * @private
+     * @internal
      * @function Highcharts.RangeSelector#hideInput
      * @param {string} name
      */
@@ -823,7 +913,7 @@ class RangeSelector {
     }
 
     /**
-     * @private
+     * @internal
      * @function Highcharts.RangeSelector#defaultInputDateParser
      */
     public defaultInputDateParser(
@@ -831,46 +921,13 @@ class RangeSelector {
         useUTC: boolean,
         time?: Time
     ): number {
-        const hasTimezone = (str: string): boolean =>
-            str.length > 6 &&
-            (str.lastIndexOf('-') === str.length - 6 ||
-            str.lastIndexOf('+') === str.length - 6);
-
-        let input = inputDate.split('/').join('-').split(' ').join('T');
-        if (input.indexOf('T') === -1) {
-            input += 'T00:00';
-        }
-        if (useUTC) {
-            input += 'Z';
-        } else if (H.isSafari && !hasTimezone(input)) {
-            const offset = new Date(input).getTimezoneOffset() / 60;
-            input += offset <= 0 ? `+${pad(-offset)}:00` : `-${pad(offset)}:00`;
-        }
-        let date = Date.parse(input);
-
-        // If the value isn't parsed directly to a value by the
-        // browser's Date.parse method, like YYYY-MM-DD in IE8, try
-        // parsing it a different way
-        if (!isNumber(date)) {
-            const parts = inputDate.split('-');
-            date = Date.UTC(
-                pInt(parts[0]),
-                pInt(parts[1]) - 1,
-                pInt(parts[2])
-            );
-        }
-
-        if (time && useUTC && isNumber(date)) {
-            date += time.getTimezoneOffset(date);
-        }
-
-        return date;
+        return time?.parse(inputDate) || 0;
     }
 
     /**
      * Draw either the 'from' or the 'to' HTML input box of the range selector
      *
-     * @private
+     * @internal
      * @function Highcharts.RangeSelector#drawInput
      */
     public drawInput(
@@ -890,27 +947,20 @@ class RangeSelector {
             lang = defaultOptions.lang,
             isMin = name === 'min';
 
-        /**
-         * @private
-         */
-        function updateExtremes(): void {
+        /** @internal */
+        function updateExtremes(name: 'min'| 'max'): void {
             const { maxInput, minInput } = rangeSelector,
                 chartAxis = chart.xAxis[0],
-                dataAxis = chart.scroller && chart.scroller.xAxis ?
-                    chart.scroller.xAxis :
-                    chartAxis,
-                dataMin = dataAxis.dataMin,
-                dataMax = dataAxis.dataMax;
+                unionExtremes = chart.scroller?.getUnionExtremes() || chartAxis,
+                dataMin = unionExtremes.dataMin,
+                dataMax = unionExtremes.dataMax,
+                currentExtreme = chart.xAxis[0].getExtremes()[name];
 
             let value: number | undefined = rangeSelector.getInputValue(name);
 
-            if (
-                value !== Number(input.getAttribute('data-hc-time-previous')) &&
-                isNumber(value)
-            ) {
-                input.setAttribute('data-hc-time-previous', value);
+            if (isNumber(value) && value !== currentExtreme) {
 
-                // Validate the extremes. If it goes beyound the data min or
+                // Validate the extremes. If it goes beyond the data min or
                 // max, use the actual data extreme (#2438).
                 if (isMin && maxInput && isNumber(dataMin)) {
                     if (value > Number(maxInput.getAttribute('data-hc-time'))) {
@@ -927,10 +977,10 @@ class RangeSelector {
                 }
 
                 // Set the extremes
-                if (typeof value !== 'undefined') { // @todo typof undefined
+                if (typeof value !== 'undefined') { // @todo typeof undefined
                     chartAxis.setExtremes(
-                        isMin ? value : (chartAxis.min as any),
-                        isMin ? (chartAxis.max as any) : value,
+                        isMin ? value : chartAxis.min,
+                        isMin ? chartAxis.max : value,
                         void 0,
                         void 0,
                         { trigger: 'rangeSelectorInput' }
@@ -952,8 +1002,8 @@ class RangeSelector {
             })
             .add(inputGroup);
 
-        // Create an SVG label that shows updated date ranges and and records
-        // click events that bring in the HTML input.
+        // Create an SVG label that shows updated date ranges and records click
+        // events that bring in the HTML input.
         const dateBox = renderer
             .label('', 0)
             .addClass('highcharts-range-input')
@@ -991,7 +1041,7 @@ class RangeSelector {
         // we need to use setAttribute instead
         input.setAttribute(
             'type',
-            preferredInputType(options.inputDateFormat || '%b %e, %Y')
+            preferredInputType(options.inputDateFormat || '%e %b %Y')
         );
 
         if (!chart.styledMode) {
@@ -999,7 +1049,7 @@ class RangeSelector {
             label.css(merge(chartStyle, options.labelStyle));
 
             dateBox.css(merge({
-                color: Palette.neutralColor80
+                color: 'var(--highcharts-neutral-color-80)'
             }, chartStyle, options.inputStyle));
 
             css(input, extend<CSSObject>({
@@ -1023,11 +1073,11 @@ class RangeSelector {
 
         // Hide away the input box
         input.onblur = (): void => {
-            // update extermes only when inputs are active
+            // Update extremes only when inputs are active
             if (input === H.doc.activeElement) { // Only when focused
                 // Update also when no `change` event is triggered, like when
                 // clicking inside the SVG (#4710)
-                updateExtremes();
+                updateExtremes(name);
             }
             // #10404 - move hide and blur outside focus
             rangeSelector.hideInput(name);
@@ -1037,11 +1087,11 @@ class RangeSelector {
 
         let keyDown = false;
 
-        // handle changes in the input boxes
+        // Handle changes in the input boxes
         input.onchange = (): void => {
             // Update extremes and blur input when clicking date input calendar
             if (!keyDown) {
-                updateExtremes();
+                updateExtremes(name);
                 rangeSelector.hideInput(name);
                 input.blur();
             }
@@ -1050,7 +1100,7 @@ class RangeSelector {
         input.onkeypress = (event: KeyboardEvent): void => {
             // IE does not fire onchange on enter
             if (event.keyCode === 13) {
-                updateExtremes();
+                updateExtremes(name);
             }
         };
 
@@ -1058,8 +1108,12 @@ class RangeSelector {
             keyDown = true;
 
             // Arrow keys
-            if (event.keyCode === 38 || event.keyCode === 40) {
-                updateExtremes();
+            if (
+                event.key === 'ArrowUp' ||
+                event.key === 'ArrowDown' ||
+                event.key === 'Tab'
+            ) {
+                updateExtremes(name);
             }
         };
 
@@ -1074,7 +1128,7 @@ class RangeSelector {
      * Get the position of the range selector buttons and inputs. This can be
      * overridden from outside for custom positioning.
      *
-     * @private
+     * @internal
      * @function Highcharts.RangeSelector#getPosition
      */
     public getPosition(): Record<string, number> {
@@ -1083,7 +1137,7 @@ class RangeSelector {
                 chart.options.rangeSelector as RangeSelectorOptions,
             top = options.verticalAlign === 'top' ?
                 chart.plotTop - chart.axisOffset[0] :
-                0; // set offset only for varticalAlign top
+                0; // Set offset only for verticalAlign top
 
         return {
             buttonTop: top + options.buttonPosition.y,
@@ -1095,37 +1149,91 @@ class RangeSelector {
      * the current timestamp. Will choose dataMin if its value is higher than
      * the timestamp for the start of current year.
      *
-     * @private
+     * @internal
      * @function Highcharts.RangeSelector#getYTDExtremes
      * @return {*}
      * Returns min and max for the YTD
      */
     public getYTDExtremes(
         dataMax: number,
-        dataMin: number,
-        useUTC?: boolean
+        dataMin: number
     ): RangeSelector.RangeObject {
         const time = this.chart.time,
-            now = new time.Date(dataMax),
-            year = time.get('FullYear', now),
-            startOfYear = useUTC ?
-                time.Date.UTC(year, 0, 1) : // eslint-disable-line new-cap
-                +new time.Date(year, 0, 1),
-            min = Math.max(dataMin, startOfYear),
-            ts = now.getTime();
+            year = time.toParts(dataMax)[0],
+            startOfYear = time.makeTime(year, 0);
 
         return {
-            max: Math.min(dataMax || ts, ts),
-            min
+            max: dataMax,
+            min: Math.max(dataMin, startOfYear)
         };
     }
 
+    public createElements(): void {
+        const chart = this.chart,
+            renderer = chart.renderer,
+            container = chart.container,
+            chartOptions = chart.options,
+            options =
+                chartOptions.rangeSelector as RangeSelectorOptions,
+            inputEnabled = options.inputEnabled,
+            // Put inputs above `scrollablePlotArea` (#22630)
+            inputsZIndex = (chartOptions.chart.style?.zIndex ?? 0) + 3;
+
+        if (options.enabled === false) {
+            return;
+        }
+
+        this.group = renderer.g('range-selector-group')
+            .attr({
+                zIndex: 7
+            })
+            .add();
+
+        this.div = createElement('div', void 0, {
+            position: 'relative',
+            height: 0,
+            zIndex: inputsZIndex
+        });
+
+        if (this.buttonOptions.length) {
+            this.renderButtons();
+        }
+
+        // First create a wrapper outside the container in order to make
+        // the inputs work and make export correct
+        if (container.parentNode) {
+            container.parentNode.insertBefore(this.div, container);
+        }
+        if (inputEnabled) {
+            this.createInputs();
+        }
+
+    }
+
+    /**
+     * Create the input elements and its group.
+     *
+     */
+    public createInputs(): void {
+        this.inputGroup = this.chart.renderer.g('input-group').add(this.group);
+
+        const minElems = this.drawInput('min');
+        this.minDateBox = minElems.dateBox;
+        this.minLabel = minElems.label;
+        this.minInput = minElems.input;
+
+        const maxElems = this.drawInput('max');
+        this.maxDateBox = maxElems.dateBox;
+        this.maxLabel = maxElems.label;
+        this.maxInput = maxElems.input;
+
+    }
     /**
      * Render the range selector including the buttons and the inputs. The first
      * time render is called, the elements are created and positioned. On
      * subsequent calls, they are moved and updated.
      *
-     * @private
+     * @internal
      * @function Highcharts.RangeSelector#render
      * @param {number} [min]
      *        X axis minimum
@@ -1137,70 +1245,29 @@ class RangeSelector {
         max?: number
     ): void {
 
-        const chart = this.chart,
-            renderer = chart.renderer,
-            container = chart.container,
-            chartOptions = chart.options,
-            options =
-                chartOptions.rangeSelector as RangeSelectorOptions,
-            // Place inputs above the container
-            inputsZIndex = pick(
-                (chartOptions.chart as any).style &&
-                (chartOptions.chart as any).style.zIndex,
-                0
-            ) + 1,
-            inputEnabled = options.inputEnabled,
-            rendered = this.rendered;
-
-        if (options.enabled === false) {
+        if (this.options.enabled === false) {
             return;
         }
 
-        // create the elements
-        if (!rendered) {
-
-            this.group = renderer.g('range-selector-group')
-                .attr({
-                    zIndex: 7
-                })
-                .add();
-
-            this.div = createElement('div', void 0, {
-                position: 'relative',
-                height: 0,
-                zIndex: inputsZIndex
-            });
-
-            if (this.buttonOptions.length) {
-                this.renderButtons();
-            }
-
-            // First create a wrapper outside the container in order to make
-            // the inputs work and make export correct
-            if (container.parentNode) {
-                container.parentNode.insertBefore(this.div, container);
-            }
-            if (inputEnabled) {
-                // Create the group to keep the inputs
-                this.inputGroup = renderer.g('input-group').add(this.group);
-
-                const minElems = this.drawInput('min');
-                this.minDateBox = minElems.dateBox;
-                this.minLabel = minElems.label;
-                this.minInput = minElems.input;
-
-                const maxElems = this.drawInput('max');
-                this.maxDateBox = maxElems.dateBox;
-                this.maxLabel = maxElems.label;
-                this.maxInput = maxElems.input;
-            }
-        }
+        const chart = this.chart,
+            chartOptions = chart.options,
+            options = chartOptions.rangeSelector as RangeSelectorOptions,
+            // Place inputs above the container
+            inputEnabled = options.inputEnabled;
 
         if (inputEnabled) {
+            if (!this.inputGroup) {
+
+                this.createInputs();
+            }
             // Set or reset the input values
             this.setInputValue('min', min);
             this.setInputValue('max', max);
 
+            if (!this.chart.styledMode) {
+                this.maxLabel?.css(options.labelStyle);
+                this.minLabel?.css(options.labelStyle);
+            }
             const unionExtremes = (
                 chart.scroller && chart.scroller.getUnionExtremes()
             ) || chart.xAxis[0] || {};
@@ -1247,23 +1314,32 @@ class RangeSelector {
                     }
                 });
             }
+        } else {
+            if (this.inputGroup) {
+                this.inputGroup.destroy();
+                delete this.inputGroup;
+            }
+        }
+
+        if (!this.chart.styledMode) {
+            if (this.zoomText) {
+                this.zoomText.css(options.labelStyle);
+            }
         }
 
         this.alignElements();
-
-        this.rendered = true;
+        this.updateButtonStates();
     }
 
     /**
      * Render the range buttons. This only runs the first time, later the
      * positioning is laid out in alignElements.
      *
-     * @private
+     * @internal
      * @function Highcharts.RangeSelector#renderButtons
      */
     public renderButtons(): void {
         const {
-            buttons,
             chart,
             options
         } = this;
@@ -1276,7 +1352,6 @@ class RangeSelector {
         // Prevent the button from resetting the width when the button state
         // changes since we need more control over the width when collapsing
         // the buttons
-        const width = buttonTheme.width || 28;
         delete buttonTheme.width;
         delete buttonTheme.states;
 
@@ -1284,14 +1359,37 @@ class RangeSelector {
 
         const dropdown = this.dropdown = createElement('select', void 0, {
             position: 'absolute',
-            width: '1px',
-            height: '1px',
             padding: 0,
             border: 0,
-            top: '-9999em',
             cursor: 'pointer',
             opacity: 0.0001
         }, this.div) as HTMLSelectElement;
+
+        // Create a label for dropdown select element
+        const userButtonTheme = chart.userOptions.rangeSelector?.buttonTheme;
+        this.dropdownLabel = renderer.button(
+            '',
+            0,
+            0,
+            (): void => {},
+            merge(buttonTheme, {
+                'stroke-width': (buttonTheme['stroke-width'] ?? 0),
+                width: 'auto',
+                paddingLeft:
+                    options.buttonTheme.paddingLeft ??
+                    userButtonTheme?.padding ??
+                    8,
+                paddingRight:
+                    options.buttonTheme.paddingRight ??
+                    userButtonTheme?.padding ??
+                    8
+            }),
+            states && states.hover,
+            states && states.select,
+            states && states.disabled
+        )
+            .hide()
+            .add(this.group);
 
         // Prevent page zoom on iPhone
         addEvent(dropdown, 'touchstart', (): void => {
@@ -1299,21 +1397,21 @@ class RangeSelector {
         });
 
         // Forward events from select to button
-        [
-            [H.isMS ? 'mouseover' : 'mouseenter'],
-            [H.isMS ? 'mouseout' : 'mouseleave'],
-            ['change', 'click']
-        ].forEach(([from, to]): void => {
-            addEvent(dropdown, from, (): void => {
-                const button = buttons[this.currentButtonIndex()];
-                if (button) {
-                    fireEvent(button.element, to || from);
-                }
-            });
+        const mouseOver = H.isMS ? 'mouseover' : 'mouseenter',
+            mouseOut = H.isMS ? 'mouseout' : 'mouseleave';
+        addEvent(dropdown, mouseOver, (): void => {
+            fireEvent(this.dropdownLabel.element, mouseOver);
+        });
+        addEvent(dropdown, mouseOut, (): void => {
+            fireEvent(this.dropdownLabel.element, mouseOut);
+        });
+        addEvent(dropdown, 'change', (): void => {
+            const button = this.buttons[dropdown.selectedIndex - 1];
+            fireEvent(button.element, 'click');
         });
 
         this.zoomText = renderer
-            .label((lang && lang.rangeSelectorZoom) || '', 0)
+            .label(lang.rangeSelectorZoom || '', 0)
             .attr({
                 padding: options.buttonTheme.padding,
                 height: options.buttonTheme.height,
@@ -1324,69 +1422,99 @@ class RangeSelector {
 
         if (!this.chart.styledMode) {
             this.zoomText.css(options.labelStyle);
-
-            buttonTheme['stroke-width'] = pick(buttonTheme['stroke-width'], 0);
+            options.buttonTheme['stroke-width'] ??= 0;
         }
+
 
         createElement('option', {
             textContent: this.zoomText.textStr,
             disabled: true
         }, void 0, dropdown);
 
+        this.createButtons();
+    }
+
+    private createButtons(): void {
+        const { options } = this;
+        const buttonTheme = merge(options.buttonTheme);
+        const states = buttonTheme && buttonTheme.states;
+
+        // Prevent the button from resetting the width when the button state
+        // changes since we need more control over the width when collapsing
+        // the buttons
+        const width = buttonTheme.width || 28;
+        delete buttonTheme.width;
+        delete buttonTheme.states;
+
         this.buttonOptions.forEach((
             rangeOptions: RangeSelectorButtonOptions,
             i: number
         ): void => {
+            this.createButton(rangeOptions, i, width, states);
+        });
+    }
+
+    private createButton(
+        rangeOptions: RangeSelectorButtonOptions,
+        i: number,
+        width: number,
+        states?: ButtonThemeStatesObject
+    ): void {
+        const { dropdown, buttons, chart, options } = this;
+        const renderer = chart.renderer;
+        const buttonTheme = merge(options.buttonTheme);
+        dropdown?.add(
             createElement('option', {
                 textContent: rangeOptions.title || rangeOptions.text
-            }, void 0, dropdown);
+            }) as HTMLOptionElement,
+            i + 2
+        );
 
-            buttons[i] = renderer
-                .button(
-                    rangeOptions.text,
-                    0,
-                    0,
-                    (e: (Event|AnyRecord)): void => {
+        buttons[i] = renderer
+            .button(
+                rangeOptions.text ?? '',
+                0,
+                0,
+                (e): void => {
 
-                        // extract events from button object and call
-                        const buttonEvents = (
-                            rangeOptions.events && rangeOptions.events.click
-                        );
+                    // Extract events from button object and call
+                    const buttonEvents = (
+                        rangeOptions.events && rangeOptions.events.click
+                    );
 
-                        let callDefaultEvent;
+                    let callDefaultEvent;
 
-                        if (buttonEvents) {
-                            callDefaultEvent =
-                                buttonEvents.call(rangeOptions, e as any);
-                        }
+                    if (buttonEvents) {
+                        callDefaultEvent =
+                            buttonEvents.call(rangeOptions, e as any);
+                    }
 
-                        if (callDefaultEvent !== false) {
-                            this.clickButton(i);
-                        }
+                    if (callDefaultEvent !== false) {
+                        this.clickButton(i);
+                    }
 
-                        this.isActive = true;
-                    },
-                    buttonTheme,
-                    states && states.hover,
-                    states && states.select,
-                    states && states.disabled
-                )
-                .attr({
-                    'text-align': 'center',
-                    width
-                })
-                .add(this.buttonGroup);
+                    this.isActive = true;
+                },
+                buttonTheme,
+                states && states.hover,
+                states && states.select,
+                states && states.disabled
+            )
+            .attr({
+                'text-align': 'center',
+                width
+            })
+            .add(this.buttonGroup);
 
-            if (rangeOptions.title) {
-                buttons[i].attr('title', rangeOptions.title);
-            }
-        });
+        if (rangeOptions.title) {
+            buttons[i].attr('title', rangeOptions.title);
+        }
     }
 
     /**
      * Align the elements horizontally and vertically.
      *
-     * @private
+     * @internal
      * @function Highcharts.RangeSelector#alignElements
      */
     public alignElements(): void {
@@ -1413,16 +1541,17 @@ class RangeSelector {
         } = options;
 
         // Get the X offset required to avoid overlapping with the exporting
-        // button. This is is used both by the buttonGroup and the inputGroup.
+        // button. This is used both by the buttonGroup and the inputGroup.
         const getXOffsetForExportButton = (
             group: SVGElement,
-            position: RangeSelectorPositionOptions
+            position: RangeSelectorPositionOptions,
+            rightAligned?: boolean
         ): number => {
             if (
                 navButtonOptions &&
                 this.titleCollision(chart) &&
                 verticalAlign === 'top' &&
-                position.align === 'right' && (
+                rightAligned && (
                     (
                         position.y -
                         group.getBBox().height - 12
@@ -1459,7 +1588,7 @@ class RangeSelector {
                         button: SVGElement,
                         i: number
                     ): void => {
-                        width += button.width;
+                        width += button.width || 0;
                         if (i !== buttons.length - 1) {
                             width += options.buttonSpacing;
                         }
@@ -1469,15 +1598,20 @@ class RangeSelector {
                 }
 
                 plotLeft -= chart.spacing[3];
-                this.updateButtonStates();
 
                 // Detect collision between button group and exporting
                 const xOffsetForExportButton = getXOffsetForExportButton(
                     buttonGroup,
-                    buttonPosition
+                    buttonPosition,
+                    buttonPosition.align === 'right' ||
+                    inputPosition.align === 'right'
                 );
 
                 this.alignButtonGroup(xOffsetForExportButton);
+                if (this.buttonGroup?.translateY) {
+                    this.dropdownLabel
+                        .attr({ y: this.buttonGroup.translateY });
+                }
 
                 // Skip animation
                 group.placed = buttonGroup.placed = chart.hasLoaded;
@@ -1485,11 +1619,13 @@ class RangeSelector {
 
             let xOffsetForExportButton = 0;
 
-            if (inputGroup) {
+            if (options.inputEnabled && inputGroup) {
                 // Detect collision between the input group and exporting button
                 xOffsetForExportButton = getXOffsetForExportButton(
                     inputGroup,
-                    inputPosition
+                    inputPosition,
+                    buttonPosition.align === 'right' ||
+                    inputPosition.align === 'right'
                 );
 
                 if (inputPosition.align === 'left') {
@@ -1506,14 +1642,13 @@ class RangeSelector {
                     y: inputPosition.y,
                     width: inputGroup.getBBox().width,
                     align: inputPosition.align,
-                    // fix wrong getBBox() value on right align
+                    // Fix wrong getBBox() value on right align
                     x: inputPosition.x + translateX - 2
                 }, true, chart.spacingBox);
 
                 // Skip animation
                 inputGroup.placed = chart.hasLoaded;
             }
-
             this.handleCollision(xOffsetForExportButton);
 
             // Vertical align
@@ -1537,7 +1672,7 @@ class RangeSelector {
                     !legendOptions.floating ?
                         (
                             chart.legend.legendHeight +
-                            pick(legendOptions.margin, 10)
+                            (legendOptions.margin ?? 10)
                         ) :
                         0
                 );
@@ -1598,10 +1733,95 @@ class RangeSelector {
         }
     }
 
+    /** @internal */
+    public redrawElements(): void {
+        const chart = this.chart,
+            { inputBoxHeight, inputBoxBorderColor } = this.options;
+
+        this.maxDateBox?.attr({
+            height: inputBoxHeight
+        });
+
+        this.minDateBox?.attr({
+            height: inputBoxHeight
+        });
+
+        if (!chart.styledMode) {
+            this.maxDateBox?.attr({
+                stroke: inputBoxBorderColor
+            });
+
+            this.minDateBox?.attr({
+                stroke: inputBoxBorderColor
+            });
+        }
+
+        if (this.isDirty) {
+
+            this.isDirty = false;
+            // Reset this prop to force redrawing collapse of buttons
+            this.isCollapsed = void 0;
+            const newButtonsOptions = this.options.buttons ?? [];
+            const btnLength = Math.min(
+                newButtonsOptions.length,
+                this.buttonOptions.length
+            );
+            const { dropdown, options } = this;
+            const buttonTheme = merge(options.buttonTheme);
+            const states = buttonTheme && buttonTheme.states;
+
+            // Prevent the button from resetting the width when the button state
+            // changes since we need more control over the width when collapsing
+            // the buttons
+            const width = buttonTheme.width || 28;
+
+
+            // Destroy additional buttons
+            if (newButtonsOptions.length < this.buttonOptions.length) {
+                for (
+                    let i = this.buttonOptions.length - 1;
+                    i >= newButtonsOptions.length;
+                    i--
+                ) {
+                    const btn = this.buttons.pop();
+                    btn?.destroy();
+                    this.dropdown?.options.remove(i + 1);
+                }
+            }
+
+            // Update current buttons
+            for (let i = btnLength - 1; i >= 0; i--) {
+                const rangeOptions = newButtonsOptions[i];
+                this.buttons[i].destroy();
+                dropdown?.options.remove(i + 1);
+                this.createButton(rangeOptions, i, width, states);
+                this.computeButtonRange(rangeOptions);
+            }
+
+            // Create missing buttons
+            if (newButtonsOptions.length > this.buttonOptions.length) {
+                for (
+                    let i = this.buttonOptions.length;
+                    i < newButtonsOptions.length;
+                    i++
+                ) {
+                    this.createButton(newButtonsOptions[i], i, width, states);
+                    this.computeButtonRange(newButtonsOptions[i]);
+                }
+            }
+            this.buttonOptions = this.options.buttons ?? [];
+
+            if (defined(this.options.selected) && this.buttons.length) {
+                this.clickButton(this.options.selected, false);
+            }
+
+        }
+    }
+
     /**
      * Align the button group horizontally and vertically.
      *
-     * @private
+     * @internal
      * @function Highcharts.RangeSelector#alignButtonGroup
      * @param {number} xOffsetForExportButton
      * @param {number} [width]
@@ -1610,22 +1830,45 @@ class RangeSelector {
         xOffsetForExportButton: number,
         width?: number
     ): void {
-        const { chart, options, buttonGroup, buttons } = this;
+        const { chart, options, buttonGroup, dropdown, dropdownLabel } = this;
         const { buttonPosition } = options;
         const plotLeft = chart.plotLeft - chart.spacing[3];
         let translateX = buttonPosition.x - chart.spacing[3];
+        let dropdownTranslateX = chart.plotLeft;
 
         if (buttonPosition.align === 'right') {
             translateX += xOffsetForExportButton - plotLeft; // #13014
+
+            if (this.hasVisibleDropdown) {
+                dropdownTranslateX = chart.chartWidth +
+                    xOffsetForExportButton -
+                    this.maxButtonWidth() - 20;
+            }
         } else if (buttonPosition.align === 'center') {
             translateX -= plotLeft / 2;
+
+            if (this.hasVisibleDropdown) {
+                dropdownTranslateX = chart.chartWidth / 2 -
+                this.maxButtonWidth();
+            }
         }
+
+        if (dropdown) {
+            css(dropdown, {
+                left: dropdownTranslateX + 'px',
+                top: buttonGroup?.translateY + 'px'
+            });
+        }
+
+        dropdownLabel?.attr({
+            x: dropdownTranslateX
+        });
 
         if (buttonGroup) {
             // Align button group
             buttonGroup.align({
                 y: buttonPosition.y,
-                width: pick(width, this.initialButtonGroupWidth),
+                width: (width ?? this.initialButtonGroupWidth),
                 align: buttonPosition.align,
                 x: translateX
             }, true, chart.spacingBox);
@@ -1633,7 +1876,7 @@ class RangeSelector {
     }
 
     /**
-     * @private
+     * @internal
      * @function Highcharts.RangeSelector#positionButtons
      */
     public positionButtons(): void {
@@ -1652,7 +1895,7 @@ class RangeSelector {
         if (zoomText && zoomText.visibility !== 'hidden') {
             // #8769, allow dynamically updating margins
             zoomText[verb]({
-                x: pick(plotLeft + buttonPosition.x, plotLeft)
+                x: plotLeft + (buttonPosition.x ?? 0)
             });
 
             // Button start position
@@ -1664,18 +1907,31 @@ class RangeSelector {
             if (buttons[i].visibility !== 'hidden') {
                 buttons[i][verb]({ x: buttonLeft });
 
-                // increase button position for the next button
-                buttonLeft += buttons[i].width + options.buttonSpacing;
+                // Increase the button position for the next button
+                buttonLeft += (buttons[i].width || 0) + options.buttonSpacing;
             } else {
                 buttons[i][verb]({ x: plotLeft });
             }
         }
     }
 
+    public maxButtonWidth = (): number => {
+        let buttonWidth = 0;
+
+        this.buttons.forEach((button): void => {
+            const bBox = button.getBBox();
+            if (bBox.width > buttonWidth) {
+                buttonWidth = bBox.width;
+            }
+        });
+
+        return buttonWidth;
+    };
+
     /**
      * Handle collision between the button group and the input group
      *
-     * @private
+     * @internal
      * @function Highcharts.RangeSelector#handleCollision
      *
      * @param  {number} xOffsetForExportButton
@@ -1686,7 +1942,8 @@ class RangeSelector {
         const {
             chart,
             buttonGroup,
-            inputGroup
+            inputGroup,
+            initialButtonGroupWidth
         } = this;
 
         const {
@@ -1694,49 +1951,6 @@ class RangeSelector {
             dropdown,
             inputPosition
         } = this.options;
-
-        const maxButtonWidth = (): number => {
-            let buttonWidth = 0;
-
-            this.buttons.forEach((button): void => {
-                const bBox = button.getBBox();
-                if (bBox.width > buttonWidth) {
-                    buttonWidth = bBox.width;
-                }
-            });
-
-            return buttonWidth;
-        };
-
-        const groupsOverlap = (buttonGroupWidth: number): boolean => {
-            if (inputGroup && buttonGroup) {
-                const inputGroupX = (
-                    inputGroup.alignAttr.translateX +
-                    inputGroup.alignOptions.x -
-                    xOffsetForExportButton +
-                    // getBBox for detecing left margin
-                    inputGroup.getBBox().x +
-                    // 2px padding to not overlap input and label
-                    2
-                );
-
-                const inputGroupWidth = inputGroup.alignOptions.width;
-
-                const buttonGroupX = buttonGroup.alignAttr.translateX +
-                    buttonGroup.getBBox().x;
-
-                return (buttonGroupX + buttonGroupWidth > inputGroupX) &&
-                    (inputGroupX + inputGroupWidth > buttonGroupX) &&
-                    (
-                        buttonPosition.y <
-                        (
-                            inputPosition.y +
-                            inputGroup.getBBox().height
-                        )
-                    );
-            }
-            return false;
-        };
 
         const moveInputsDown = (): void => {
             if (inputGroup && buttonGroup) {
@@ -1752,227 +1966,132 @@ class RangeSelector {
             }
         };
 
-        if (buttonGroup) {
-            if (dropdown === 'always') {
-                this.collapseButtons(xOffsetForExportButton);
+        // Detect collision
+        if (inputGroup && buttonGroup) {
+            if (inputPosition.align === buttonPosition.align) {
+                moveInputsDown();
 
-                if (groupsOverlap(maxButtonWidth())) {
-                    // Move the inputs down if there is still a collision
-                    // after collapsing the buttons
+                if (
+                    initialButtonGroupWidth >
+                    chart.plotWidth + xOffsetForExportButton - 20
+                ) {
+                    this.collapseButtons();
+                } else {
+                    this.expandButtons();
+                }
+            } else if (
+                initialButtonGroupWidth -
+                xOffsetForExportButton +
+                inputGroup.getBBox().width >
+                chart.plotWidth
+            ) {
+                if (dropdown === 'responsive' || dropdown === 'always') {
+                    this.collapseButtons();
+                } else {
                     moveInputsDown();
                 }
-                return;
+            } else {
+                this.expandButtons();
+            }
+        } else if (buttonGroup && dropdown === 'responsive') {
+            if (initialButtonGroupWidth > chart.plotWidth) {
+                this.collapseButtons();
+            } else {
+                this.expandButtons();
+            }
+        }
+
+        // Forced states
+        if (buttonGroup) {
+            if (dropdown === 'always') {
+                this.collapseButtons();
             }
             if (dropdown === 'never') {
                 this.expandButtons();
             }
         }
 
-        // Detect collision
-        if (inputGroup && buttonGroup) {
-            if (
-                (inputPosition.align === buttonPosition.align) ||
-                // 20 is minimal spacing between elements
-                groupsOverlap(this.initialButtonGroupWidth + 20)
-            ) {
-                if (dropdown === 'responsive') {
-                    this.collapseButtons(xOffsetForExportButton);
-
-                    if (groupsOverlap(maxButtonWidth())) {
-                        moveInputsDown();
-                    }
-                } else {
-                    moveInputsDown();
-                }
-            } else if (dropdown === 'responsive') {
-                this.expandButtons();
-            }
-        } else if (buttonGroup && dropdown === 'responsive') {
-            if (this.initialButtonGroupWidth > chart.plotWidth) {
-                this.collapseButtons(xOffsetForExportButton);
-            } else {
-                this.expandButtons();
-            }
-        }
+        this.alignButtonGroup(xOffsetForExportButton);
     }
 
     /**
-     * Collapse the buttons and put the select element on top.
+     * Collapse the buttons and show the select element.
      *
-     * @private
+     * @internal
      * @function Highcharts.RangeSelector#collapseButtons
-     * @param {number} xOffsetForExportButton
      */
-    public collapseButtons(xOffsetForExportButton: number): void {
+    public collapseButtons(): void {
         const {
             buttons,
-            buttonOptions,
-            chart,
-            dropdown,
-            options,
             zoomText
         } = this;
 
-        const userButtonTheme = (
-            chart.userOptions.rangeSelector &&
-            chart.userOptions.rangeSelector.buttonTheme
-        ) || {};
-
-        const getAttribs = (text?: string): SVGAttributes => ({
-            text: text ? `${text} ▾` : '▾',
-            width: 'auto',
-            paddingLeft: pick(
-                options.buttonTheme.paddingLeft,
-                userButtonTheme.padding,
-                8
-            ),
-            paddingRight: pick(
-                options.buttonTheme.paddingRight,
-                userButtonTheme.padding,
-                8
-            )
-        } as unknown as SVGAttributes);
-
-        if (zoomText) {
-            zoomText.hide();
+        if (this.isCollapsed === true) {
+            return;
         }
 
-        let hasActiveButton = false;
+        this.isCollapsed = true;
 
-        buttonOptions.forEach((
-            rangeOptions: RangeSelectorButtonOptions,
-            i: number
-        ): void => {
-            const button = buttons[i];
-            if (button.state !== 2) {
-                button.hide();
-            } else {
-                button.show();
-                button.attr(getAttribs(rangeOptions.text));
-
-                hasActiveButton = true;
-            }
-        });
-
-        if (!hasActiveButton) {
-            if (dropdown) {
-                dropdown.selectedIndex = 0;
-            }
-
-            buttons[0].show();
-            buttons[0].attr(getAttribs(this.zoomText && this.zoomText.textStr));
-        }
-
-        const { align } = options.buttonPosition;
-
-        this.positionButtons();
-
-        if (align === 'right' || align === 'center') {
-            this.alignButtonGroup(
-                xOffsetForExportButton,
-                buttons[this.currentButtonIndex()].getBBox().width
-            );
-        }
-
+        zoomText.hide();
+        buttons.forEach((button): void => void button.hide());
         this.showDropdown();
     }
 
     /**
      * Show all the buttons and hide the select element.
      *
-     * @private
+     * @internal
      * @function Highcharts.RangeSelector#expandButtons
      */
     public expandButtons(): void {
         const {
             buttons,
-            buttonOptions,
-            options,
             zoomText
         } = this;
 
+        if (this.isCollapsed === false) {
+            return;
+        }
+
+        this.isCollapsed = false;
+
         this.hideDropdown();
-
-        if (zoomText) {
-            zoomText.show();
-        }
-
-        buttonOptions.forEach((
-            rangeOptions: RangeSelectorButtonOptions,
-            i: number
-        ): void => {
-            const button = buttons[i];
-
-            button.show();
-            button.attr({
-                text: rangeOptions.text,
-                width: options.buttonTheme.width || 28,
-                paddingLeft: pick(options.buttonTheme.paddingLeft, 'unset'),
-                paddingRight: pick(options.buttonTheme.paddingRight, 'unset')
-            } as SVGAttributes);
-
-            if (button.state < 2) {
-                button.setState(0);
-            }
-        });
-
+        zoomText.show();
+        buttons.forEach((button): void => void button.show());
         this.positionButtons();
-    }
-
-    /**
-     * Get the index of the visible button when the buttons are collapsed.
-     *
-     * @private
-     * @function Highcharts.RangeSelector#currentButtonIndex
-     */
-    public currentButtonIndex(): number {
-        const { dropdown } = this;
-
-        if (dropdown && dropdown.selectedIndex > 0) {
-            return dropdown.selectedIndex - 1;
-        }
-        return 0;
     }
 
     /**
      * Position the select element on top of the button.
      *
-     * @private
+     * @internal
      * @function Highcharts.RangeSelector#showDropdown
      */
     public showDropdown(): void {
         const {
             buttonGroup,
-            buttons,
-            chart,
+            dropdownLabel,
             dropdown
         } = this;
-
         if (buttonGroup && dropdown) {
-            const { translateX, translateY } = buttonGroup;
-            const bBox = buttons[this.currentButtonIndex()].getBBox();
-            css(dropdown, {
-                left: (chart.plotLeft + translateX) + 'px',
-                top: (translateY + 0.5) + 'px',
-                width: bBox.width + 'px',
-                height: bBox.height + 'px'
-            });
+            dropdownLabel.show();
+
+            css(dropdown, { visibility: 'inherit' });
             this.hasVisibleDropdown = true;
         }
     }
 
     /**
-     * @private
+     * @internal
      * @function Highcharts.RangeSelector#hideDropdown
      */
     public hideDropdown(): void {
         const { dropdown } = this;
 
         if (dropdown) {
+            this.dropdownLabel.hide();
             css(dropdown, {
-                top: '-9999em',
-                width: '1px',
-                height: '1px'
+                visibility: 'hidden'
             });
             this.hasVisibleDropdown = false;
         }
@@ -1981,7 +2100,7 @@ class RangeSelector {
     /**
      * Extracts height of range selector
      *
-     * @private
+     * @internal
      * @function Highcharts.RangeSelector#getHeight
      * @return {number}
      * Returns rangeSelector height
@@ -2006,6 +2125,7 @@ class RangeSelector {
         // between wrapped and non-wrapped layout
         this.alignElements();
 
+
         rangeSelectorHeight = rangeSelectorGroup ?
             // 13px to keep back compatibility
             (rangeSelectorGroup.getBBox(true).height) + 13 +
@@ -2014,7 +2134,8 @@ class RangeSelector {
 
         const minPosition = Math.min(inputPositionY, buttonPositionY);
 
-        if ((inputPositionY < 0 && buttonPositionY < 0) ||
+        if (
+            (inputPositionY < 0 && buttonPositionY < 0) ||
             (inputPositionY > 0 && buttonPositionY > 0)
         ) {
             rangeSelectorHeight += Math.abs(minPosition);
@@ -2026,7 +2147,7 @@ class RangeSelector {
     /**
      * Detect collision with title or subtitle
      *
-     * @private
+     * @internal
      * @function Highcharts.RangeSelector#titleCollision
      * @return {boolean}
      * Returns collision status
@@ -2043,26 +2164,39 @@ class RangeSelector {
     /**
      * Update the range selector with new options
      *
-     * @private
+     * @internal
      * @function Highcharts.RangeSelector#update
      * @param {Highcharts.RangeSelectorOptions} options
      */
     public update(
-        options: RangeSelectorOptions
+        options: RangeSelectorOptions,
+        redraw: boolean = true
     ): void {
         const chart = this.chart;
-        merge(true, chart.options.rangeSelector, options);
+        merge(true, this.options, options);
+        if (
+            this.options.selected &&
+            this.options.selected >= this.options.buttons!.length
+        ) {
+            this.options.selected = void 0;
+            chart.options.rangeSelector!.selected = void 0;
+        }
+        if (defined(options.enabled)) {
+            this.destroy();
+            return this.init(chart);
+        }
 
-        this.destroy();
-        this.init(chart);
+        this.isDirty = !!options.buttons || !!options.buttonTheme;
 
-        this.render();
+        if (redraw) {
+            this.render();
+        }
     }
 
     /**
      * Destroys allocated elements.
      *
-     * @private
+     * @internal
      * @function Highcharts.RangeSelector#destroy
      */
     public destroy(): void {
@@ -2094,17 +2228,21 @@ class RangeSelector {
                 if (val instanceof SVGElement) {
                     // SVGElement
                     val.destroy();
+
                 } else if (
                     val instanceof window.HTMLElement
                 ) {
                     // HTML element
                     discardElement(val);
                 }
+                delete rSelector[key];
             }
             if (val !== RangeSelector.prototype[key]) {
                 (rSelector as any)[key] = null;
             }
         }, this);
+
+        this.buttons = [];
     }
 }
 
@@ -2114,48 +2252,15 @@ class RangeSelector {
  *
  * */
 
+/** @internal */
 interface RangeSelector {
-    defaultButtons: Array<RangeSelectorButtonOptions>;
     inputTypeFormats: Record<string, string>;
 }
 
 extend(RangeSelector.prototype, {
     /**
-     * The default buttons for pre-selecting time frames.
-     * @private
-     */
-    defaultButtons: [{
-        type: 'month',
-        count: 1,
-        text: '1m',
-        title: 'View 1 month'
-    }, {
-        type: 'month',
-        count: 3,
-        text: '3m',
-        title: 'View 3 months'
-    }, {
-        type: 'month',
-        count: 6,
-        text: '6m',
-        title: 'View 6 months'
-    }, {
-        type: 'ytd',
-        text: 'YTD',
-        title: 'View year to date'
-    }, {
-        type: 'year',
-        count: 1,
-        text: '1y',
-        title: 'View 1 year'
-    }, {
-        type: 'all',
-        text: 'All',
-        title: 'View all'
-    }],
-    /**
      * The date formats to use when setting min, max and value on date inputs.
-     * @private
+     * @internal
      */
     inputTypeFormats: {
         'datetime-local': '%Y-%m-%dT%H:%M:%S',
@@ -2170,6 +2275,7 @@ extend(RangeSelector.prototype, {
  *
  * */
 
+/** @internal */
 namespace RangeSelector {
     export interface InputElements {
         dateBox: SVGElement;
@@ -2188,6 +2294,7 @@ namespace RangeSelector {
  *
  * */
 
+/** @internal */
 export default RangeSelector;
 
 /* *
@@ -2210,8 +2317,8 @@ export default RangeSelector;
  * @param {global.Event} e
  *        Event arguments.
  *
- * @param {boolean|undefined}
- *        Return false to cancel the default button event.
+ * @return {boolean|undefined}
+ *         Return false to cancel the default button event.
  */
 
 /**
@@ -2227,4 +2334,4 @@ export default RangeSelector;
  *         Parsed JavaScript time value.
  */
 
-(''); // keeps doclets above in JS file
+(''); // Keeps doclets above in JS file

@@ -1,4 +1,9 @@
-@import "https://code.highcharts.com/css/highcharts.css";
+@import url("https://code.highcharts.com/css/highcharts.css");
+
+body {
+    background: var(--highcharts-background-color);
+    color: var(--highcharts-neutral-color-100);
+}
 
 #container {
     max-width: 800px;
@@ -8,5 +13,4 @@
 .highcharts-treegrid-node-level-1 {
     font-size: 13px;
     font-weight: bold;
-    fill: black;
 }

@@ -3,12 +3,12 @@ Highcharts.stockChart('container', {
         height: 600,
         events: {
             load: function () {
-                var chart = this,
+                const chart = this,
                     rawSeries = chart.series[0],
                     groupedSeries = chart.series[1];
 
                 setInterval(function () {
-                    var randomNumber = Math.random() * 5;
+                    const randomNumber = Math.random() * 5;
 
                     rawSeries.addPoint(randomNumber, false);
                     groupedSeries.addPoint(randomNumber);
@@ -34,6 +34,12 @@ Highcharts.stockChart('container', {
             text: 'Last anchor set to last point'
         }
     }],
+    plotOptions: {
+        series: {
+            pointStart: '2025-01-01',
+            pointInterval: 24 * 36e5
+        }
+    },
     series: [{
         data: [5, 4, 4, 3, 5, 3, 2, 1, 2, 3, 1, 2, 2, 1, 3],
         dataGrouping: {
@@ -47,7 +53,7 @@ Highcharts.stockChart('container', {
             enabled: true,
             forced: true,
             units: [
-                ['millisecond', [5]]
+                ['week', [1]]
             ],
             lastAnchor: 'lastPoint'
         }

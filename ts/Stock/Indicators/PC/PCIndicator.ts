@@ -1,8 +1,9 @@
 /* *
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -14,6 +15,7 @@
  *
  * */
 
+import type { IndicatorLinkedSeriesBase } from '../IndicatorBase';
 import type IndicatorValuesObject from '../IndicatorValuesObject';
 import type LineSeries from '../../../Series/Line/LineSeries';
 import type {
@@ -24,16 +26,9 @@ import type PCPoint from './PCPoint';
 
 import AU from '../ArrayUtilities.js';
 import MultipleLinesComposition from '../MultipleLinesComposition.js';
-import Palettes from '../../../Core/Color/Palettes.js';
+import SMAIndicator from '../SMA/SMAIndicator.js';
 import SeriesRegistry from '../../../Core/Series/SeriesRegistry.js';
-const {
-    sma: SMAIndicator
-} = SeriesRegistry.seriesTypes;
-import U from '../../../Core/Utilities.js';
-const {
-    merge,
-    extend
-} = U;
+import { extend, merge } from '../../../Shared/Utilities.js';
 
 /* *
  *
@@ -44,7 +39,6 @@ const {
 /**
  * The Price Channel series type.
  *
- * @private
  * @class
  * @name Highcharts.seriesTypes.pc
  *
@@ -72,26 +66,26 @@ class PCIndicator extends SMAIndicator {
      *               navigatorOptions, pointInterval, pointIntervalUnit,
      *               pointPlacement, pointRange, pointStart, showInNavigator,
      *               stacking
-     * @requires     stock/indicators/indicators
-     * @requires     stock/indicators/price-channel
+     * @requires     indicators/indicators
+     * @requires     indicators/price-channel
      * @optionparent plotOptions.pc
+     * @internal
      */
     public static defaultOptions: PCOptions = merge(SMAIndicator.defaultOptions, {
         /**
          * Option for fill color between lines in Price channel Indicator.
          *
          * @sample {highstock} stock/indicators/indicator-area-fill
-         *      background fill between lines
+         *      Background fill between lines.
          *
          * @type {Highcharts.Color}
          * @apioption plotOptions.pc.fillColor
-         *
          */
         /**
          * @excluding index
          */
         params: {
-            index: void 0, // unchangeable index, do not inherit (#15362)
+            index: void 0, // Unchangeable index, do not inherit (#15362)
             period: 20
         },
         lineWidth: 1,
@@ -103,7 +97,7 @@ class PCIndicator extends SMAIndicator {
                  *
                  * @type {Highcharts.ColorString}
                  */
-                lineColor: Palettes.colors[2],
+                lineColor: 'var(--highcharts-color-2)',
                 /**
                  * Pixel width of the line.
                  */
@@ -118,7 +112,7 @@ class PCIndicator extends SMAIndicator {
                  *
                  * @type {Highcharts.ColorString}
                  */
-                lineColor: Palettes.colors[8],
+                lineColor: 'var(--highcharts-color-8)',
                 /**
                  * Pixel width of the line.
                  */
@@ -136,9 +130,9 @@ class PCIndicator extends SMAIndicator {
      *
      * */
 
-    public data: Array<PCPoint> = void 0 as any;
-    public options: PCOptions = void 0 as any;
-    public points: Array<PCPoint> = void 0 as any;
+    public data!: Array<PCPoint>;
+    public options!: PCOptions;
+    public points!: Array<PCPoint>;
 
     /* *
      *
@@ -146,25 +140,27 @@ class PCIndicator extends SMAIndicator {
      *
      * */
 
+    /** @internal */
     public getValues<TLinkedSeries extends LineSeries>(
-        series: TLinkedSeries,
+        series: TLinkedSeries&IndicatorLinkedSeriesBase,
         params: PCParamsOptions
     ): (IndicatorValuesObject<TLinkedSeries> | undefined) {
-        let period: number = (params.period as any),
+        const period: number = (params.period as any),
             xVal: Array<number> = (series.xData as any),
             yVal: Array<Array<number>> = (series.yData as any),
             yValLen: number = yVal ? yVal.length : 0,
             // 0- date, 1-top line, 2-middle line, 3-bottom line
             PC: Array<Array<number>> = [],
-            // middle line, top line and bottom line
-            ML: number,
-            TL: number,
-            BL: number,
-            date: number,
+            // Middle line, top line and bottom line
             low = 2,
             high = 1,
             xData: Array<number> = [],
-            yData: Array<Array<number>> = [],
+            yData: Array<Array<number>> = [];
+
+        let ML: number,
+            TL: number,
+            BL: number,
+            date: number,
             slicedY: Array<Array<number>>,
             extremes: [number, number],
             i: number;
@@ -199,6 +195,7 @@ class PCIndicator extends SMAIndicator {
  *
  * */
 
+/** @internal */
 interface PCIndicator extends MultipleLinesComposition.IndicatorComposition {
     nameBase: string;
     nameComponents: Array<string>;
@@ -251,13 +248,13 @@ export default PCIndicator;
  * @extends      series,plotOptions.pc
  * @since        7.0.0
  * @product      highstock
- * @excluding    allAreas, colorAxis, compare, compareBase, dataParser, dataURL,
+ * @excluding    allAreas, colorAxis, compare, compareBase,
  *               joinBy, keys, navigatorOptions, pointInterval,
  *               pointIntervalUnit, pointPlacement, pointRange, pointStart,
  *               showInNavigator, stacking
- * @requires     stock/indicators/indicators
- * @requires     stock/indicators/price-channel
+ * @requires     indicators/indicators
+ * @requires     indicators/price-channel
  * @apioption    series.pc
  */
 
-''; // to include the above in the js output
+''; // To include the above in the js output

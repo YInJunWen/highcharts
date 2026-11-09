@@ -1,12 +1,14 @@
 /* *
  *
- *  (c) 2009-2021 Øystein Moseng
+ *  (c) 2009-2026 Highsoft AS
+ *  Author: Øystein Moseng
  *
  *  Accessibility component for series and points.
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -23,6 +25,7 @@ import type Accessibility from '../../Accessibility';
 import type Chart from '../../../Core/Chart/Chart';
 import type KeyboardNavigationHandler from '../../KeyboardNavigationHandler';
 import type Point from '../../../Core/Series/Point';
+import type Tooltip from '../../../Core/Tooltip';
 
 import AccessibilityComponent from '../../AccessibilityComponent.js';
 import ChartUtilities from '../../Utils/ChartUtilities.js';
@@ -31,9 +34,11 @@ import ForcedMarkers from './ForcedMarkers.js';
 import NewDataAnnouncer from './NewDataAnnouncer.js';
 import Series from '../../../Core/Series/Series.js';
 import SeriesDescriber from './SeriesDescriber.js';
-const { describeSeries } = SeriesDescriber;
+const {
+    compose: composeSeriesDescriber,
+    describeSeries
+} = SeriesDescriber;
 import SeriesKeyboardNavigation from './SeriesKeyboardNavigation.js';
-import Tooltip from '../../../Core/Tooltip.js';
 
 
 /* *
@@ -45,9 +50,10 @@ import Tooltip from '../../../Core/Tooltip.js';
 /**
  * The SeriesComponent class
  *
- * @private
  * @class
  * @name Highcharts.SeriesComponent
+ *
+ * @internal
  */
 class SeriesComponent extends AccessibilityComponent {
 
@@ -58,11 +64,8 @@ class SeriesComponent extends AccessibilityComponent {
      *
      * */
 
-    /* eslint-disable valid-jsdoc */
 
-    /**
-     * @private
-     */
+    /** @internal */
     public static compose(
         ChartClass: typeof Chart,
         PointClass: typeof Point,
@@ -70,6 +73,7 @@ class SeriesComponent extends AccessibilityComponent {
     ): void {
         NewDataAnnouncer.compose(SeriesClass);
         ForcedMarkers.compose(SeriesClass);
+        composeSeriesDescriber(PointClass);
         SeriesKeyboardNavigation.compose(ChartClass, PointClass, SeriesClass);
     }
 
@@ -107,27 +111,29 @@ class SeriesComponent extends AccessibilityComponent {
     }
 
 
-    /**
-     * @private
-     */
+    /** @internal */
     public hideTooltipFromATWhenShown(): void {
         const component = this;
 
-        this.addEvent(Tooltip, 'refresh', function (): void {
-            if (
-                this.chart === component.chart &&
-                this.label &&
-                this.label.element
-            ) {
-                this.label.element.setAttribute('aria-hidden', true);
-            }
-        });
+        if (this.chart.tooltip) {
+            this.addEvent(
+                this.chart.tooltip.constructor as unknown as Tooltip,
+                'refresh',
+                function (): void {
+                    if (
+                        this.chart === component.chart &&
+                        this.label &&
+                        this.label.element
+                    ) {
+                        this.label.element.setAttribute('aria-hidden', true);
+                    }
+                }
+            );
+        }
     }
 
 
-    /**
-     * @private
-     */
+    /** @internal */
     public hideSeriesLabelsFromATWhenShown(): void {
         this.addEvent(
             this.chart as any,
@@ -155,7 +161,7 @@ class SeriesComponent extends AccessibilityComponent {
         ): void {
             const shouldDescribeSeries = (series.options.accessibility &&
                 series.options.accessibility.enabled) !== false &&
-                series.visible;
+                series.visible && series.getPointsCollection().length !== 0;
 
             if (shouldDescribeSeries) {
                 describeSeries(series);
@@ -168,7 +174,8 @@ class SeriesComponent extends AccessibilityComponent {
 
     /**
      * Get keyboard navigation handler for this component.
-     * @private
+     *
+     * @internal
      */
     public getKeyboardNavigation(): KeyboardNavigationHandler {
         return (this.keyboardNavigation as any).getKeyboardNavigationHandler();
@@ -177,7 +184,8 @@ class SeriesComponent extends AccessibilityComponent {
 
     /**
      * Remove traces
-     * @private
+     *
+     * @internal
      */
     public destroy(): void {
         (this as any).newDataAnnouncer.destroy();
@@ -193,6 +201,7 @@ class SeriesComponent extends AccessibilityComponent {
  *
  * */
 
+/** @internal */
 interface SeriesComponent {
     chart: SeriesKeyboardNavigation.ChartComposition;
 }
@@ -204,4 +213,5 @@ interface SeriesComponent {
  *
  * */
 
+/** @internal */
 export default SeriesComponent;

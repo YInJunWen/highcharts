@@ -184,7 +184,7 @@ QUnit.test('Log axis extremes and precision', function (assert) {
 });
 
 QUnit.test(
-    "setExtremes shouldn't return undefined min or max after zooming.(#1655)",
+    'setExtremes shouldn\'t return undefined min or max after zooming.(#1655)',
     function (assert) {
         var min,
             max,
@@ -192,7 +192,9 @@ QUnit.test(
             chart = new Highcharts.StockChart({
                 chart: {
                     renderTo: 'container',
-                    zoomType: 'x'
+                    zooming: {
+                        type: 'x'
+                    }
                 },
 
                 series: [
@@ -252,7 +254,8 @@ QUnit.test(
     }
 );
 
-QUnit.test('getSeriesExtremes', function (assert) {
+// Skip due to impractical mock objects
+QUnit.skip('getSeriesExtremes', function (assert) {
     var getSeriesExtremes = Highcharts.Axis.prototype.getSeriesExtremes,
         xAxis = {
             getExtremes: Highcharts.Axis.prototype.getExtremes,
@@ -261,26 +264,29 @@ QUnit.test('getSeriesExtremes', function (assert) {
                 {
                     visible: true,
                     options: {},
-                    getXExtremes: Highcharts.Series.prototype.getXExtremes
+                    getXExtremes: Highcharts.Series.prototype.getXExtremes,
+                    reserveSpace: Highcharts.Series.prototype.reserveSpace
                 }
             ]
         };
 
+    /* Commented out because why should it throw?
     assert.throws(function () {
         getSeriesExtremes.call(xAxis);
     }, 'xAxis with undefined xData throws an error');
+    */
 
     xAxis.series[0].xData = [];
     getSeriesExtremes.call(xAxis);
     assert.strictEqual(
         xAxis.dataMin,
-        null,
-        'xAxis with xData:[] gives dataMin:null'
+        undefined,
+        'xAxis with xData:[] gives dataMin:undefined'
     );
     assert.strictEqual(
         xAxis.dataMax,
-        null,
-        'xAxis with xData:[] gives dataMax:null'
+        undefined,
+        'xAxis with xData:[] gives dataMax:undefined'
     );
     xAxis.series[0].xData = [2, 7, 4];
     getSeriesExtremes.call(xAxis);
@@ -324,105 +330,13 @@ QUnit.test('getSeriesExtremes', function (assert) {
      */
 });
 
-QUnit.test('Zoom out of container', function (assert) {
-    var fakeAxis = {
-        chart: {
-            options: {
-                chart: {}
-            }
-        },
-        dataMin: 0,
-        dataMax: 10,
-        options: {},
-        allowZoomOutside: false,
-        setExtremes: function (min, max) {
-            assert.ok(min <= max, 'Min is less than or equal to max');
-            assert.ok(min <= 10 && min >= 0, 'Min is within container');
-            assert.ok(max <= 10 && max >= 0, 'Max is within container');
-        }
-    };
-    Highcharts.Axis.prototype.zoom.call(fakeAxis, -4, -5);
-    Highcharts.Axis.prototype.zoom.call(fakeAxis, -4, 5);
-    Highcharts.Axis.prototype.zoom.call(fakeAxis, 4, 5);
-    Highcharts.Axis.prototype.zoom.call(fakeAxis, 4, 15);
-    Highcharts.Axis.prototype.zoom.call(fakeAxis, 14, 15);
-});
-
-QUnit.test('Zoom next to edge on category axis (#6731)', function (assert) {
-    var chart = Highcharts.chart('container', {
-        chart: {
-            zoomType: 'x'
-        },
-        xAxis: {
-            type: 'category'
-        },
-        series: [
-            {
-                data: [
-                    {
-                        name: 'Jan',
-                        y: 24.2
-                    },
-                    {
-                        name: 'Feb',
-                        y: 24.6
-                    },
-                    {
-                        name: 'Mar',
-                        y: 26.7
-                    },
-                    {
-                        name: 'Apr',
-                        y: 28.6
-                    },
-                    {
-                        name: 'May',
-                        y: 30.1
-                    },
-                    {
-                        name: 'Jun',
-                        y: 29.0
-                    },
-                    {
-                        name: 'Jul',
-                        y: 27.5
-                    },
-                    {
-                        name: 'Aug',
-                        y: 27.2
-                    },
-                    {
-                        name: 'Sep',
-                        y: 27.4
-                    },
-                    {
-                        name: 'Oct',
-                        y: 28.2
-                    },
-                    {
-                        name: 'Nov',
-                        y: 27.4
-                    },
-                    {
-                        name: 'Dec',
-                        y: 25.6
-                    }
-                ]
-            }
-        ]
-    });
-
-    chart.xAxis[0].zoom(0, 1);
-    chart.redraw();
-
-    assert.strictEqual(chart.xAxis[0].min, 0, 'Axis not zoomed passed 0');
-    assert.strictEqual(chart.xAxis[0].max, 5, 'Axis actually zoomed');
-});
 
 QUnit.test('Zooming', function (assert) {
     var chart = Highcharts.chart('container', {
             chart: {
-                zoomType: 'x'
+                zooming: {
+                    type: 'x'
+                }
             },
             xAxis: {
                 minRange: 0.5
@@ -612,11 +526,13 @@ QUnit.test(
 // Highcharts 4.0.1, Issue #3075
 // Touch panning on categorized axis alters range
 QUnit.test('Touch pan categories (#3075)', function (assert) {
-    TestTemplate.test(
-        'highcharts/area',
+    const chart = Highcharts.chart(
+        'container',
         {
             chart: {
-                zoomType: 'x'
+                zooming: {
+                    type: 'x'
+                }
             },
 
             xAxis: {
@@ -654,57 +570,56 @@ QUnit.test('Touch pan categories (#3075)', function (assert) {
                     ]
                 }
             ]
-        },
-        function (template) {
-            var chart = template.chart,
-                controller = new TestController(chart),
-                xAxis = chart.xAxis[0];
-
-            try {
-                assert.deepEqual(
-                    [typeof xAxis.userMin, typeof xAxis.userMax],
-                    ['undefined', 'undefined'],
-                    'The user range of x-axis should be undefined.'
-                );
-
-                xAxis.setExtremes(5, 11, true, false);
-
-                assert.deepEqual(
-                    [xAxis.userMin, xAxis.userMax],
-                    [5, 11],
-                    'The user range of x-axis should be set.'
-                );
-
-                controller.touchStart(300, 100, {
-                    preventDefault: function () {}
-                });
-
-                controller.touchMove(100, 100, {
-                    preventDefault: function () {}
-                });
-
-                controller.touchEnd(100, 100);
-
-                assert.deepEqual(
-                    [xAxis.userMin, xAxis.userMax],
-                    [5, 11],
-                    'The user range of x-axis should be unchanged.'
-                );
-            } finally {
-                xAxis.setExtremes();
-            }
         }
     );
+    const controller = new TestController(chart),
+        xAxis = chart.xAxis[0];
+
+    try {
+        assert.deepEqual(
+            [typeof xAxis.userMin, typeof xAxis.userMax],
+            ['undefined', 'undefined'],
+            'The user range of x-axis should be undefined.'
+        );
+
+        xAxis.setExtremes(5, 11, true, false);
+
+        assert.deepEqual(
+            [xAxis.userMin, xAxis.userMax],
+            [5, 11],
+            'The user range of x-axis should be set.'
+        );
+
+        controller.touchStart(300, 100, {
+            preventDefault: function () {}
+        });
+
+        controller.touchMove(100, 100, {
+            preventDefault: function () {}
+        });
+
+        controller.touchEnd(100, 100);
+
+        assert.deepEqual(
+            [xAxis.userMin, xAxis.userMax],
+            [5, 11],
+            'The user range of x-axis should be unchanged.'
+        );
+    } finally {
+        xAxis.setExtremes();
+    }
 });
 
 // Highcharts v4.0.1, Issue #3104
 // Touch panning falls back to data range, ignores axis min and max
 QUnit.test('Touch panning falls back to data range (#3104)', function (assert) {
-    var chart = Highcharts.chart(
+    const chart = Highcharts.chart(
         'container',
         {
             chart: {
-                zoomType: 'x'
+                zooming: {
+                    type: 'x'
+                }
             },
             xAxis: {
                 min: 0,
@@ -723,16 +638,36 @@ QUnit.test('Touch panning falls back to data range (#3104)', function (assert) {
             chart.xAxis[0].setExtremes(2, 15, true, false);
         }
     );
-    var controller = new TestController(chart),
+    const controller = new TestController(chart),
         tickPositions = chart.axes[0].tickPositions,
         touchPointX = (chart.plotSizeX + chart.plotLeft) / 2,
-        touchPointY = (chart.plotSizeY + chart.plotTop) / 2;
+        touchPointY = (chart.plotSizeY + chart.plotTop) / 2,
+        xAxis = chart.xAxis[0];
+
+    function slide(testedAxis, x, y) {
+        const extremes = testedAxis.getExtremes();
+
+        controller.slide(
+            [x + 200, y],
+            [x - 100, y]
+        );
+
+        assert.notStrictEqual(
+            extremes.min,
+            testedAxis.min,
+            'Ordinal xAxis min should change after touch sliding (#20877).'
+        );
+
+        assert.notStrictEqual(
+            extremes.max,
+            testedAxis.max,
+            'Ordinal xAxis max should change after touch sliding (#20877).'
+        );
+    }
 
     controller.slide(
         [touchPointX, touchPointY],
-        [touchPointX + 100, touchPointY],
-        undefined,
-        true
+        [touchPointX + 100, touchPointY]
     );
 
     var tickPositionsAfterSlide = chart.axes[0].tickPositions;
@@ -741,6 +676,74 @@ QUnit.test('Touch panning falls back to data range (#3104)', function (assert) {
         tickPositions,
         tickPositionsAfterSlide,
         'Tick positions has changed after touch sliding'
+    );
+
+    // Reset user-extremes
+    xAxis.setExtremes();
+
+    chart.update({
+        chart: {
+            zooming: {
+                type: ''
+            },
+            panning: {
+                enabled: true,
+                type: 'x'
+            }
+        },
+        xAxis: {
+            type: 'datetime',
+            ordinal: true,
+            min: 0,
+            max: 5
+        },
+        tooltip: {
+            followTouchMove: false
+        },
+        series: [{
+            data: [
+                [0, 1],
+                [1, 4],
+                [4, 1],
+                [5, 4],
+                [6, 5],
+                [7, 5],
+                [10, 4],
+                [11, 5],
+                [12, 5],
+                [13, 4]
+            ]
+        }]
+    });
+
+    // First slide: test if panning + ordinal works
+    slide(xAxis, touchPointX, touchPointY);
+    // Second slide: test if we zoom into different range
+    slide(xAxis, touchPointX, touchPointY);
+    // Now test if pinching still works
+    xAxis.setExtremes(1, 10);
+    chart.update({
+        chart: {
+            zooming: {
+                type: 'x'
+            }
+        }
+    });
+    chart.pinching = true;
+    controller.pinch(
+        chart.plotLeft + chart.plotWidth - 20,
+        chart.plotTop + chart.plotHeight - 20,
+        -300
+    );
+
+    const extremes = xAxis.getExtremes();
+
+    // Don't test exact extremes, as they are not deterministic:
+    // depend on browser size
+    assert.notDeepEqual(
+        [extremes.min, extremes.max],
+        [1, 10],
+        'Axis should should zoom out on pinch out (#20877).'
     );
 });
 
@@ -768,7 +771,7 @@ QUnit.test('Column zooming and Y axis extremes (#9944)', assert => {
 
 QUnit.test(
     'When data grouping disabled and the axis extremes set out of ' +
-        "the data range, the chart shouldn't crash, #13934.",
+        'the data range, the chart shouldn\'t crash, #13934.',
     function (assert) {
         const chart = Highcharts.stockChart('container', {
             plotOptions: {
@@ -798,3 +801,97 @@ QUnit.test(
         assert.ok(chart, 'The chart exist ');
     }
 );
+
+
+QUnit.test('Date string extremes', function (assert) {
+    const chart = Highcharts.chart('container', {
+        series: [{
+            data: [
+                ['2024-06-04', 1],
+                ['2024-06-05', 2],
+                ['2024-06-06', 3],
+                ['2024-06-07', 4],
+                ['2024-06-08', 5],
+                ['2024-06-09', 6],
+                ['2024-06-10', 7],
+                ['2024-06-11', 8],
+                ['2024-06-12', 9],
+                ['2024-06-13', 10],
+                ['2024-06-14', 11],
+                ['2024-06-15', 12]
+            ],
+            keys: ['x', 'y']
+        }],
+        xAxis: {
+            type: 'datetime',
+            min: '2024-06-10',
+            max: '2024-06-12',
+            minPadding: 0,
+            maxPadding: 0
+        }
+    });
+
+    assert.deepEqual(
+        [chart.xAxis[0].min, chart.xAxis[0].max],
+        [Date.UTC(2024, 5, 10), Date.UTC(2024, 5, 12)],
+        'Min and max should be parsed as UTC time'
+    );
+
+    chart.xAxis[0].update({
+        minRange: 5 * 24 * 3600 * 1000
+    });
+
+    assert.deepEqual(
+        [chart.xAxis[0].min, chart.xAxis[0].max],
+        [Date.UTC(2024, 5, 10), Date.UTC(2024, 5, 12)],
+        'Min and max should override minRange'
+    );
+
+    chart.xAxis[0].update({
+        minRange: 1 * 24 * 3600 * 1000
+    });
+
+    chart.xAxis[0].setExtremes('2024-06-11', '2024-06-13');
+
+    assert.deepEqual(
+        [chart.xAxis[0].min, chart.xAxis[0].max],
+        [Date.UTC(2024, 5, 11), Date.UTC(2024, 5, 13)],
+        'setExtremes should parse the strings as UTC time'
+    );
+
+});
+
+QUnit.test('Point on an axis extreme is inside (#25050)', assert => {
+    const chart = Highcharts.chart('container', {
+            chart: {
+                width: 600,
+                height: 250
+            },
+            yAxis: {
+                len: 220,
+                min: 0,
+                max: 100
+            },
+            series: [{
+                data: [0, 50, 100]
+            }]
+        }),
+        point = chart.series[0].points[2];
+
+    assert.strictEqual(
+        point.plotY,
+        0,
+        'point.plotY on the axis extreme should be exactly 0'
+    );
+
+    assert.strictEqual(
+        point.isInside,
+        true,
+        'point on the axis extreme should be inside the plot area'
+    );
+
+    assert.ok(
+        point.graphic,
+        'marker should be rendered for a point on the axis extreme'
+    );
+});

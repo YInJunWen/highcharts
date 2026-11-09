@@ -1,0 +1,47 @@
+name: Post-release
+
+on:
+  push:
+    tags:
+      - v*
+  workflow_dispatch:
+    inputs:
+      dryrun:
+        description: 'Whether to update the nightly branch on highcharts-dist'
+        required: false
+        default: true
+        type: boolean
+
+permissions:
+   contents: read # to fetch code (actions/checkout)
+
+jobs:
+  generate_release_reference_images:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 'lts/*'
+          cache: 'npm'
+
+      - run: echo ${{github.ref_name}}
+
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+
+      - name: Generate release reference images
+        env:
+          VISUAL_TEST_REFERENCE: '1'
+        run: npm run test:pw:visual
+
+      - name: Prepare release reference report
+        run: node -e "require('node:fs').writeFileSync('test/visual-test-results.json', '{}')"
+
+      - name: Publish release reference images
+        if: ${{ github.event_name == 'push' || inputs.dryrun == false }}
+        env:
+          VISUAL_REVIEW_API_KEY: ${{secrets.VISUAL_REVIEW_INGESTION_API_KEY}}
+        run: npx gulp update-nightly-testresults --tag "${{github.ref_name}}"
+

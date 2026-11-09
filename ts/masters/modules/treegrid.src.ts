@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: LicenseRef-Highcharts
 /**
  * @license Highcharts Gantt JS v@product.version@ (@product.date@)
  * @module highcharts/modules/treegrid
@@ -5,13 +6,15 @@
  *
  * Tree Grid
  *
- * (c) 2016-2021 Jon Arild Nygard
+ * (c) 2016-2026 Highsoft AS
+ * Author: Jon Arild Nygård
  *
- * License: www.highcharts.com/license
+ * A commercial license may be required depending on use,
+ * see www.highcharts.com/license
  */
 'use strict';
 import Highcharts from '../../Core/Globals.js';
 import TreeGridAxis from '../../Core/Axis/TreeGrid/TreeGridAxis.js';
 const G: AnyRecord = Highcharts;
-// Compositions
 TreeGridAxis.compose(G.Axis, G.Chart, G.Series, G.Tick);
+export default Highcharts;

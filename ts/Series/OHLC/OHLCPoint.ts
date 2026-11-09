@@ -1,10 +1,12 @@
 /* *
  *
- *  (c) 2010-2021 Torstein Honsi
+ *  (c) 2010-2026 Highsoft AS
+ *  Author: Torstein Hønsi
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -18,15 +20,10 @@
 
 import type OHLCPointOptions from './OHLCPointOptions';
 import type OHLCSeries from './OHLCSeries';
-import type { SeriesZonesOptions } from './../../Core/Series/SeriesOptions';
-import Point from './../../Core/Series/Point.js';
-import SeriesRegistry from '../../Core/Series/SeriesRegistry.js';
+import type Series from './../../Core/Series/Series';
 
-const {
-    seriesTypes: {
-        hlc: HLCSeries
-    }
-} = SeriesRegistry;
+import Point from './../../Core/Series/Point.js';
+import HLCSeries from '../HLC/HLCSeries.js';
 
 /* *
  *
@@ -42,21 +39,22 @@ class OHLCPoint extends HLCSeries.prototype.pointClass {
      *
      * */
 
-    public open: number = void 0 as any;
+    /** @internal */
+    public open!: number;
 
-    public options: OHLCPointOptions = void 0 as any;
+    public options!: OHLCPointOptions;
 
-    public plotOpen: number = void 0 as any;
+    /** @internal */
+    public plotOpen!: number;
 
-    public series: OHLCSeries = void 0 as any;
+    /** @internal */
+    public series!: OHLCSeries;
 
     /* *
      *
      *  Functions
      *
      * */
-
-    /* eslint-disable valid-jsdoc */
 
     /**
      * Extend the parent method by adding up or down to the class name.
@@ -94,7 +92,9 @@ class OHLCPoint extends HLCSeries.prototype.pointClass {
      */
     public resolveColor(): void {
         super.resolveColor();
-        this.resolveUpColor();
+        if (!this.series.is('heikinashi')) {
+            this.resolveUpColor();
+        }
     }
 
     /**
@@ -102,10 +102,10 @@ class OHLCPoint extends HLCSeries.prototype.pointClass {
      * @private
      * @function Highcharts.seriesTypes.ohlc#getZone
      *
-     * @return {Highcharts.SeriesZonesOptionsObject}
-     *         The zone item.
+     * @return {Highcharts.SeriesZonesOptionsObject|undefined}
+     *         The zone item, or `undefined` if the series has no zones.
      */
-    public getZone(): SeriesZonesOptions {
+    public getZone(): Series.ZoneObject|undefined {
         const zone = super.getZone();
         this.resolveUpColor();
 
@@ -116,6 +116,7 @@ class OHLCPoint extends HLCSeries.prototype.pointClass {
      * Extend the parent method by resolving up/down colors (#15849)
      * @private
      **/
+    /** @internal */
     public applyOptions(): Point {
         super.applyOptions.apply(this, arguments);
         if (this.resolveColor) {
@@ -123,8 +124,6 @@ class OHLCPoint extends HLCSeries.prototype.pointClass {
         }
         return this;
     }
-
-    /* eslint-enable valid-jsdoc */
 
 }
 

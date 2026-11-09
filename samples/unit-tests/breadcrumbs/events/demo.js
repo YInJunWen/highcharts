@@ -42,8 +42,7 @@ QUnit.test('Breadcrumbs format', function (assert) {
                 }]
             }
         }),
-        test = new TestController(chart),
-        breadrumbs = chart.breadcrumbs;
+        test = new TestController(chart);
 
     chart.series[0].points[0].doDrilldown();
     test.triggerEvent(
@@ -77,8 +76,38 @@ QUnit.test('Breadcrumbs format', function (assert) {
         chart.breadcrumbs.group.translateY + 10
     );
     assert.strictEqual(
-        chart.container.getElementsByClassName('highcharts-breadcrumbs-group').length,
+        chart.container.getElementsByClassName(
+            'highcharts-breadcrumbs-group'
+        ).length,
         1,
         'The breadcrumbs separators group should be destroyed.'
+    );
+
+    chart.series[0].points[0].doDrilldown();
+
+    // Update with arrow function
+    chart.update({
+        drilldown: {
+            breadcrumbs: {
+                events: {
+                    click: (e, breadcrumb, ctx) => (
+                        // Making sure arguments are passed correctly
+                        e && breadcrumb && ctx
+                    ) || false
+                }
+            }
+        }
+    });
+
+    test.triggerEvent(
+        'click',
+        chart.breadcrumbs.group.translateX + 10,
+        chart.breadcrumbs.group.translateY + 10
+    );
+
+    assert.strictEqual(
+        chart.breadcrumbs.group.element.childNodes.length,
+        0,
+        'There should be no breadcrumbs after clicking with arrow function.'
     );
 });

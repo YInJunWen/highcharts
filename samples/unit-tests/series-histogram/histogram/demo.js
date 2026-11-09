@@ -1,5 +1,23 @@
 QUnit.test('Histogram', function (assert) {
-    var chart = Highcharts.chart('container', {
+    let chart = Highcharts.chart('container', {
+        series: [
+            {
+                type: 'histogram',
+                data: [
+                    { y: 1 },
+                    { y: 2 },
+                    { y: 3 }
+                ]
+            }
+        ]
+    });
+
+    assert.ok(
+        chart.series[0],
+        'Histogram should work with object data without baseseries (#24073).'
+    );
+
+    chart = Highcharts.chart('container', {
         series: [
             {
                 type: 'histogram',
@@ -452,25 +470,31 @@ QUnit.test('Histogram', function (assert) {
         ]
     });
 
-    var histogram = chart.series[0];
-    var baseSeries = chart.series[1];
+    const histogram = chart.series[0],
+        baseSeries = chart.series[1];
 
     assert.ok(histogram, 'Histogram series initialised');
     assert.ok(
         histogram.baseSeries === baseSeries,
-        "Histogram's base series is set correctly"
+        'Histogram\'s base series is set correctly'
     );
 
     assert.deepEqual(
-        histogram.xData,
+        histogram.getColumn('x'),
         [22, 32, 42, 52, 62, 72, 82],
         'Bins ranges are calculated correctly'
     );
 
     assert.deepEqual(
-        histogram.yData,
+        histogram.getColumn('y'),
         [2, 4, 4, 6, 2, 1, 1],
         'Bins frequencies are calculated correctly'
+    );
+
+    assert.deepEqual(
+        histogram.data.map(point => point.x2),
+        [32, 42, 52, 62, 72, 82, 91],
+        'Bins x2 value is calculated properly (#20340)'
     );
 
     histogram.update({
@@ -478,36 +502,41 @@ QUnit.test('Histogram', function (assert) {
     });
 
     assert.deepEqual(
-        histogram.xData,
+        histogram.getColumn('x'),
         [22, 27, 32, 37, 42, 47, 52, 57, 62, 67, 72, 77, 82, 87],
-        "After updating histogram's bin width bin ranges are calculated correctly"
+        'After updating histogram\'s bin width bin ranges are calculated ' +
+        'correctly'
     );
 
     assert.deepEqual(
-        histogram.yData,
+        histogram.getColumn('y'),
         [2, 0, 2, 2, 3, 1, 4, 2, 0, 2, 1, 0, 0, 1],
-        "After updating histogram's bin width bin frequencies are calculated correctly"
+        'After updating histogram\'s bin width bin frequencies are ' +
+        'calculated correctly'
     );
 
     baseSeries.addPoint(20);
     assert.deepEqual(
-        histogram.yData,
+        histogram.getColumn('y'),
         [2, 1, 0, 4, 0, 4, 1, 4, 1, 2, 1, 0, 0, 0, 1],
-        'After adding a new point to the base series bin frequencies are calculated correctly'
+        'After adding a new point to the base series bin frequencies are ' +
+        'calculated correctly'
     );
 
     chart.get('p1').update({ y: 20 });
     assert.deepEqual(
-        histogram.yData,
+        histogram.getColumn('y'),
         [3, 0, 0, 4, 0, 4, 1, 4, 1, 2, 1, 0, 0, 0, 1],
-        'After updating a point in the base series bin frequencies are calculated correctly'
+        'After updating a point in the base series bin frequencies are ' +
+        'calculated correctly'
     );
 
     chart.get('p1').remove();
     assert.deepEqual(
-        histogram.yData,
+        histogram.getColumn('y'),
         [2, 0, 0, 4, 0, 4, 1, 4, 1, 2, 1, 0, 0, 0, 1],
-        'After removing a point in the base series bin frequencies are calculated correctly'
+        'After removing a point in the base series bin frequencies are ' +
+        'calculated correctly'
     );
 
     chart.addSeries({
@@ -524,7 +553,7 @@ QUnit.test('Histogram', function (assert) {
         // when number of bins is correct change this test to check len of yData
     );
 
-    var addedHistogram = chart.addSeries({
+    const addedHistogram = chart.addSeries({
         type: 'histogram',
         id: 'h2',
         baseSeries: 's2',
@@ -532,12 +561,12 @@ QUnit.test('Histogram', function (assert) {
     });
 
     assert.deepEqual(
-        addedHistogram && addedHistogram.yData,
+        addedHistogram && addedHistogram.getColumn('y'),
         [4, 4],
         'Added histogram dynamically is calculated correctly'
     );
 
-    var h3 = chart.addSeries({
+    const h3 = chart.addSeries({
         type: 'histogram',
         id: 'h3',
         baseSeries: 's3'
@@ -551,7 +580,7 @@ QUnit.test('Histogram', function (assert) {
         'The base series for the histogram has equaled values, #7825'
     );
 
-    var h4 = chart.addSeries({
+    const h4 = chart.addSeries({
         type: 'histogram',
         id: 'h4',
         baseSeries: 's4'
@@ -559,7 +588,7 @@ QUnit.test('Histogram', function (assert) {
 
     assert.deepEqual(
         h4 &&
-            Highcharts.map(h4.points, function (point) {
+            h4.points.map(function (point) {
                 return point.x;
             }),
         [
@@ -589,7 +618,7 @@ QUnit.test('Histogram', function (assert) {
 
     assert.deepEqual(
         h4 &&
-            Highcharts.map(h4.points, function (point) {
+            h4.points.map(function (point) {
                 return point.y;
             }),
         [100, 160, 71, 40, 8, 8, 5, 4, 1, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 1],
@@ -646,18 +675,19 @@ QUnit.test('Histogram', function (assert) {
         ]
     });
 
-    var h5 = chart.addSeries({
+    const h5 = chart.addSeries({
         baseSeries: 'floatData',
         type: 'histogram'
     });
 
     assert.deepEqual(
         h5 &&
-            Highcharts.map(h5.points, function (point) {
+            h5.points.map(function (point) {
                 return point.y;
             }),
         [6, 2, 7, 4, 11, 7, 7],
-        'Histogram does not produce points with NaN y values, when baseSeries data has float values'
+        'Histogram does not produce points with NaN y values, when ' +
+        'baseSeries data has float values'
     );
 
     baseSeries.remove();
@@ -703,7 +733,8 @@ QUnit.test('Histogram', function (assert) {
         // Rounding is applied in order to crisp column edges
         Math.round(chart.get('histo-s2').barW),
         Math.round(chart.get('histo-s2').closestPointRangePx),
-        'Histogram has appropriate pointRange value, when multiple series on the same axis, #9128, #10025'
+        'Histogram has appropriate pointRange value, when multiple series on ' +
+        'the same axis, #9128, #10025'
     );
 
     chart.update(
@@ -784,13 +815,13 @@ QUnit.test('Histogram', function (assert) {
 
     assert.strictEqual(
         chart.get('histo-s1').data.length,
-        chart.get('histo-s1').binsNumber(),
-        `Histogram produces correctnumber of bins on negative point values.`
+        chart.get('histo-s1').binsNumber(chart.series[1].baseSeries.data),
+        'Histogram produces correctnumber of bins on negative point values.'
     );
 });
 
 QUnit.test('#12077 - Histogram long digits.', function (assert) {
-    var chart = Highcharts.chart('container', {
+    const chart = Highcharts.chart('container', {
         xAxis: [
             {},
             {
@@ -816,6 +847,7 @@ QUnit.test('#12077 - Histogram long digits.', function (assert) {
                     {
                         length: 10000
                     },
+                    // eslint-disable-next-line no-loss-of-precision
                     () => 6.6429209090989899214
                 ),
                 id: 's1'
@@ -825,7 +857,7 @@ QUnit.test('#12077 - Histogram long digits.', function (assert) {
 
     assert.ok(
         chart.series[0].data.length,
-        `Histogram should be draw when long digits.`
+        'Histogram should be draw when long digits.'
     );
 });
 

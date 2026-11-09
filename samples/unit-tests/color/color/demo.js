@@ -1,8 +1,9 @@
 QUnit.test('Compatibility', function (assert) {
     assert.strictEqual(
-        Highcharts.Color('#ff0000').get('rgba'),
+        Highcharts.color('#ff0000').get('rgba'),
         'rgba(255,0,0,1)',
-        'Backwards compatibility - the Color class should work without the "new" keyword'
+        'Backwards compatibility - the Color class should work without the ' +
+        '"new" keyword'
     );
 });
 
@@ -33,19 +34,19 @@ QUnit.test('Interpolate colors', function (assert) {
 
     assert.equal(
         color('red').tweenTo(color('blue'), 0.5),
-        'blue',
+        'color-mix(in srgb,red,blue 50%)',
         'Named colors'
     );
 
     assert.equal(
         color('red').tweenTo(color('#FFFFFF'), 0.5),
-        '#FFFFFF',
+        'color-mix(in srgb,red,#FFFFFF 50%)',
         'Named color to hex'
     );
 
     assert.equal(
         color('#FFFFFF').tweenTo(color('red'), 0.5),
-        'red',
+        'color-mix(in srgb,#FFFFFF,red 50%)',
         'Hex to named color'
     );
 
@@ -68,7 +69,8 @@ QUnit.test('Interpolate colors', function (assert) {
                 0.5
             )
         ),
-        '{"radialGradient":{"cx":0.5,"cy":0.3,"r":0.7},"stops":[[0,"#FFFF00"],[1,"#00FFFF"]]}',
+        '{"radialGradient":{"cx":0.5,"cy":0.3,"r":0.7},"stops":[[0,' +
+        '"#FFFF00"],[1,"#00FFFF"]]}',
         'Gradients'
     );
     assert.equal(color().tweenTo(color(), 0.5), 'none', 'Undefined colors');

@@ -1,0 +1,23 @@
+@import url("https://code.highcharts.com/dashboards/css/dashboards.css");
+@import url("https://cdn.jsdelivr.net/npm/@highcharts/grid-pro/css/grid-pro.css");
+
+#csv {
+    display: none;
+}
+
+.inputs {
+    padding: 8px 16px;
+    background-color: var(--highcharts-neutral-color-5);
+    user-select: none;
+    color: var(--highcharts-neutral-color-60);
+}
+
+.inputs label {
+    color: var(--highcharts-neutral-color-100);
+}
+
+@media screen and (max-width: 576px) {
+    .highcharts-dashboards-cell {
+        flex: 1 1 100%;
+    }
+}

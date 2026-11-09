@@ -5,9 +5,10 @@ QUnit.test('Range series data labels(#4421)', function (assert) {
         data.push([i, i + 100]);
     }
 
-    $('#container').highcharts({
+    const chart = Highcharts.chart('container', {
         chart: {
-            type: 'arearange'
+            type: 'arearange',
+            width: 600
         },
         rangeSelector: {
             selected: 0
@@ -22,8 +23,6 @@ QUnit.test('Range series data labels(#4421)', function (assert) {
         ]
     });
 
-    var chart = $('#container').highcharts();
-
     assert.strictEqual(
         chart.series[0].points[0].dataLabelUpper.attr('opacity'),
         1,
@@ -33,6 +32,138 @@ QUnit.test('Range series data labels(#4421)', function (assert) {
         chart.series[0].points[1].dataLabelUpper.attr('opacity'),
         0,
         'Second label hidden'
+    );
+    assert.deepEqual(
+        [
+            chart.series[0].points[0].dataLabelUpper.text.textStr,
+            chart.series[0].points[0].dataLabel.text.textStr
+        ],
+        ['100', '0'],
+        'Default labels render the high and low values (#23904)'
+    );
+
+    const series = chart.series[0];
+
+    chart.update({
+        plotOptions: {
+            arearange: {
+                dataLabels: {
+                    enabled: true,
+                    format: '{y}'
+                }
+            }
+        }
+    });
+
+    assert.deepEqual(
+        [
+            series.points[0].dataLabelUpper.text.textStr,
+            series.points[0].dataLabel.text.textStr
+        ],
+        ['100', '0'],
+        'Legacy {y} format resolves to the high and low value per label ' +
+        '(#23904)'
+    );
+
+    series.update({
+        dataLabels: [{
+            enabled: true,
+            alignToKey: 'high',
+            format: 'H1 {point.high}'
+        }, {
+            enabled: true,
+            alignToKey: 'high',
+            format: 'H2 {point.high}',
+            y: 16
+        }, {
+            enabled: true,
+            alignToKey: 'low',
+            format: 'L {point.low}'
+        }],
+        data: [[0, 1, 8]]
+    });
+
+    const point = series.points[0];
+
+    assert.deepEqual(
+        point.dataLabels.map(label => label.text.textStr),
+        ['H1 8', 'H2 8', 'L 1'],
+        'Multiple labels can be attached to the same range value'
+    );
+
+    assert.ok(
+        point.dataLabelUpper === point.dataLabels[0] &&
+            point.dataLabel === point.dataLabels[2],
+        'Legacy high and low label references point to the first matching label'
+    );
+
+    assert.ok(
+        point.dataLabels[0].y < point.dataLabels[2].y,
+        'Labels align to their selected range values'
+    );
+
+    series.update({
+        dataLabels: {
+            enabled: false
+        },
+        label: {
+            enabled: true,
+            onArea: true
+        },
+        data: [
+            [1, 2],
+            [1, 2],
+            [1, 2]
+        ]
+    });
+
+    const isLabelInsideArea = label => {
+        const {
+            x: areaX, y: areaY,
+            width: areaWidth, height: areaHeight
+        } = series.area.element.getBBox();
+
+        const { width: labelWidth, height: labelHeight } = label.getBBox();
+
+        return label.y > chart.plotTop + areaY &&
+            label.y + labelHeight < chart.plotTop + areaY + areaHeight &&
+            label.x > chart.plotLeft + areaX &&
+            label.x + labelWidth < chart.plotLeft + areaX + areaWidth;
+    };
+
+    assert.ok(
+        isLabelInsideArea(series.labelBySeries),
+        'Series label is inside the area when onArea: true (#14602)'
+    );
+
+    series.update({
+        label: {
+            onArea: false
+        }
+    });
+
+    assert.ok(
+        !isLabelInsideArea(series.labelBySeries),
+        'Series label is not inside the area when onArea: false (#14602)'
+    );
+
+    series.update({
+        data: [
+            [1, 1, 1],
+            [1.5, 1.40, 1.60],
+            [2, 2, 2],
+            [2.5, 2.40, 2.60],
+            [3, 3, 3]
+        ],
+        label: {
+            onArea: true
+        }
+    });
+
+    assert.ok(
+        !series.labelBySeries,
+        'Series label is destroyed when onArea: true and there is no place ' +
+        'to render it (#14602)'
     );
 });
 

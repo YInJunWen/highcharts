@@ -1,10 +1,12 @@
 /* *
  *
- *  (c) 2010-2021 Torstein Honsi
+ *  (c) 2010-2026 Highsoft AS
+ *  Author: Torstein Hønsi
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -16,81 +18,24 @@
  *
  * */
 
-import type BBoxObject from '../../Core/Renderer/BBoxObject';
-import type ColumnMetricsObject from '../Column/ColumnMetricsObject';
 import type ColumnRangeSeriesOptions from './ColumnRangeSeriesOptions';
+import type RadialAxis from '../../Core/Axis/RadialAxis';
 import type SVGAttributes from '../../Core/Renderer/SVG/SVGAttributes';
 
 import ColumnRangePoint from './ColumnRangePoint.js';
+import ColumnRangeSeriesDefaults from './ColumnRangeSeriesDefaults.js';
+import AreaRangeSeries from '../AreaRange/AreaRangeSeries.js';
+import ColumnSeries from '../Column/ColumnSeries.js';
 import H from '../../Core/Globals.js';
 const { noop } = H;
 import SeriesRegistry from '../../Core/Series/SeriesRegistry.js';
-const {
-    seriesTypes: {
-        arearange: AreaRangeSeries,
-        column: ColumnSeries,
-        column: {
-            prototype: columnProto
-        }
-    }
-} = SeriesRegistry;
-import U from '../../Core/Utilities.js';
-const {
+import {
+    addEvent,
     clamp,
     extend,
     isNumber,
-    merge,
-    pick
-} = U;
-
-/* *
- *
- *  Constants
- *
- * */
-
-/**
- * The column range is a cartesian series type with higher and lower
- * Y values along an X axis. To display horizontal bars, set
- * [chart.inverted](#chart.inverted) to `true`.
- *
- * @sample {highcharts|highstock} highcharts/demo/columnrange/
- *         Inverted column range
- *
- * @extends      plotOptions.column
- * @since        2.3.0
- * @excluding    negativeColor, stacking, softThreshold, threshold
- * @product      highcharts highstock
- * @requires     highcharts-more
- * @optionparent plotOptions.columnrange
- */
-const columnRangeOptions: ColumnRangeSeriesOptions = {
-
-    /**
-     * Extended data labels for range series types. Range series data labels
-     * have no `x` and `y` options. Instead, they have `xLow`, `xHigh`,
-     * `yLow` and `yHigh` options to allow the higher and lower data label
-     * sets individually.
-     *
-     * @declare   Highcharts.SeriesAreaRangeDataLabelsOptionsObject
-     * @extends   plotOptions.arearange.dataLabels
-     * @since     2.3.0
-     * @product   highcharts highstock
-     * @apioption plotOptions.columnrange.dataLabels
-     */
-
-    pointRange: null,
-
-    /** @ignore-option */
-    marker: null as any,
-
-    states: {
-        hover: {
-            /** @ignore-option */
-            halo: false
-        }
-    }
-};
+    merge
+} from '../../Shared/Utilities.js';
 
 /* *
  *
@@ -101,7 +46,6 @@ const columnRangeOptions: ColumnRangeSeriesOptions = {
 /**
  * The ColumnRangeSeries class
  *
- * @private
  * @class
  * @name Highcharts.seriesTypes.columnrange
  *
@@ -116,10 +60,11 @@ class ColumnRangeSeries extends AreaRangeSeries {
      *
      * */
 
+    /** @internal */
     public static defaultOptions: ColumnRangeSeriesOptions = merge(
         ColumnSeries.defaultOptions,
         AreaRangeSeries.defaultOptions,
-        columnRangeOptions
+        ColumnRangeSeriesDefaults as ColumnRangeSeriesOptions
     );
 
     /* *
@@ -128,21 +73,78 @@ class ColumnRangeSeries extends AreaRangeSeries {
      *
      * */
 
+    /** @internal */
     public setOptions(): ColumnRangeSeriesOptions {
         // #14359 Prevent side-effect from stacking.
         merge(true, arguments[0], { stacking: void 0 });
         return AreaRangeSeries.prototype.setOptions.apply(this, arguments);
     }
 
-    // eslint-disable-next-line valid-jsdoc
+
+    // Overrides from modules that may be loaded after this module
+    // @todo move to compositions
+
+    /** @internal */
+    public translate(): void {
+        return ColumnSeries.prototype.translate.apply(this);
+    }
+
+    // Public crispCol(): BBoxObject {
+    //     return ColumnSeries.prototype.crispCol.apply(this, arguments as any);
+    // }
+    // public drawPoints(): void {
+    //     return ColumnSeries.prototype.drawPoints.apply(
+    //         this, arguments as any
+    //     );
+    // }
+    // public drawTracker(): void {
+    //     return ColumnSeries.prototype.drawTracker.apply(
+    //         this, arguments as any
+    //     );
+    // }
+    // public getColumnMetrics(): ColumnMetricsObject {
+    //     return ColumnSeries.prototype.getColumnMetrics.apply(
+    //         this, arguments as any
+    //     );
+    // }
+    /** @internal */
+    public pointAttribs(): SVGAttributes {
+        return ColumnSeries.prototype.pointAttribs.apply(
+            this,
+            arguments as any
+        );
+    }
+    // Public adjustForMissingColumns(): number {
+    //     return ColumnSeries.prototype.adjustForMissingColumns.apply(
+    //         this, arguments
+    //     );
+    // }
+    // public animate(): void {
+    //     return ColumnSeries.prototype.animate.apply(this, arguments as any);
+    // }
+    /** @internal */
+    public translate3dPoints(): void {
+        return ColumnSeries.prototype.translate3dPoints.apply(
+            this,
+            arguments as any
+        );
+    }
+    /** @internal */
+    public translate3dShapes(): void {
+        return ColumnSeries.prototype.translate3dShapes.apply(
+            this,
+            arguments as any
+        );
+    }
+
     /**
      * Translate data points from raw values x and y to plotX and plotY
-     * @private
+     * @internal
      */
-    public translate(): void {
+    public afterColumnTranslate(): void {
         const yAxis = this.yAxis,
             xAxis = this.xAxis,
-            startAngleRad = xAxis.startAngleRad,
+            startAngleRad = (xAxis as RadialAxis.AxisComposition).startAngleRad,
             chart = this.chart,
             isRadial = this.xAxis.isRadial,
             safeDistance = Math.max(chart.chartWidth, chart.chartHeight) + 999;
@@ -150,20 +152,16 @@ class ColumnRangeSeries extends AreaRangeSeries {
         let height: number,
             heightDifference: number,
             start: number,
-            plotHigh: number,
             y: number;
 
         // eslint-disable-next-line valid-jsdoc
         /**
          * Don't draw too far outside plot area (#6835)
-         * @private
+         * @internal
          */
         function safeBounds(pixelPos: number): number {
             return clamp(pixelPos, -safeDistance, safeDistance);
         }
-
-
-        columnProto.translate.apply(this);
 
         // Set plotLow and plotHigh
         this.points.forEach((point): void => {
@@ -178,12 +176,11 @@ class ColumnRangeSeries extends AreaRangeSeries {
                 point.plotHigh = safeBounds(plotHigh);
                 point.plotLow = safeBounds(plotY);
 
-                // adjust shape
+                // Adjust shape
                 y = point.plotHigh;
-                height = pick(
-                    (point as any).rectPlotY,
-                    point.plotY
-                ) - point.plotHigh;
+                height =
+                    ((point as any).rectPlotY ?? point.plotY) -
+                    point.plotHigh;
 
                 // Adjust for minPointLength
                 if (Math.abs(height) < (minPointLength as any)) {
@@ -205,13 +202,19 @@ class ColumnRangeSeries extends AreaRangeSeries {
                         y + height,
                         y,
                         start,
-                        start + point.pointWidth
+                        start + (point.pointWidth || 0)
                     );
                 } else {
 
                     shapeArgs.height = height;
                     shapeArgs.y = y;
                     const { x = 0, width = 0 } = shapeArgs;
+                    // #17912, aligning column range points
+                    // merge if shapeArgs contains more properties e.g. for 3d
+                    point.shapeArgs = merge(
+                        point.shapeArgs,
+                        this.crispCol(x, y, width, height)
+                    );
 
                     point.tooltipPos = chart.inverted ?
                         [
@@ -224,44 +227,16 @@ class ColumnRangeSeries extends AreaRangeSeries {
                             xAxis.left - chart.plotLeft + x + width / 2,
                             yAxis.pos - chart.plotTop + y + height / 2,
                             height
-                        ]; // don't inherit from column tooltip position - #3372
+                        ]; // Don't inherit from column tooltip position - #3372
                 }
             }
         });
     }
-
-    // Overrides from modules that may be loaded after this module
-    // @todo move to compositions
-
-    // public crispCol(): BBoxObject {
-    //     return columnProto.crispCol.apply(this, arguments as any);
-    // }
-    // public drawPoints(): void {
-    //     return columnProto.drawPoints.apply(this, arguments as any);
-    // }
-    // public drawTracker(): void {
-    //     return columnProto.drawTracker.apply(this, arguments as any);
-    // }
-    // public getColumnMetrics(): ColumnMetricsObject {
-    //     return columnProto.getColumnMetrics.apply(this, arguments as any);
-    // }
-    public pointAttribs(): SVGAttributes {
-        return columnProto.pointAttribs.apply(this, arguments as any);
-    }
-    // public adjustForMissingColumns(): number {
-    //     return columnProto.adjustForMissingColumns.apply(this, arguments);
-    // }
-    // public animate(): void {
-    //     return columnProto.animate.apply(this, arguments as any);
-    // }
-    public translate3dPoints(): void {
-        return columnProto.translate3dPoints.apply(this, arguments as any);
-    }
-    public translate3dShapes(): void {
-        return columnProto.translate3dShapes.apply(this, arguments as any);
-    }
-
 }
+
+addEvent(ColumnRangeSeries, 'afterColumnTranslate', function (): void {
+    ColumnRangeSeries.prototype.afterColumnTranslate.apply(this);
+}, { order: 5 });
 
 /* *
  *
@@ -269,36 +244,36 @@ class ColumnRangeSeries extends AreaRangeSeries {
  *
  * */
 
+/** @internal */
 interface ColumnRangeSeries {
     options: ColumnRangeSeriesOptions;
+    /** @internal */
     pointClass: typeof ColumnRangePoint;
     points: Array<ColumnRangePoint>;
-    adjustForMissingColumns: typeof columnProto.adjustForMissingColumns;
-    animate: typeof columnProto.animate,
-    crispCol: typeof columnProto.crispCol;
-    drawPoints: typeof columnProto.drawPoints,
-    getColumnMetrics: typeof columnProto.getColumnMetrics;
-    // pointAttribs: typeof columnProto.pointAttribs,
-    // polarArc: typeof columnProto.polarArc
-    // translate3dPoints: typeof columnProto.translate3dPoints,
-    // translate3dShapes: typeof columnProto.translate3dShapes
+    /** @internal */
+    adjustForMissingColumns:
+        typeof ColumnSeries.prototype.adjustForMissingColumns;
+    /** @internal */
+    animate: typeof ColumnSeries.prototype.animate,
+    /** @internal */
+    crispCol: typeof ColumnSeries.prototype.crispCol;
+    /** @internal */
+    drawPoints: typeof ColumnSeries.prototype.drawPoints,
+    /** @internal */
+    getColumnMetrics: typeof ColumnSeries.prototype.getColumnMetrics;
 }
 extend(ColumnRangeSeries.prototype, {
     directTouch: true,
     pointClass: ColumnRangePoint,
     trackerGroups: ['group', 'dataLabelsGroup'],
-    adjustForMissingColumns: columnProto.adjustForMissingColumns,
-    animate: columnProto.animate,
-    crispCol: columnProto.crispCol,
+    adjustForMissingColumns: ColumnSeries.prototype.adjustForMissingColumns,
+    animate: ColumnSeries.prototype.animate,
+    crispCol: ColumnSeries.prototype.crispCol,
     drawGraph: noop,
-    drawPoints: columnProto.drawPoints,
+    drawPoints: ColumnSeries.prototype.drawPoints,
     getSymbol: noop,
-    drawTracker: columnProto.drawTracker,
-    getColumnMetrics: columnProto.getColumnMetrics
-    // pointAttribs: columnProto.pointAttribs,
-    // polarArc: columnProto.polarArc
-    // translate3dPoints: columnProto.translate3dPoints,
-    // translate3dShapes: columnProto.translate3dShapes
+    drawTracker: ColumnSeries.prototype.drawTracker,
+    getColumnMetrics: ColumnSeries.prototype.getColumnMetrics
 });
 
 /* *
@@ -307,9 +282,6 @@ extend(ColumnRangeSeries.prototype, {
  *
  * */
 
-/**
- * @private
- */
 declare module '../../Core/Series/SeriesType' {
     interface SeriesTypeRegistry {
         columnrange: typeof ColumnRangeSeries;
@@ -325,97 +297,3 @@ SeriesRegistry.registerSeriesType('columnrange', ColumnRangeSeries);
  * */
 
 export default ColumnRangeSeries;
-
-/* *
- *
- *  API Options
- *
- * */
-
-/**
- * A `columnrange` series. If the [type](#series.columnrange.type)
- * option is not specified, it is inherited from
- * [chart.type](#chart.type).
- *
- * @extends   series,plotOptions.columnrange
- * @excluding dataParser, dataURL, stack, stacking
- * @product   highcharts highstock
- * @requires  highcharts-more
- * @apioption series.columnrange
- */
-
-/**
- * An array of data points for the series. For the `columnrange` series
- * type, points can be given in the following ways:
- *
- * 1. An array of arrays with 3 or 2 values. In this case, the values correspond
- *    to `x,low,high`. If the first value is a string, it is applied as the name
- *    of the point, and the `x` value is inferred. The `x` value can also be
- *    omitted, in which case the inner arrays should be of length 2\. Then the
- *    `x` value is automatically calculated, either starting at 0 and
- *    incremented by 1, or from `pointStart` and `pointInterval` given in the
- *    series options.
- *    ```js
- *    data: [
- *        [0, 4, 2],
- *        [1, 2, 1],
- *        [2, 9, 10]
- *    ]
- *    ```
- *
- * 2. An array of objects with named values. The following snippet shows only a
- *    few settings, see the complete options set below. If the total number of
- *    data points exceeds the series'
- *    [turboThreshold](#series.columnrange.turboThreshold), this option is not
- *    available.
- *    ```js
- *    data: [{
- *        x: 1,
- *        low: 0,
- *        high: 4,
- *        name: "Point2",
- *        color: "#00FF00"
- *    }, {
- *        x: 1,
- *        low: 5,
- *        high: 3,
- *        name: "Point1",
- *        color: "#FF00FF"
- *    }]
- *    ```
- *
- * @sample {highcharts} highcharts/series/data-array-of-arrays/
- *         Arrays of numeric x and y
- * @sample {highcharts} highcharts/series/data-array-of-arrays-datetime/
- *         Arrays of datetime x and y
- * @sample {highcharts} highcharts/series/data-array-of-name-value/
- *         Arrays of point.name and y
- * @sample {highcharts} highcharts/series/data-array-of-objects/
- *         Config objects
- *
- * @type      {Array<Array<(number|string),number>|Array<(number|string),number,number>|*>}
- * @extends   series.arearange.data
- * @excluding marker
- * @product   highcharts highstock
- * @apioption series.columnrange.data
- */
-
-/**
- * @extends   series.columnrange.dataLabels
- * @product   highcharts highstock
- * @apioption series.columnrange.data.dataLabels
- */
-
-/**
- * @excluding halo, lineWidth, lineWidthPlus, marker
- * @product   highcharts highstock
- * @apioption series.columnrange.states.hover
- */
-
-/**
- * @excluding halo, lineWidth, lineWidthPlus, marker
- * @product   highcharts highstock
- * @apioption series.columnrange.states.select
- */
-
-''; // adds doclets above into transpiled

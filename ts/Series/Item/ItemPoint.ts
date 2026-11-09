@@ -1,12 +1,14 @@
 /* *
  *
- *  (c) 2019-2021 Torstein Honsi
+ *  (c) 2019-2026 Highsoft AS
+ *  Author: Torstein Hønsi
  *
  *  Item series type for Highcharts
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -20,16 +22,19 @@
 
 import type ItemPointOptions from './ItemPointOptions';
 import type ItemSeries from './ItemSeries';
-import type SVGElement from '../../Core/Renderer/SVG/SVGElement';
-import SeriesRegistry from '../../Core/Series/SeriesRegistry.js';
-const {
-    series: Series,
-    seriesTypes: {
-        pie: PieSeries
-    }
-} = SeriesRegistry;
-import U from '../../Core/Utilities.js';
-const { extend } = U;
+
+import PieSeries from '../Pie/PieSeries.js';
+import Series from '../../Core/Series/Series.js';
+import { extend } from '../../Shared/Utilities.js';
+
+/* *
+ *
+ *  Constants
+ *
+ * */
+
+const PiePoint = PieSeries.prototype.pointClass;
+const Point = Series.prototype.pointClass;
 
 /* *
  *
@@ -37,7 +42,7 @@ const { extend } = U;
  *
  * */
 
-class ItemPoint extends PieSeries.prototype.pointClass {
+class ItemPoint extends PiePoint {
 
     /* *
      *
@@ -45,9 +50,10 @@ class ItemPoint extends PieSeries.prototype.pointClass {
      *
      * */
 
-    public options: ItemPointOptions = void 0 as any;
+    public options!: ItemPointOptions;
 
-    public series: ItemSeries = void 0 as any;
+    /** @internal */
+    public series!: ItemSeries;
 
 }
 
@@ -58,10 +64,11 @@ class ItemPoint extends PieSeries.prototype.pointClass {
  * */
 
 interface ItemPoint {
-    haloPath: typeof Series.prototype.pointClass.prototype.haloPath;
+    haloPath: typeof Point.prototype.haloPath;
 }
+
 extend(ItemPoint.prototype, {
-    haloPath: Series.prototype.pointClass.prototype.haloPath
+    haloPath: Point.prototype.haloPath
 });
 
 /* *

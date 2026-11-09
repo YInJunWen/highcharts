@@ -2,11 +2,13 @@
  *
  *  Networkgraph series
  *
- *  (c) 2010-2021 Paweł Fus
+ *  (c) 2010-2026 Highsoft AS
+ *  Author: Paweł Fus
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -25,8 +27,13 @@ import type ReingoldFruchtermanLayout from './Networkgraph/ReingoldFruchtermanLa
 import type Series from '../Core/Series/Series';
 import type SeriesOptions from '../Core/Series/SeriesOptions';
 
-import U from '../Core/Utilities.js';
-const { addEvent } = U;
+import H from '../Core/Globals.js';
+const { composed } = H;
+import {
+    addEvent,
+    isObject,
+    pushUnique
+} from '../Shared/Utilities.js';
 
 /* *
  *
@@ -34,11 +41,13 @@ const { addEvent } = U;
  *
  * */
 
+/** @internal */
 export interface DragNodesChart extends Chart {
     graphLayoutsLookup: Array<ReingoldFruchtermanLayout>;
     hoverPoint: DragNodesPoint;
 }
 
+/** @internal */
 export interface DragNodesPoint extends Point {
     fixedPosition?: Record<string, number>;
     hasDragged?: boolean;
@@ -46,6 +55,7 @@ export interface DragNodesPoint extends Point {
     series: DragNodesSeries;
 }
 
+/** @internal */
 export interface DragNodesSeries extends Series {
     chart: DragNodesChart;
     data: Array<DragNodesPoint>;
@@ -73,18 +83,11 @@ export interface DragNodesSeries extends Series {
     ): void;
 }
 
+/** @internal */
 export interface DragNodesSeriesOptions extends SeriesOptions {
     draggable?: boolean;
     fixedDraggable?: boolean;
 }
-
-/* *
- *
- *  Constants
- *
- * */
-
-const composedClasses: Array<Function> = [];
 
 /* *
  *
@@ -93,15 +96,13 @@ const composedClasses: Array<Function> = [];
  * */
 
 /**
- * @private
+ * @internal
  */
 function compose(
     ChartClass: typeof Chart
 ): void {
 
-    if (composedClasses.indexOf(ChartClass) === -1) {
-        composedClasses.push(ChartClass);
-
+    if (pushUnique(composed, 'DragNodes')) {
         addEvent(ChartClass, 'load', onChartLoad);
     }
 
@@ -109,7 +110,7 @@ function compose(
 
 /**
  * Draggable mode:
- * @private
+ * @internal
  */
 function onChartLoad(
     this: Chart
@@ -118,14 +119,25 @@ function onChartLoad(
 
     let mousedownUnbinder: Function,
         mousemoveUnbinder: Function,
-        mouseupUnbinder: Function;
+        mouseupUnbinder: Function,
+        point: DragNodesPoint;
 
     if (chart.container) {
         mousedownUnbinder = addEvent(
             chart.container,
             'mousedown',
             (event: PointerEvent): void => {
-                const point = chart.hoverPoint;
+
+                if (mousemoveUnbinder) {
+                    mousemoveUnbinder();
+                }
+
+                if (mouseupUnbinder) {
+                    mouseupUnbinder();
+                }
+
+                point = chart.hoverPoint;
+
                 if (
                     point &&
                     point.series &&
@@ -166,9 +178,9 @@ function onChartLoad(
 /**
  * Mouse down action, initializing drag&drop mode.
  *
- * @private
+ * @internal
  * @param {Highcharts.Point} point
- *        The point that event occured.
+ *        The point that event occurred.
  * @param {Highcharts.PointerEventObject} event
  *        Browser event, before normalization.
  */
@@ -177,7 +189,14 @@ function onMouseDown(
     point: DragNodesPoint,
     event: PointerEvent
 ): void {
-    const normalizedEvent = this.chart.pointer.normalize(event);
+    const { panKey } = this.chart.options.chart,
+        panKeyPressed = panKey && event[`${panKey}Key`];
+
+    if (panKeyPressed) {
+        return;
+    }
+
+    const normalizedEvent = this.chart.pointer?.normalize(event) || event;
 
     point.fixedPosition = {
         chartX: normalizedEvent.chartX,
@@ -192,13 +211,12 @@ function onMouseDown(
 /**
  * Mouse move action during drag&drop.
  *
- * @private
+ * @internal
  *
+ * @param {Highcharts.Point} point
+ *        The point that event occurred.
  * @param {global.Event} event
  *        Browser event, before normalization.
- * @param {Highcharts.Point} point
- *        The point that event occured.
- *
  */
 function onMouseMove(
     this: DragNodesSeries,
@@ -208,7 +226,7 @@ function onMouseMove(
     if (point.fixedPosition && point.inDragMode) {
         const series = this,
             chart = series.chart,
-            normalizedEvent = chart.pointer.normalize(event),
+            normalizedEvent = chart.pointer?.normalize(event) || event,
             diffX = point.fixedPosition.chartX - normalizedEvent.chartX,
             diffY = point.fixedPosition.chartY - normalizedEvent.chartY,
             graphLayoutsLookup = chart.graphLayoutsLookup;
@@ -239,14 +257,13 @@ function onMouseMove(
 /**
  * Mouse up action, finalizing drag&drop.
  *
- * @private
+ * @internal
  * @param {Highcharts.Point} point
- *        The point that event occured.
+ *        The point that event occurred.
  */
 function onMouseUp(
     this: DragNodesSeries,
-    point: DragNodesPoint,
-    _event?: PointerEvent
+    point: DragNodesPoint
 ): void {
     if (point.fixedPosition) {
         if (point.hasDragged) {
@@ -266,7 +283,7 @@ function onMouseUp(
 /**
  * Redraw halo on mousemove during the drag&drop action.
  *
- * @private
+ * @internal
  * @param {Highcharts.Point} point
  *        The point that should show halo.
  */
@@ -277,8 +294,9 @@ function redrawHalo(
     if (point && this.halo) {
         this.halo.attr({
             d: point.haloPath(
-                (this.options.states as any).hover.halo.size
-            ) as any
+                isObject(this.options.states?.hover?.halo) &&
+                this.options.states?.hover?.halo.size || 0
+            )
         });
     }
 }
@@ -290,6 +308,7 @@ function redrawHalo(
  *
  * */
 
+/** @internal */
 const DragNodesComposition = {
     compose,
     onMouseDown,
@@ -298,4 +317,5 @@ const DragNodesComposition = {
     redrawHalo
 };
 
+/** @internal */
 export default DragNodesComposition;

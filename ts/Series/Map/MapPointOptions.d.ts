@@ -1,10 +1,12 @@
 /* *
  *
- *  (c) 2010-2021 Torstein Honsi
+ *  (c) 2010-2026 Highsoft AS
+ *  Author: Torstein Hønsi
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -18,7 +20,9 @@ import type ColorType from '../../Core/Color/ColorType';
 import type DataLabelOptions from '../../Core/Series/DataLabelOptions';
 import type ScatterPointOptions from '../Scatter/ScatterPointOptions';
 import type SVGPath from '../../Core/Renderer/SVG/SVGPath';
-import type GeoJSONGeometryMultiPoint from '../../Maps/GeoJSON';
+import type { GeoJSONGeometryMultiPoint } from '../../Maps/GeoJSON';
+import type { PointDataLabelOptionsModifier } from '../../Core/Series/DataLabel';
+import type { PointMarkerStatesOptions } from '../../Core/Series/PointOptions';
 
 /* *
  *
@@ -28,7 +32,7 @@ import type GeoJSONGeometryMultiPoint from '../../Maps/GeoJSON';
 
 export interface MapPointOptions extends ScatterPointOptions {
     color?: ColorType;
-    dataLabels?: DataLabelOptions;
+    dataLabels?: (MapPointDataLabelOptions | Array<MapPointDataLabelOptions>);
     drilldown?: string;
     geometry?: GeoJSONGeometryMultiPoint;
     id?: string;
@@ -38,7 +42,17 @@ export interface MapPointOptions extends ScatterPointOptions {
     name?: string;
     path?: (string|SVGPath);
     properties?: AnyRecord;
+    states?: PointMarkerStatesOptions<MapPointOptions>;
     value?: (number|null);
 }
+
+export type MapPointDataLabelOptions =
+    DataLabelOptions & PointDataLabelOptionsModifier;
+
+/* *
+ *
+ *  Default Export
+ *
+ * */
 
 export default MapPointOptions;

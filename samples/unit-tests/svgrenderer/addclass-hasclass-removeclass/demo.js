@@ -62,7 +62,8 @@
         assert.strictEqual(
             elem.attr('class'),
             'highcharts-point highcharts-color-0',
-            'Sandwiched class name should be removed without leaving or removing white-space #(13590)'
+            'Sandwiched class name should be removed without leaving or ' +
+            'removing white-space #(13590)'
         );
     }
 
@@ -105,10 +106,15 @@
 
         var g = ren.g().add();
 
-        ren.text('HTML', 100, 300, true).add(g);
+        const txt = ren.text('HTML', 100, 300, true).add(g);
 
         // The class names should now be set on g.div
-        checkElement('HTML group', g, g.div, assert);
+        checkElement(
+            'HTML group',
+            g,
+            txt.foreignObject ? g.element : g.div,
+            assert
+        );
     });
 
     QUnit.test('Add multiple class names', assert => {

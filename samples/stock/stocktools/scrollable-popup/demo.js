@@ -1,7 +1,4 @@
 Highcharts.stockChart('container', {
-    mapNavigation: {
-        enabled: true
-    },
     stockTools: {
         gui: {
             enabled: true,
@@ -9,7 +6,10 @@ Highcharts.stockChart('container', {
         }
     },
     series: [{
+        id: 'main',
         type: 'line',
-        data: Array.from({ length: 50 }, () => Math.random() * 10)
+        data: Array.from({ length: 50 }, () => Math.random() * 10),
+        pointInterval: 24 * 36e5,
+        pointStart: '2024-01-01'
     }]
 });

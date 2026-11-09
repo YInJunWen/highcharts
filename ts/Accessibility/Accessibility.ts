@@ -1,12 +1,14 @@
 /* *
  *
- *  (c) 2009-2021 Øystein Moseng
+ *  (c) 2009-2026 Highsoft AS
+ *  Author: Øystein Moseng
  *
  *  Accessibility module for Highcharts
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -19,7 +21,6 @@
  * */
 
 import type AccessibilityComponent from './AccessibilityComponent';
-import type Axis from '../Core/Axis/Axis';
 import type Chart from '../Core/Chart/Chart';
 import type Legend from '../Core/Legend/Legend';
 import type { Options } from '../Core/Options';
@@ -29,29 +30,25 @@ import type Series from '../Core/Series/Series';
 import type SeriesOptions from '../Core/Series/SeriesOptions';
 import type SVGElement from '../Core/Renderer/SVG/SVGElement';
 
-import D from '../Core/DefaultOptions.js';
+import D from '../Core/Defaults.js';
 const { defaultOptions } = D;
 import H from '../Core/Globals.js';
 const { doc } = H;
-import U from '../Core/Utilities.js';
-const {
-    addEvent,
-    extend,
-    fireEvent,
-    merge
-} = U;
 import HU from './Utils/HTMLUtilities.js';
 const {
-    removeElement
+    escapeStringForHTML,
+    removeElement,
+    stripHTMLTagsFromString
 } = HU;
 
 import A11yI18n from './A11yI18n.js';
 import ContainerComponent from './Components/ContainerComponent.js';
-import FocusBorder from './FocusBorder.js';
+import FocusBorderComposition from './FocusBorder.js';
 import InfoRegionsComponent from './Components/InfoRegionsComponent.js';
 import KeyboardNavigation from './KeyboardNavigation.js';
 import LegendComponent from './Components/LegendComponent.js';
 import MenuComponent from './Components/MenuComponent.js';
+import NavigatorComponent from './Components/NavigatorComponent.js';
 import NewDataAnnouncer from './Components/SeriesComponent/NewDataAnnouncer.js';
 import ProxyProvider from './ProxyProvider.js';
 import RangeSelectorComponent from './Components/RangeSelectorComponent.js';
@@ -63,6 +60,7 @@ import highContrastTheme from './HighContrastTheme.js';
 import defaultOptionsA11Y from './Options/A11yDefaults.js';
 import defaultLangOptions from './Options/LangDefaults.js';
 import copyDeprecatedOptions from './Options/DeprecatedOptions.js';
+import { addEvent, extend, fireEvent, merge } from '../Shared/Utilities.js';
 
 /* *
  *
@@ -70,8 +68,9 @@ import copyDeprecatedOptions from './Options/DeprecatedOptions.js';
  *
  * */
 
-declare module '../Core/Chart/ChartLike' {
-    interface ChartLike {
+/** @internal */
+declare module '../Core/Chart/ChartBase' {
+    interface ChartBase {
         a11yDirty?: boolean;
         accessibility?: Accessibility;
         types?: Array<string>;
@@ -89,14 +88,15 @@ declare module '../Core/Chart/ChartLike' {
 /**
  * The Accessibility class
  *
- * @private
- * @requires module:modules/accessibility
+ * @requires modules/accessibility
  *
  * @class
  * @name Highcharts.Accessibility
  *
  * @param {Highcharts.Chart} chart
  * Chart object
+ *
+ * @internal
  */
 class Accessibility {
 
@@ -120,10 +120,10 @@ class Accessibility {
      *
      * */
 
-    public chart: Accessibility.ChartComposition = void 0 as any;
-    public components: Accessibility.ComponentsObject = void 0 as any;
-    public keyboardNavigation: KeyboardNavigation = void 0 as any;
-    public proxyProvider: ProxyProvider = void 0 as any;
+    public chart!: Accessibility.ChartComposition;
+    public components!: Accessibility.ComponentsObject;
+    public keyboardNavigation!: KeyboardNavigation;
+    public proxyProvider!: ProxyProvider;
     public zombie?: boolean; // Zombie object on old browsers
 
 
@@ -133,14 +133,13 @@ class Accessibility {
      *
      * */
 
-    /* eslint-disable valid-jsdoc */
-
 
     /**
      * Initialize the accessibility class
-     * @private
      * @param {Highcharts.Chart} chart
      *        Chart object
+     *
+     * @internal
      */
     public init(
         chart: Chart
@@ -148,7 +147,7 @@ class Accessibility {
         this.chart = chart as Accessibility.ChartComposition;
 
         // Abort on old browsers
-        if (!doc.addEventListener || !chart.renderer.isSVG) {
+        if (!doc?.addEventListener) {
             this.zombie = true;
             this.components = {} as Accessibility.ComponentsObject;
             chart.renderTo.setAttribute('aria-hidden', true);
@@ -167,9 +166,7 @@ class Accessibility {
     }
 
 
-    /**
-     * @private
-     */
+    /** @internal */
     public initComponents(): void {
         const chart = this.chart;
         const proxyProvider = this.proxyProvider;
@@ -182,7 +179,8 @@ class Accessibility {
             chartMenu: new MenuComponent(),
             rangeSelector: new RangeSelectorComponent(),
             series: new SeriesComponent(),
-            zoom: new ZoomComponent()
+            zoom: new ZoomComponent(),
+            navigator: new NavigatorComponent()
         };
 
         if (a11yOptions.customComponents) {
@@ -201,7 +199,8 @@ class Accessibility {
 
     /**
      * Get order to update components in.
-     * @private
+     *
+     * @internal
      */
     public getComponentOrder(): string[] {
         if (!this.components) {
@@ -255,9 +254,15 @@ class Accessibility {
         this.keyboardNavigation.update(kbdNavOrder);
 
         // Handle high contrast mode
+        // Reapply after updates while HC mode is active, but avoid recursion
+        // while the theme itself is being applied through chart.update.
         if (
-            !chart.highContrastModeActive && // Only do this once
-            whcm.isHighContrastModeActive()
+            !chart.highContrastState?.applying &&
+            a11yOptions.highContrastMode !== false && (
+                chart.highContrastState?.active ||
+                whcm.isHighContrastModeActive() ||
+                a11yOptions.highContrastMode === true
+            )
         ) {
             whcm.setHighContrastTheme(chart);
         }
@@ -310,7 +315,8 @@ class Accessibility {
 
     /**
      * Return a list of the types of series we have in the chart.
-     * @private
+     *
+     * @internal
      */
     public getChartTypes(): Array<string> {
         const types: Record<string, number> = {};
@@ -328,6 +334,7 @@ class Accessibility {
  *
  * */
 
+/** @internal */
 namespace Accessibility {
 
     /* *
@@ -336,6 +343,7 @@ namespace Accessibility {
      *
      * */
 
+    /** @internal */
     export interface ComponentsObject {
         [key: string]: AccessibilityComponent;
         container: ContainerComponent;
@@ -345,23 +353,28 @@ namespace Accessibility {
         rangeSelector: RangeSelectorComponent;
         series: SeriesComponent;
         zoom: ZoomComponent;
+        navigator: NavigatorComponent;
     }
 
+    /** @internal */
     export declare class ChartComposition extends Chart {
         options: Required<Options>;
         series: Array<SeriesComposition>;
     }
 
+    /** @internal */
     export declare class PointComposition extends Point {
         accessibility?: PointStateObject;
         series: SeriesComposition;
         value?: (number|null);
     }
 
+    /** @internal */
     export interface PointStateObject {
         valueDescription?: string;
     }
 
+    /** @internal */
     export declare class SeriesComposition extends Series {
         chart: ChartComposition;
         newDataAnnouncer?: NewDataAnnouncer;
@@ -375,8 +388,7 @@ namespace Accessibility {
      *
      * */
 
-    const composedClasses: Array<Function> = [];
-
+    /** @internal */
     export const i18nFormat = A11yI18n.i18nFormat;
 
     /* *
@@ -385,11 +397,10 @@ namespace Accessibility {
      *
      * */
 
-    /* eslint-disable valid-jsdoc */
-
     /**
      * Destroy with chart.
-     * @private
+     *
+     * @internal
      */
     function chartOnDestroy(
         this: ChartComposition
@@ -401,7 +412,8 @@ namespace Accessibility {
 
     /**
      * Handle updates to the module and send render updates to components.
-     * @private
+     *
+     * @internal
      */
     function chartOnRender(
         this: ChartComposition
@@ -424,8 +436,57 @@ namespace Accessibility {
     }
 
     /**
-     * Update with chart/series/point updates.
+     * Inject the accessibility description into the exported SVG as a
+     * Dublin Core RDF metadata block. Runs on the source chart so the
+     * `linkedDescription` selector resolves against the live DOM, then
+     * mutates the export copy's `<svg>` element before its `innerHTML`
+     * is serialized.
      * @private
+     */
+    function chartOnGetSVG(
+        this: ChartComposition,
+        e: { chartCopy: Chart }
+    ): void {
+        const a11y = this.accessibility;
+        if (!a11y || a11y.zombie) {
+            return;
+        }
+
+        const infoRegions = a11y.components.infoRegions;
+        const text = infoRegions && (
+            infoRegions.getLongdescText() ||
+            infoRegions.getTypeDescriptionText()
+        );
+        if (!text) {
+            return;
+        }
+
+        const safe = escapeStringForHTML(stripHTMLTagsFromString(text, true));
+        if (!safe.trim()) {
+            return;
+        }
+        const box = e.chartCopy.renderer.box;
+
+        box.querySelector(':scope > metadata')?.remove();
+        box.insertAdjacentHTML(
+            'afterbegin',
+            '<metadata>' +
+                '<rdf:RDF ' +
+                    'xmlns:rdf="http://www.w3.org/' +
+                        '1999/02/22-rdf-syntax-ns#" ' +
+                    'xmlns:dc="http://purl.org/dc/elements/1.1/">' +
+                    '<rdf:Description>' +
+                        '<dc:description>' + safe + '</dc:description>' +
+                    '</rdf:Description>' +
+                '</rdf:RDF>' +
+            '</metadata>'
+        );
+    }
+
+    /**
+     * Update with chart/series/point updates.
+     *
+     * @internal
      */
     function chartOnUpdate(
         this: ChartComposition,
@@ -452,14 +513,14 @@ namespace Accessibility {
         this.a11yDirty = true;
     }
 
-    /**
-     * @private
-     */
+    /** @internal */
     function chartUpdateA11yEnabled(
         this: ChartComposition
     ): void {
         let a11y = this.accessibility;
-        const accessibilityOptions = this.options.accessibility;
+        const accessibilityOptions = this.options.accessibility,
+            svg = this.renderer.boxWrapper.element,
+            title = this.title;
 
         if (accessibilityOptions && accessibilityOptions.enabled) {
             if (a11y && !a11y.zombie) {
@@ -469,6 +530,10 @@ namespace Accessibility {
                 if (a11y && !a11y.zombie) {
                     a11y.update();
                 }
+                // If a11y has been disabled, and is now enabled
+                if (svg.getAttribute('role') === 'img') {
+                    svg.removeAttribute('role');
+                }
             }
         } else if (a11y) {
             // Destroy if after update we have a11y and it is disabled
@@ -477,16 +542,25 @@ namespace Accessibility {
             }
             delete this.accessibility;
         } else {
-            // Just hide container
-            this.renderTo.setAttribute('aria-hidden', true);
+            // If a11y has been disabled dynamically or is disabled
+            this.renderTo.setAttribute('role', 'img');
+            this.renderTo.setAttribute('aria-hidden', false);
+            this.renderTo.setAttribute('aria-label', (
+                (title && title.element.textContent) || ''
+            ).replace(/</g, '&lt;'));
+            svg.setAttribute('aria-hidden', true);
+            const description =
+                document.getElementsByClassName('highcharts-description')[0];
+
+            if (description) {
+                description.setAttribute('aria-hidden', false);
+                description.classList.remove('highcharts-linked-description');
+            }
         }
     }
 
-    /**
-     * @private
-     */
+    /** @internal */
     export function compose(
-        AxisClass: typeof Axis,
         ChartClass: typeof Chart,
         LegendClass: typeof Legend,
         PointClass: typeof Point,
@@ -494,26 +568,26 @@ namespace Accessibility {
         SVGElementClass: typeof SVGElement,
         RangeSelectorClass?: typeof RangeSelector
     ): void {
-        // ordered:
+
+        // Ordered:
         KeyboardNavigation.compose(ChartClass);
         NewDataAnnouncer.compose(SeriesClass as typeof SeriesComposition);
         LegendComponent.compose(ChartClass, LegendClass);
         MenuComponent.compose(ChartClass);
         SeriesComponent.compose(ChartClass, PointClass, SeriesClass);
-        // RangeSelector
         A11yI18n.compose(ChartClass);
-        FocusBorder.compose(ChartClass, SVGElementClass);
+        FocusBorderComposition.compose(ChartClass, SVGElementClass);
 
+        // RangeSelector
         if (RangeSelectorClass) {
             RangeSelectorComponent.compose(ChartClass, RangeSelectorClass);
         }
 
-        if (composedClasses.indexOf(ChartClass) === -1) {
-            composedClasses.push(ChartClass);
+        const chartProto = ChartClass.prototype;
 
-            const chartProto = ChartClass.prototype;
-
+        if (!chartProto.updateA11yEnabled) {
             chartProto.updateA11yEnabled = chartUpdateA11yEnabled;
+
             addEvent(
                 ChartClass as typeof ChartComposition,
                 'destroy',
@@ -528,6 +602,11 @@ namespace Accessibility {
                 ChartClass as typeof ChartComposition,
                 'update',
                 chartOnUpdate
+            );
+            addEvent(
+                ChartClass as typeof ChartComposition,
+                'getSVG',
+                chartOnGetSVG
             );
 
             // Mark dirty for update
@@ -553,20 +632,12 @@ namespace Accessibility {
                     }
                 );
             });
-        }
-
-        if (composedClasses.indexOf(PointClass) === -1) {
-            composedClasses.push(PointClass);
 
             addEvent(
                 PointClass as typeof PointComposition,
                 'update',
                 pointOnUpdate
             );
-        }
-
-        if (composedClasses.indexOf(SeriesClass) === -1) {
-            composedClasses.push(SeriesClass);
 
             // Mark dirty for update
             ['update', 'updatedData', 'remove'].forEach((event): void => {
@@ -581,11 +652,13 @@ namespace Accessibility {
                 );
             });
         }
+
     }
 
     /**
      * Mark dirty for update.
-     * @private
+     *
+     * @internal
      */
     function pointOnUpdate(
         this: PointComposition
@@ -622,4 +695,5 @@ merge(
  *
  * */
 
+/** @internal */
 export default Accessibility;

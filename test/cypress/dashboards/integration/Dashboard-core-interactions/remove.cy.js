@@ -1,0 +1,14 @@
+describe('Remove the dashboard.', () => {
+    before(() => {
+        cy.visit('/dashboards/cypress/component-grid');
+    });
+
+    it('Dashboard should be removed without errors', () => {
+        cy.board().then(board => {
+            board.destroy();
+            cy.get('.highcharts-dashboards-wrapper').should('not.exist');
+            cy.get('#container').should('exist');
+        });
+    });
+});
+

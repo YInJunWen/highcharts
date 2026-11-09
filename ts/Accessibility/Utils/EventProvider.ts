@@ -1,12 +1,14 @@
 /* *
  *
- *  (c) 2009-2021 Øystein Moseng
+ *  (c) 2009-2026 Highsoft AS
+ *  Author: Øystein Moseng
  *
  *  Class that can keep track of events added, and clean them up on destroy.
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -18,11 +20,11 @@
  *
  * */
 
-import type EventCallback from '../../Core/EventCallback';
+import type { EventCallback } from '../../Core/Callback';
+import type { DOMElementType } from '../../Core/Renderer/DOMElementType';
 
+import { addEvent, type EventOptions } from '../../Shared/Utilities.js';
 import H from '../../Core/Globals.js';
-import U from '../../Core/Utilities.js';
-const { addEvent } = U;
 
 /* *
  *
@@ -30,9 +32,14 @@ const { addEvent } = U;
  *
  * */
 
-/**
- * @private
- */
+/** @internal */
+interface ElementsFocusEventRemovers {
+    element: DOMElementType,
+    remover: Function
+}
+
+
+/** @internal */
 class EventProvider {
 
     /* *
@@ -51,7 +58,7 @@ class EventProvider {
      *
      * */
 
-    public eventRemovers: Array<Function>;
+    public eventRemovers: Array<ElementsFocusEventRemovers>;
 
     /* *
      *
@@ -59,31 +66,48 @@ class EventProvider {
      *
      * */
 
-    /* eslint-disable valid-jsdoc */
 
     public addEvent<T>(
-        el: (U.Class<T>|T),
+        el: (Class<T>|T),
         type: string,
         fn: (EventCallback<T>|Function),
-        options?: U.EventOptions
+        options?: EventOptions
     ): Function;
     /**
      * Add an event to an element and keep track of it for later removal.
      * Same args as Highcharts.addEvent.
-     * @private
+     *
+     * @internal
      */
     public addEvent(): Function {
         const remover = addEvent.apply(H, arguments);
-        this.eventRemovers.push(remover);
+        this.eventRemovers.push({
+            element: arguments[0], // HTML element
+            remover
+        });
         return remover;
     }
 
     /**
+     * Remove added event.
+     *
+     * @internal
+     */
+    public removeEvent(event: Function): void {
+        const pos =
+            this.eventRemovers.map((e): Function => e.remover).indexOf(event);
+        this.eventRemovers[pos].remover();
+        this.eventRemovers.splice(pos, 1);
+    }
+
+    /**
      * Remove all added events.
-     * @private
+     *
+     * @internal
      */
     public removeAddedEvents(): void {
-        this.eventRemovers.forEach((remover): void => remover());
+        this.eventRemovers.map((e): Function => e.remover)
+            .forEach((remover): void => remover());
         this.eventRemovers = [];
     }
 
@@ -95,4 +119,5 @@ class EventProvider {
  *
  * */
 
+/** @internal */
 export default EventProvider;

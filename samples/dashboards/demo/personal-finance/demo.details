@@ -1,0 +1,12 @@
+---
+name: Personal finance
+authors:
+  - Karol Kołodziej
+js_wrap: b
+tags:
+  - Highcharts Dashboards demo
+categories:
+  - Advanced:
+        priority: 70
+use_png_thumbnail: true
+...

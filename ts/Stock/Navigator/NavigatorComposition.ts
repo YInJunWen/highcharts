@@ -1,10 +1,12 @@
 /* *
  *
- *  (c) 2010-2021 Torstein Honsi
+ *  (c) 2010-2026 Highsoft AS
+ *  Author: Torstein Hønsi
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -17,30 +19,22 @@
  * */
 
 import type Axis from '../../Core/Axis/Axis';
-import type Chart from '../../Core/Chart/Chart';
-import type Navigator from './Navigator';
-import type Scrollbar from '../Scrollbar/Scrollbar';
 import type Series from '../../Core/Series/Series';
 
-import DO from '../../Core/DefaultOptions.js';
-const {
-    defaultOptions,
-    setOptions
-} = DO;
+import Chart from '../../Core/Chart/Chart.js';
+import D from '../../Core/Defaults.js';
+const { defaultOptions } = D;
 import H from '../../Core/Globals.js';
-const { isTouchDevice } = H;
+const {
+    composed
+} = H;
 import NavigatorAxisAdditions from '../../Core/Axis/NavigatorAxisComposition.js';
 import NavigatorDefaults from './NavigatorDefaults.js';
 import NavigatorSymbols from './NavigatorSymbols.js';
-import RendererRegistry from '../../Core/Renderer/RendererRegistry.js';
-const { getRendererType } = RendererRegistry;
-import U from '../../Core/Utilities.js';
-const {
-    addEvent,
-    extend,
-    merge,
-    pick
-} = U;
+import SVGRenderer from '../../Core/Renderer/SVG/SVGRenderer.js';
+import StockUtilities from '../../Stock/Utilities/StockUtilities.js';
+const { setFixedRange } = StockUtilities;
+import { addEvent, extend, pushUnique } from '../../Shared/Utilities.js';
 
 /* *
  *
@@ -48,22 +42,16 @@ const {
  *
  * */
 
-declare module '../../Core/Chart/ChartLike'{
-    interface ChartLike {
-        navigator?: Navigator;
-        scrollbar?: Scrollbar;
-        scroller?: Navigator;
-    }
-}
-
+/** @internal */
 declare module '../../Core/Renderer/SVG/SymbolType' {
     interface SymbolTypeRegistry {
         'navigator-handle': SymbolFunction;
     }
 }
 
-declare module '../../Core/Series/SeriesLike' {
-    interface SeriesLike {
+/** @internal */
+declare module '../../Core/Series/SeriesBase' {
+    interface SeriesBase {
         baseSeries?: Series;
         navigatorSeries?: Series;
     }
@@ -71,19 +59,10 @@ declare module '../../Core/Series/SeriesLike' {
 
 /* *
  *
- *  Constants
- *
- * */
-
-const composedClasses: Array<Function> = [];
-
-/* *
- *
  *  Variables
  *
  * */
 
-let NavigatorConstructor: typeof Navigator;
 
 /* *
  *
@@ -91,247 +70,28 @@ let NavigatorConstructor: typeof Navigator;
  *
  * */
 
-/**
- * @private
- */
+/** @internal */
 function compose(
-    AxisClass: typeof Axis,
     ChartClass: typeof Chart,
-    NavigatorClass: typeof Navigator,
+    AxisClass: typeof Axis,
     SeriesClass: typeof Series
 ): void {
-
     NavigatorAxisAdditions.compose(AxisClass);
-    NavigatorConstructor = NavigatorClass;
 
-    if (composedClasses.indexOf(ChartClass) === -1) {
-        composedClasses.push(ChartClass);
+    if (pushUnique(composed, 'Navigator')) {
+        ChartClass.prototype.setFixedRange = setFixedRange;
 
-        const chartProto = ChartClass.prototype;
-
-        chartProto.callbacks.push(onChartCallback);
-
-        addEvent(ChartClass, 'afterAddSeries', onChartAfterAddSeries);
-        addEvent(ChartClass, 'afterSetChartSize', onChartAfterSetChartSize);
-        addEvent(ChartClass, 'afterUpdate', onChartAfterUpdate);
-        addEvent(ChartClass, 'beforeRender', onChartBeforeRender);
-        addEvent(ChartClass, 'beforeShowResetZoom', onChartBeforeShowResetZoom);
-        addEvent(ChartClass, 'update', onChartUpdate);
-    }
-
-    if (composedClasses.indexOf(SeriesClass) === -1) {
-        composedClasses.push(SeriesClass);
+        extend(SVGRenderer.prototype.symbols, NavigatorSymbols);
+        extend(defaultOptions, { navigator: NavigatorDefaults });
 
         addEvent(SeriesClass, 'afterUpdate', onSeriesAfterUpdate);
-    }
-
-    if (composedClasses.indexOf(getRendererType) === -1) {
-        composedClasses.push(getRendererType);
-
-        extend(getRendererType().prototype.symbols, NavigatorSymbols);
-    }
-
-    if (composedClasses.indexOf(setOptions) === -1) {
-        composedClasses.push(setOptions);
-
-        extend(defaultOptions, { navigator: NavigatorDefaults });
-    }
-
-}
-
-/**
- * Handle adding new series.
- * @private
- */
-function onChartAfterAddSeries(
-    this: Chart
-): void {
-    if (this.navigator) {
-        // Recompute which series should be shown in navigator, and add them
-        this.navigator.setBaseSeries(null as any, false);
-    }
-}
-
-/**
- * For stock charts, extend the Chart.setChartSize method so that we can set the
- * final top position of the navigator once the height of the chart, including
- * the legend, is determined. #367. We can't use Chart.getMargins, because
- * labels offsets are not calculated yet.
- * @private
- */
-function onChartAfterSetChartSize(
-    this: Chart
-): void {
-    const legend = this.legend,
-        navigator = this.navigator;
-
-    let scrollbarHeight,
-        legendOptions,
-        xAxis,
-        yAxis;
-
-    if (navigator) {
-        legendOptions = legend && legend.options;
-        xAxis = navigator.xAxis;
-        yAxis = navigator.yAxis;
-        scrollbarHeight = navigator.scrollbarHeight;
-
-        // Compute the top position
-        if (this.inverted) {
-            navigator.left = navigator.opposite ?
-                this.chartWidth - (scrollbarHeight as any) -
-                navigator.height :
-                this.spacing[3] + (scrollbarHeight as any);
-            navigator.top = this.plotTop + (scrollbarHeight as any);
-        } else {
-            navigator.left = pick(
-                xAxis.left,
-                this.plotLeft + (scrollbarHeight as any)
-            );
-            navigator.top = (navigator.navigatorOptions.top as any) ||
-                this.chartHeight -
-                navigator.height -
-                (scrollbarHeight as any) -
-                this.spacing[2] -
-                (
-                    this.rangeSelector && this.extraBottomMargin ?
-                        this.rangeSelector.getHeight() :
-                        0
-                ) -
-                (
-                    (
-                        legendOptions &&
-                        legendOptions.verticalAlign === 'bottom' &&
-                        legendOptions.layout !== 'proximate' && // #13392
-                        legendOptions.enabled &&
-                        !legendOptions.floating
-                    ) ?
-                        legend.legendHeight +
-                        pick(legendOptions.margin, 10) :
-                        0
-                ) -
-                (
-                    this.titleOffset ? this.titleOffset[2] : 0
-                );
-        }
-
-        if (xAxis && yAxis) { // false if navigator is disabled (#904)
-
-            if (this.inverted) {
-                xAxis.options.left = yAxis.options.left = navigator.left;
-            } else {
-                xAxis.options.top = yAxis.options.top = navigator.top;
-            }
-
-            xAxis.setAxisSize();
-            yAxis.setAxisSize();
-        }
-    }
-}
-
-/**
- * Initialize navigator, if no scrolling exists yet.
- * @private
- */
-function onChartAfterUpdate(
-    this: Chart,
-    event: Chart.AfterUpdateEventObject
-): void {
-
-    if (!this.navigator && !this.scroller &&
-        ((this.options.navigator as any).enabled ||
-        (this.options.scrollbar as any).enabled)
-    ) {
-        this.scroller = this.navigator = new NavigatorConstructor(this);
-
-        if (pick(event.redraw, true)) {
-            this.redraw(event.animation); // #7067
-        }
-    }
-
-}
-
-/**
- * Initialize navigator for stock charts
- * @private
- */
-function onChartBeforeRender(
-    this: Chart
-): void {
-    const options = this.options;
-
-    if ((options.navigator as any).enabled ||
-        (options.scrollbar as any).enabled
-    ) {
-        this.scroller = this.navigator = new NavigatorConstructor(this);
-    }
-}
-
-/**
- * For Stock charts. For x only zooming, do not to create the zoom button
- * because X axis zooming is already allowed by the Navigator and Range
- * selector. (#9285)
- * @private
- */
-function onChartBeforeShowResetZoom(
-    this: Chart
-): (boolean|undefined) {
-    const chartOptions = this.options,
-        navigator = chartOptions.navigator,
-        rangeSelector = chartOptions.rangeSelector;
-
-    if (((navigator && navigator.enabled) ||
-        (rangeSelector && rangeSelector.enabled)) &&
-        ((!isTouchDevice &&
-        (chartOptions.chart as any).zooming.type === 'x') ||
-        (isTouchDevice &&
-        (chartOptions.chart as any).zooming.pinchType === 'x'))
-    ) {
-        return false;
-    }
-}
-
-/**
- * @private
- */
-function onChartCallback(
-    chart: Chart
-): void {
-    const navigator = chart.navigator;
-
-    // Initialize the navigator
-    if (navigator && chart.xAxis[0]) {
-        const extremes = chart.xAxis[0].getExtremes();
-        navigator.render(extremes.min, extremes.max);
-    }
-}
-
-/**
- * Merge options, if no scrolling exists yet
- * @private
- */
-function onChartUpdate(
-    this: Chart,
-    e: Chart
-): void {
-
-    const navigatorOptions = (e.options.navigator || {}),
-        scrollbarOptions = (e.options.scrollbar || {});
-
-    if (!this.navigator && !this.scroller &&
-        (navigatorOptions.enabled || scrollbarOptions.enabled)
-    ) {
-        merge(true, this.options.navigator, navigatorOptions);
-        merge(true, this.options.scrollbar, scrollbarOptions);
-        delete e.options.navigator;
-        delete e.options.scrollbar;
     }
 
 }
 
 /**
  * Handle updating series
- * @private
+ * @internal
  */
 function onSeriesAfterUpdate(
     this: Series
@@ -347,8 +107,10 @@ function onSeriesAfterUpdate(
  *
  * */
 
+/** @internal */
 const NavigatorComposition = {
     compose
 };
 
+/** @internal */
 export default NavigatorComposition;

@@ -1,9 +1,7 @@
 // THE CHART
 Highcharts.chart('container', {
     chart: {
-        type: 'scatter',
-        marginLeft: 150,
-        marginRight: 150
+        type: 'scatter'
     },
     title: {
         text: 'Highcharts Grid axis'
@@ -18,8 +16,8 @@ Highcharts.chart('container', {
         labels: {
             format: '{value:%E}'
         },
-        min: Date.UTC(2014, 10, 17),
-        max: Date.UTC(2014, 10, 30)
+        min: '2014-11-17',
+        max: '2014-11-30'
     }, {
         id: 'bottom-linear-axis',
         grid: {
@@ -30,7 +28,10 @@ Highcharts.chart('container', {
         grid: {
             enabled: true
         },
-        categories: ['M', 'T', 'W', 'T', 'F', 'S', 'S', 'M', 'T', 'W', 'T', 'F', 'S', 'S'],
+        categories: [
+            'M', 'T', 'W', 'T', 'F', 'S', 'S', 'M', 'T', 'W', 'T', 'F',
+            'S', 'S'
+        ],
         min: 0,
         max: 12
     }, {
@@ -43,7 +44,7 @@ Highcharts.chart('container', {
         labels: {
             format: '{value:%E}',
             style: {
-                fontSize: '1.5em'
+                fontSize: '1.2em'
             }
         },
         linkedTo: 0
@@ -57,7 +58,7 @@ Highcharts.chart('container', {
         labels: {
             format: '{value:Week %W}',
             style: {
-                fontSize: '1.5em'
+                fontSize: '1.2em'
             }
         },
         linkedTo: 0
@@ -81,11 +82,11 @@ Highcharts.chart('container', {
         labels: {
             format: '{value:%E}',
             style: {
-                fontSize: '2em'
+                fontSize: '1.6em'
             }
         },
-        min: Date.UTC(2014, 10, 19),
-        max: Date.UTC(2014, 10, 22)
+        min: '2014-11-19',
+        max: '2014-11-22'
     }, {
         grid: {
             enabled: true
@@ -99,24 +100,24 @@ Highcharts.chart('container', {
                 fontSize: '24px'
             }
         },
-        min: Date.UTC(2014, 10, 19),
-        max: Date.UTC(2014, 10, 22)
+        min: '2014-11-19',
+        max: '2014-11-22'
     }],
     series: [{
         name: 'Project 1',
         borderRadius: 10,
         xAxis: 0,
         data: [{
-            x: Date.UTC(2014, 10, 18),
+            x: '2014-11-18',
             y: 0
         }, {
-            x: Date.UTC(2014, 10, 20),
+            x: '2014-11-20',
             y: 1
         }, {
-            x: Date.UTC(2014, 10, 26),
+            x: '2014-11-26',
             y: 0
         }, {
-            x: Date.UTC(2014, 10, 23),
+            x: '2014-11-23',
             y: 2
         }]
     }, {
@@ -125,16 +126,16 @@ Highcharts.chart('container', {
         visible: false,
         xAxis: 0,
         data: [{
-            x: Date.UTC(2014, 10, 24),
+            x: '2014-11-24',
             y: 1
         }, {
-            x: Date.UTC(2014, 10, 27),
+            x: '2014-11-27',
             y: 2
         }, {
-            x: Date.UTC(2014, 10, 27),
+            x: '2014-11-27',
             y: 1
         }, {
-            x: Date.UTC(2014, 10, 18),
+            x: '2014-11-18',
             y: 2
         }]
     }, {

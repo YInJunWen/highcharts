@@ -1,10 +1,12 @@
 /* *
  *
- *  (c) 2010-2021 Torstein Honsi
+ *  (c) 2010-2026 Highsoft AS
+ *  Author: Torstein Hønsi
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -16,7 +18,8 @@
  *
  * */
 
-import type GlobalsLike from './GlobalsLike';
+import type { HTMLDOMElement } from './Renderer/DOMElementType';
+import type GlobalsBase from './GlobalsBase';
 
 /* *
  *
@@ -28,15 +31,15 @@ declare global {
 
     type AnyRecord = Record<string, any>;
 
-    type DeepPartial<T> = {
-        [P in keyof T]?: (T[P]|DeepPartial<T[P]>);
-    };
-
-    type DeepRecord<K extends keyof any, T> = {
-        [P in K]: (T|DeepRecord<K, T>);
-    };
+    type ArrowFunction = (...args: any) => any;
 
     type ExtractArrayType<T> = T extends (infer U)[] ? U : never;
+
+    type FunctionNamesOf<T> = keyof FunctionsOf<T>;
+
+    type FunctionsOf<T> = {
+        [K in keyof T as T[K] extends Function ? K : never]: T[K];
+    };
 
     interface CallableFunction {
         apply<TScope, TArguments extends Array<unknown>, TReturn>(
@@ -46,14 +49,33 @@ declare global {
         ): TReturn;
     }
 
+    interface Class<T = any> extends Function {
+        new(...args: Array<any>): T;
+    }
+
+    interface Document {
+        /** @deprecated */
+        exitFullscreen: () => Promise<void>;
+        /** @deprecated */
+        mozCancelFullScreen: Function;
+        /** @deprecated */
+        msExitFullscreen: Function;
+        /** @deprecated */
+        msHidden: boolean;
+        /** @deprecated */
+        webkitExitFullscreen: Function;
+        /** @deprecated */
+        webkitHidden: boolean;
+    }
+
     interface Element {
         /**
-         * @private
+         * @internal
          * @requires Core/Renderer/SVG/SVGElement
          */
         gradient?: string;
         /**
-         * @private
+         * @internal
          * @requires Core/Renderer/SVG/SVGElement
          */
         radialReference?: Array<number>;
@@ -61,6 +83,17 @@ declare global {
             qualifiedName: string,
             value: (boolean|number|string)
         ): void;
+
+        /** @deprecated */
+        currentStyle?: ElementCSSInlineStyle;
+        /** @deprecated */
+        mozRequestFullScreen: Function;
+        /** @deprecated */
+        msMatchesSelector: Element['matches'];
+        /** @deprecated */
+        msRequestFullscreen: Function;
+        /** @deprecated */
+        webkitRequestFullScreen: Function;
     }
 
     interface HTMLElement {
@@ -68,22 +101,21 @@ declare global {
     }
 
     interface Math {
-        easeInOutSine(pos: number): number;
-    }
-
-    interface ObjectConstructor {
         /**
-         * Sets the prototype of a specified object o to object proto or null.
-         * Returns the object o.
-         * @param o The object to change its prototype.
-         * @param proto The value of the new prototype or null.
+         * Easing definition
+         *
+         * @param pos
+         * Current position, ranging from 0 to 1.
+         *
+         * @return
+         * Ease result
          */
-        setPrototypeOf?<T>(o: T, proto: object | null): T;
+        easeInOutSine(pos: number): number;
     }
 
     interface SVGElement {
         /**
-         * @private
+         * @internal
          * @requires Core/Renderer/SVG/SVGElement
          */
         cutHeight?: number;
@@ -92,6 +124,16 @@ declare global {
 
     interface TouchList {
         changedTouches: Array<Touch>;
+    }
+
+    interface Window {
+        chrome?: unknown;
+        /** @deprecated */
+        opera?: unknown;
+        /** @deprecated */
+        webkitAudioContext?: typeof AudioContext;
+        /** @deprecated */
+        webkitURL?: typeof URL;
     }
 
     namespace Intl {
@@ -104,7 +146,6 @@ declare global {
         }
 
     }
-
 }
 
 /* *
@@ -115,7 +156,7 @@ declare global {
 
 /**
  * Shared Highcharts properties.
- * @private
+ * @internal
  */
 namespace Globals {
 
@@ -133,28 +174,22 @@ namespace Globals {
                 window :
                 {}
         ) as (Window&typeof globalThis), // eslint-disable-line node/no-unsupported-features/es-builtins
-        doc = win.document,
-        svg = (
-            doc &&
-            doc.createElementNS &&
-            !!(
-                doc.createElementNS(SVG_NS, 'svg') as SVGSVGElement
-            ).createSVGRect
-        ),
-        userAgent = (win.navigator && win.navigator.userAgent) || '',
-        isChrome = userAgent.indexOf('Chrome') !== -1,
+        doc = win.document as (Document|undefined),
+        svg = !!(
+            doc?.createElementNS?.(SVG_NS, 'svg') as SVGSVGElement|undefined
+        )?.createSVGRect,
+        pageLang = (
+            doc?.documentElement?.closest('[lang]') as HTMLDOMElement|null
+        )?.lang,
+        userAgent = win.navigator?.userAgent || '',
+        isChrome = win.chrome,
         isFirefox = userAgent.indexOf('Firefox') !== -1,
         isMS = /(edge|msie|trident)/i.test(userAgent) && !win.opera,
         isSafari = !isChrome && userAgent.indexOf('Safari') !== -1,
         isTouchDevice = /(Mobile|Android|Windows Phone)/.test(userAgent),
         isWebKit = userAgent.indexOf('AppleWebKit') !== -1,
         deg2rad = Math.PI * 2 / 360,
-        hasBidiBug = (
-            isFirefox &&
-            parseInt(userAgent.split('Firefox/')[1], 10) < 4 // issue #38
-        ),
-        hasTouch = !!win.TouchEvent,
-        marginNames: GlobalsLike['marginNames'] = [
+        marginNames: GlobalsBase['marginNames'] = [
             'plotTop',
             'marginRight',
             'marginBottom',
@@ -165,14 +200,16 @@ namespace Globals {
             // Checks whether the browser supports passive events, (#11353).
             let supportsPassive = false;
 
-            // Object.defineProperty doesn't work on IE as well as passive
-            // events - instead of using polyfill, we can exclude IE totally.
+            // Accessors don't work on IE as well as passive events - instead
+            // of using polyfill, we can exclude IE totally. The getter has to
+            // be enumerable, or wrappers that shallow-copy the options never
+            // read it (#25092).
             if (!isMS) {
-                const opts = Object.defineProperty({}, 'passive', {
-                    get: function (): void {
-                        supportsPassive = true;
+                const opts: AddEventListenerOptions = {
+                    get passive(): boolean {
+                        return (supportsPassive = true);
                     }
-                });
+                };
 
                 if (win.addEventListener && win.removeEventListener) {
                     win.addEventListener('testPassive', noop, opts);
@@ -191,7 +228,14 @@ namespace Globals {
      * @name Highcharts.charts
      * @type {Array<Highcharts.Chart|undefined>}
      */
-    export const charts: GlobalsLike['charts'] = [];
+    export const charts: GlobalsBase['charts'] = [];
+
+    /**
+     * A shared registry between all bundles to keep track of applied
+     * compositions.
+     * @internal
+     */
+    export const composed: Array<string> = [];
 
     /**
      * A hook for defining additional date format specifiers. New
@@ -200,25 +244,30 @@ namespace Globals {
      * value. This function returns the formatted portion of the
      * date.
      *
+     * Using `dateFormats` is also a convenient way to define new keys for
+     * complex locale-aware date formats compatible with the
+     * [Intl.DateTimeFormat](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Intl/DateTimeFormat)
+     * browser API, whenever the built-in formats are not sufficient.
+     *
      * @sample highcharts/global/dateformats/
      *         Adding support for week number
+     * @sample highcharts/global/dateformats-object/
+     *         A locale-aware date format using `Intl.DateTimeFormat`
      *
      * @name Highcharts.dateFormats
      * @type {Record<string, Highcharts.TimeFormatCallbackFunction>}
      */
-    export const dateFormats: GlobalsLike['dateFormats'] = {};
+    export const dateFormats: GlobalsBase['dateFormats'] = {};
 
     /**
-     * @private
+     * @internal
      * @deprecated
      * @todo Use only `Core/Series/SeriesRegistry.seriesTypes`
      */
-    export const seriesTypes = {} as GlobalsLike['seriesTypes'];
+    export const seriesTypes = {} as GlobalsBase['seriesTypes'];
 
-    /**
-     * @private
-     */
-    export const symbolSizes: GlobalsLike['symbolSizes'] = {};
+    /** @internal */
+    export const symbolSizes: GlobalsBase['symbolSizes'] = {};
 
     /* *
      *
@@ -237,7 +286,7 @@ namespace Globals {
  *
  * */
 
-export default Globals as unknown as GlobalsLike;
+export default Globals as unknown as GlobalsBase;
 
 /* *
  *
@@ -250,9 +299,9 @@ export default Globals as unknown as GlobalsLike;
  * might not be possible to change this property because of read-only
  * restrictions, instead use {@link Highcharts.setOptions}.
  *
- * @deprecated
+ * @deprecated 9.1.2
  * @name Highcharts.theme
  * @type {Highcharts.Options}
  */
 
-(''); // keeps doclets above in JS file
+(''); // Keeps doclets above in JS file

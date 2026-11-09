@@ -1,5 +1,23 @@
 QUnit.test('Curve bell', function (assert) {
-    var chart = Highcharts.chart('container', {
+    let chart = Highcharts.chart('container', {
+        series: [
+            {
+                type: 'bellcurve',
+                data: [
+                    { y: 1 },
+                    { y: 2 },
+                    { y: 3 }
+                ]
+            }
+        ]
+    });
+
+    assert.ok(
+        chart.series[0],
+        'Bellcurve should work with object data without baseseries (#24073).'
+    );
+
+    chart = Highcharts.chart('container', {
         series: [
             {
                 type: 'bellcurve',
@@ -38,13 +56,13 @@ QUnit.test('Curve bell', function (assert) {
         ]
     });
 
-    var bellcurve = chart.series[0];
-    var baseSeries = chart.series[1];
+    const bellcurve = chart.series[0],
+        baseSeries = chart.series[1];
 
     assert.ok(bellcurve, 'Curve bell series initialised');
     assert.ok(
         bellcurve.baseSeries === baseSeries,
-        "Curve bell's base series is set correctly"
+        'Curve bell\'s base series is set correctly'
     );
 
     assert.strictEqual(bellcurve.mean, 50.7, 'Mean is set correctly');
@@ -57,7 +75,8 @@ QUnit.test('Curve bell', function (assert) {
     assert.strictEqual(
         bellcurve.points.length,
         41,
-        'Number of points is correct according to intervals and pointsInInterval options'
+        'Number of points is correct according to intervals and ' +
+        'pointsInInterval options'
     );
 
     bellcurve.update({
@@ -67,7 +86,22 @@ QUnit.test('Curve bell', function (assert) {
     assert.deepEqual(
         bellcurve.points.length,
         25,
-        "After updating bellcurve's pointsInInterval number of points is correct"
+        'After updating bellcurve\'s pointsInInterval number of points is ' +
+        'correct'
+    );
+
+    bellcurve.update({ visible: false });
+    bellcurve.update({ visible: true });
+
+    assert.equal(
+        bellcurve.visible,
+        true,
+        'Curve bell should be visible after toggling visibility off and on'
+    );
+
+    assert.ok(
+        chart.exporting.getSVG(),
+        'Bellcurve with baseSeries should be exportable via getSVG() (#24752).'
     );
 
     baseSeries.remove();

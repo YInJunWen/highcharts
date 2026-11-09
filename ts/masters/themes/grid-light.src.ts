@@ -1,14 +1,18 @@
+// SPDX-License-Identifier: LicenseRef-Highcharts
 /**
  * @license Highcharts JS v@product.version@ (@product.date@)
  * @module highcharts/themes/grid-light
  * @requires highcharts
  *
- * (c) 2009-2021 Torstein Honsi
+ * (c) 2009-2026 Highsoft AS
+ * Author: Torstein Hønsi
  *
- * License: www.highcharts.com/license
+ * A commercial license may be required depending on use,
+ * see www.highcharts.com/license
  */
 'use strict';
 import H from '../../Core/Globals.js';
 import GridLightTheme from '../../Extensions/Themes/GridLight.js';
 H.theme = GridLightTheme.options;
 GridLightTheme.apply();
+export default H;

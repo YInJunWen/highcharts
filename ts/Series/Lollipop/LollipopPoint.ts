@@ -1,10 +1,12 @@
 /* *
  *
- *  (c) 2010-2021 Torstein Honsi
+ *  (c) 2010-2026 Highsoft AS
+ *  Author: Torstein Hønsi
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -18,32 +20,22 @@
 
 import type LollipopPointOptions from './LollipopPointOptions';
 import type LollipopSeries from './LollipopSeries';
+import type SVGElement from '../../Core/Renderer/SVG/SVGElement';
 
-import SeriesRegistry from '../../Core/Series/SeriesRegistry.js';
-const {
-    series: {
-        prototype: {
-            pointClass: {
-                prototype: pointProto
-            }
-        }
-    },
-    seriesTypes: {
-        area: {
-            prototype: areaProto
-        },
-        dumbbell: {
-            prototype: {
-                pointClass: DumbbellPoint
-            }
-        }
-    }
-} = SeriesRegistry;
-import U from '../../Core/Utilities.js';
-const {
-    isObject,
-    extend
-} = U;
+import DumbbellSeries from '../Dumbbell/DumbbellSeries.js';
+import ScatterSeries from '../Scatter/ScatterSeries.js';
+import Series from '../../Core/Series/Series.js';
+import { extend } from '../../Shared/Utilities.js';
+
+/* *
+ *
+ *  Constants
+ *
+ * */
+
+const Point = Series.prototype.pointClass;
+const ScatterPoint = ScatterSeries.prototype.pointClass;
+const DumbbellPoint = DumbbellSeries.prototype.pointClass;
 
 /* *
  *
@@ -51,7 +43,7 @@ const {
  *
  * */
 
-class LollipopPoint extends DumbbellPoint {
+class LollipopPoint extends Point {
 
     /* *
      *
@@ -59,28 +51,15 @@ class LollipopPoint extends DumbbellPoint {
      *
      * */
 
-    public options: LollipopPointOptions = void 0 as any;
-
-    public series: LollipopSeries = void 0 as any;
-
-    /* *
-     *
-     *  Functions
-     *
-     * */
-
-    public init(
-        _series: LollipopSeries,
-        options: LollipopPointOptions,
-        _x?: number
-    ): typeof pointProto {
-        if (isObject(options) && 'low' in options) {
-            options.y = options.low;
-            delete options.low;
-        }
-        return pointProto.init.apply(this, arguments);
-    }
-
+    /** @internal */
+    public connector?: SVGElement;
+    public options!: LollipopPointOptions;
+    /** @internal */
+    public series!: LollipopSeries;
+    /** @internal */
+    public plotX!: number;
+    /** @internal */
+    public pointWidth!: number;
 }
 
 /* *
@@ -90,13 +69,15 @@ class LollipopPoint extends DumbbellPoint {
  * */
 
 interface LollipopPoint {
-    pointSetState: typeof areaProto.pointClass.prototype.setState;
+    destroy: typeof DumbbellPoint.prototype['destroy'],
+    pointSetState: typeof ScatterPoint.prototype['setState'],
+    setState: typeof DumbbellPoint.prototype['setState']
 }
 
 extend(LollipopPoint.prototype, {
-    pointSetState: areaProto.pointClass.prototype.setState,
-    // Does not work with the inherited `isvalid`
-    isValid: pointProto.isValid
+    destroy: DumbbellPoint.prototype.destroy,
+    pointSetState: ScatterPoint.prototype.setState,
+    setState: DumbbellPoint.prototype.setState
 });
 
 /* *

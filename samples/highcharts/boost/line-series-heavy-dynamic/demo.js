@@ -1,9 +1,11 @@
+const pointStart = Date.UTC(2024, 0, 1),
+    pointInterval = 36e5;
 function getData(n) {
-    var arr = [],
-        i;
-    for (i = 0; i < n; i = i + 1) {
+    const arr = [];
+
+    for (let i = 0; i < n; i = i + 1) {
         arr.push([
-            i,
+            pointStart + pointInterval * i,
             2 * Math.sin(i / 100) + Math.random()
         ]);
     }
@@ -11,10 +13,9 @@ function getData(n) {
 }
 
 function getSeries(n, s) {
-    var i = 0,
-        r = [];
+    const r = [];
 
-    for (; i < s; i++) {
+    for (let i = 0; i < s; i++) {
         r.push({
             data: getData(n),
             dataGrouping: {
@@ -23,43 +24,45 @@ function getSeries(n, s) {
             animation: false,
             lineWidth: 2,
             boostThreshold: 1,
-            turboThreshold: 1,
             showInNavigator: true,
-            requireSorting: false
+            requireSorting: false,
+            pointStart,
+            pointInterval
         });
     }
 
     return r;
 }
 
-var n = 20,
-    s = 600,
-    series = getSeries(n, s),
-    chart;
+let n = 20;
 
-Highcharts.setOptions({
-    global: {
-        useUTC: false
-    }
-});
+const s = 600,
+    series = getSeries(n, s);
 
 console.time('line');
-chart =  Highcharts.stockChart('container', {
+const chart = Highcharts.stockChart('container', {
 
     chart: {
         animation: false,
-        zoomType: 'x'
+        zooming: {
+            type: 'x'
+        }
+    },
+
+    lang: {
+        timezone: undefined
     },
 
     title: {
-        text: 'Highcharts drawing ' + (n * s) + ' points across ' + s + ' series'
+        text:
+            'Highcharts drawing ' + (n * s) + ' points across ' + s + ' series'
     },
 
     navigator: {
         xAxis: {
-            ordinal: false//,
+            ordinal: false// ,
             // min: n / 2
-            //max: 10
+            // max: 10
         },
         yAxis: {
             // min: 0,
@@ -81,8 +84,8 @@ chart =  Highcharts.stockChart('container', {
     },
 
     yAxis: {
-        //min: 0,
-        //max: 8
+        // min: 0,
+        // max: 8
     },
 
     subtitle: {
@@ -103,11 +106,11 @@ function addPoint() {
     ++n;
 
     chart.series.forEach(function dynAddPoint(se) {
-        var x = n,
-            y = 2 * Math.sin(x / 100) + Math.random();
+        const x = pointStart + pointInterval * n,
+            y = 2 * Math.sin(n / 100) + Math.random();
 
-        //Yeah...
-        if (se.options.className === "highcharts-navigator-series") {
+        // Yeah...
+        if (se.options.className === 'highcharts-navigator-series') {
             return;
         }
 
@@ -122,7 +125,7 @@ function addPoint() {
 }
 
 setInterval(addPoint, 1000);
-//console.log(chart);
+// console.log(chart);
 
 document.getElementById('profile-add').onclick = function () {
     console.profile('addPoint');

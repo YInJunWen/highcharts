@@ -1,15 +1,16 @@
 /* *
  *
- *  (c) 2010-2021 Highsoft AS
+ *  (c) 2010-2026 Highsoft AS
  *
  *  Author: Øystein Moseng
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
  *  Accessible high-contrast theme for Highcharts. Considers colorblindness and
  *  monochrome rendering.
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -21,12 +22,12 @@
  *
  * */
 
-import type Options from '../../Core/Options';
+import type { DeepPartial } from '../../Shared/Types';
+import type { DefaultOptions } from '../../Core/Options';
 import type { SeriesTypePlotOptions } from '../../Core/Series/SeriesType';
 
-import D from '../../Core/DefaultOptions.js';
+import D from '../../Core/Defaults.js';
 const { setOptions } = D;
-import H from '../../Core/Globals.js';
 
 /* *
  *
@@ -42,7 +43,7 @@ namespace SunsetTheme {
      *
      * */
 
-    export const options: DeepPartial<Options> = {
+    export const options: DeepPartial<DefaultOptions> = {
         colors: ['#FDD089', '#FF7F79', '#A0446E', '#251535'],
 
         colorAxis: {

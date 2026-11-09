@@ -1,0 +1,127 @@
+/* *
+ *
+ *  (c) 2009-2026 Highsoft AS
+ *
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
+ *
+ *
+ *  Authors:
+ *  - Sebastian Bochan
+ *  - Wojciech Chmiel
+ *  - Gøran Slettemark
+ *  - Sophie Bremer
+ *  - Paweł Lysy
+ *  - Karol Kołodziej
+ *
+ * */
+
+'use strict';
+
+/* *
+ *
+ *  Imports
+ *
+ * */
+
+import type { GUIElementType } from './Layout/GUIElement';
+import type Board from './Board';
+
+/* *
+ *
+ *  Declarations
+ *
+ * */
+
+/**
+ * Global Dashboards namespace in classic `<scripts>`-based implementations.
+ *
+ * @namespace Dashboards
+ */
+
+/**
+ * Abstract class type to wrap expected instance T.
+ */
+export interface Class<T = unknown> extends Function {
+    new(...args: Array<unknown>): T;
+}
+
+/**
+ * Event callback as used by Highcharts.
+ */
+export interface EventCallback<T> {
+    (
+        this: T,
+        eventArguments: (Record<string, unknown>|Event)
+    ): (boolean|void);
+}
+
+/* *
+ *
+ *  Constants
+ *
+ * */
+
+/**
+ * Prefix of a GUIElement HTML class name.
+ */
+export const classNamePrefix = 'highcharts-dashboards-';
+
+export const version = '@product.version@';
+
+/** @internal */
+export const classNames = {
+    layout: classNamePrefix + 'layout',
+    cell: classNamePrefix + 'cell',
+    cellHover: classNamePrefix + 'cell-state-hover',
+    cellActive: classNamePrefix + 'cell-state-active',
+    cellLoading: classNamePrefix + 'cell-state-loading',
+    row: classNamePrefix + 'row',
+    layoutsWrapper: classNamePrefix + 'layouts-wrapper',
+    boardContainer: classNamePrefix + 'wrapper'
+};
+
+/** @internal */
+export const guiElementType: Record<string, GUIElementType> = {
+    row: 'row',
+    cell: 'cell',
+    layout: 'layout'
+};
+
+/**
+ * Contains all Board instances of this window.
+ */
+export const boards: Array<Board|undefined> = [];
+
+/**
+ * Reference to the window used by Dashboards.
+ */
+export const win = window;
+
+export const doc = document;
+
+export const noop = function (): void {};
+
+export const isMS = /(edge|msie|trident)/i
+    .test((win.navigator && win.navigator.userAgent) || '') && !win.opera;
+
+const Globals = {
+    boards,
+    classNamePrefix,
+    classNames,
+    doc,
+    guiElementType,
+    isMS,
+    noop,
+    version,
+    win
+};
+
+/* *
+ *
+ *  Default Export
+ *
+ * */
+
+export default Globals;

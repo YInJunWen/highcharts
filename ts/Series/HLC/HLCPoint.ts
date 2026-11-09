@@ -1,10 +1,12 @@
 /* *
  *
- *  (c) 2010-2021 Pawel Lysy
+ *  (c) 2010-2026 Highsoft AS
+ *  Author: Paweł Lysy
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -18,13 +20,18 @@
 
 import type HLCPointOptions from './HLCPointOptions';
 import type HLCSeries from './HLCSeries';
-import SeriesRegistry from '../../Core/Series/SeriesRegistry.js';
+import type SVGAttributes from '../../Core/Renderer/SVG/SVGAttributes';
+import type SVGPath from '../../Core/Renderer/SVG/SVGPath';
 
-const {
-    seriesTypes: {
-        column: ColumnSeries
-    }
-} = SeriesRegistry;
+import ColumnSeries from '../Column/ColumnSeries.js';
+
+/* *
+ *
+ *  Constants
+ *
+ * */
+
+const ColumnPoint = ColumnSeries.prototype.pointClass;
 
 /* *
  *
@@ -32,7 +39,7 @@ const {
  *
  * */
 
-class HLCPoint extends ColumnSeries.prototype.pointClass {
+class HLCPoint extends ColumnPoint {
 
     /* *
      *
@@ -40,24 +47,56 @@ class HLCPoint extends ColumnSeries.prototype.pointClass {
      *
      * */
 
-    public close: number = void 0 as any;
+    /** @internal */
+    public close!: number;
 
-    public high: number = void 0 as any;
+    /** @internal */
+    public high!: number;
 
-    public low: number = void 0 as any;
+    /** @internal */
+    public low!: number;
 
-    public options: HLCPointOptions = void 0 as any;
+    public options!: HLCPointOptions;
 
-    public plotClose: number = void 0 as any;
+    /** @internal */
+    public plotClose!: number;
 
+    /** @internal */
     public plotHigh?: number;
 
+    /** @internal */
     public plotLow?: number;
 
-    public series: HLCSeries = void 0 as any;
+    /** @internal */
+    public series!: HLCSeries;
 
+    /** @internal */
     public yBottom?: number;
 
+    /**
+     * Get the origin position for entrance animation of new points.
+     * @internal
+     */
+    public getOrigin(
+        { x = 0 }: SVGAttributes,
+        shape: SVGAttributes = {}
+    ): SVGAttributes {
+        const d = shape.d as SVGPath|undefined,
+            shiftX = x - (this.plotX || 0);
+
+        if (d) {
+            return {
+                d: d.map((segment): SVGPath.Segment => {
+                    const slice = segment.slice() as SVGPath.Segment;
+                    if (typeof slice[1] === 'number') {
+                        slice[1] += shiftX;
+                    }
+                    return slice;
+                })
+            };
+        }
+        return shape;
+    }
 }
 
 /* *

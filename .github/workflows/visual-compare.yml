@@ -1,0 +1,124 @@
+name: Highcharts Visual Comparison
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - 'master'
+    paths:
+      - 'samples/**'
+      - 'ts/**'
+      - 'css/**'
+      - '.github/workflows/visual-compare.yml'
+
+permissions:
+  contents: read # to fetch code (actions/checkout)
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  file_size_comparison:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: master
+
+      - name: Use Node.js lts/*
+        uses: actions/setup-node@v6
+        with:
+          node-version: 'lts/*'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check TypeScript version
+        run: npx tsc -v
+
+      - name: Build Highcharts
+        run: npx gulp scripts
+
+      - name: Build Grid
+        run: npx gulp scripts --product Grid
+
+      - name: Build Dashboards
+        run: npx gulp scripts --product Dashboards
+
+      - name: Write file sizes at master
+        run: npx gulp write-file-sizes --filename master.json
+
+      - name: Checkout current branch
+        uses: actions/checkout@v6
+        with:
+          clean: false
+          fetch-depth: 0
+
+      - name: Use Node.js lts/*
+        uses: actions/setup-node@v6
+        with:
+          node-version: 'lts/*'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check TypeScript version
+        run: npx tsc -v
+
+      - name: Build Highcharts
+        run: npx gulp scripts
+
+      - name: Build Grid
+        run: npx gulp scripts --product Grid
+
+      - name: Build Dashboards
+        run: npx gulp scripts --product Dashboards
+
+      - name: File size comparison
+        run: |
+          npx gulp write-file-sizes --filename ${{github.event.pull_request.number}}.json
+          npx gulp write-size-table \
+          --master ./tmp/filesizes/master.json \
+          --proposed ./tmp/filesizes/${{github.event.pull_request.number}}.json
+
+      - name: Comment PR with file size table
+        if: ${{ github.event.pull_request.number && hashFiles('tmp/filesizes/comparison.md') != '' }}
+        uses: actions/github-script@v8
+        with:
+          github-token: ${{secrets.PR_COMMENT_TOKEN}}
+          script: |
+            const { readFileSync } = require('node:fs');
+            const { createOrUpdateComment } = require('./.github/scripts/commentOnPR');
+
+            const comparisonPath = './tmp/filesizes/comparison.md';
+            const title = 'File size comparison';
+
+            let body = readFileSync(comparisonPath, 'utf8');
+            body = body.replace(/^### File size comparison\s*/i, '').trim();
+
+            if (!body) {
+              body = 'No differences found';
+            }
+
+            if (!body.startsWith('\n')) {
+              body = `\n${body}`;
+            }
+
+            await createOrUpdateComment(
+              github,
+              context,
+              title,
+              body
+            );
+
+      - name: Upload file size comparison artifact
+        if: ${{ always() && hashFiles('tmp/filesizes/comparison.md') != '' }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: filesize-comparison-${{ github.event.pull_request.number || github.run_id }}
+          path: |
+            tmp/filesizes/master.json
+            tmp/filesizes/${{ github.event.pull_request.number }}.json
+            tmp/filesizes/comparison.md

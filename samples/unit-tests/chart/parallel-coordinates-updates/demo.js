@@ -171,23 +171,26 @@ QUnit.test('Update parallel coordinates plot', function (assert) {
     assert.strictEqual(
         points[0].low,
         firstAxisMin,
-        `The first yAxis' min should be equal to the first point's low value.`
+        'The first yAxis\' min should be equal to the first point\'s low value.'
     );
     assert.strictEqual(
         points[0].high,
         firstAxisMax,
-        `The first yAxis' max should be equal to the first point's high value.`
+        'The first yAxis\' max should be equal to the first point\'s high ' +
+        'value.'
     );
 
     assert.strictEqual(
         points[2].low,
         thirdAxisMin,
-        `The third yAxis' min should be equal to the third point's low value.`
+        'The third yAxis\' min should be equal to the third point\'s low ' +
+        'value.'
     );
     assert.strictEqual(
         points[2].high,
         thirdAxisMax,
-        `The third yAxis' max should be equal to the third point's high value.`
+        'The third yAxis\' max should be equal to the third point\'s high ' +
+        'value.'
     );
 
     // Calculate plotHigh value based on each yAxis scale (#15752)
@@ -195,7 +198,7 @@ QUnit.test('Update parallel coordinates plot', function (assert) {
         assert.strictEqual(
             chart.yAxis[i].translate(point.high, 0, 1, 0, 1),
             point.plotHigh,
-            `PlotHigh value should be calculated based on the point's yAxis.`
+            'PlotHigh value should be calculated based on the point\'s yAxis.'
         );
     });
 
@@ -219,22 +222,62 @@ QUnit.test('Update parallel coordinates plot', function (assert) {
     assert.strictEqual(
         secondSeries.points[0].low,
         firstAxisMin,
-        `The first yAxis' min should be equal to the first point's low value.`
+        'The first yAxis\' min should be equal to the first point\'s low value.'
     );
     assert.strictEqual(
         firstSeries.points[0].high,
         firstAxisMax,
-        `The first yAxis' max should be equal to the first point's high value.`
+        'The first yAxis\' max should be equal to the first point\'s high ' +
+        'value.'
     );
 
     assert.strictEqual(
         secondSeries.points[2].low,
         thirdAxisMin,
-        `The third yAxis' min should be equal to the third point's low value.`
+        'The third yAxis\' min should be equal to the third point\'s low value.'
     );
     assert.strictEqual(
         firstSeries.points[2].high,
         thirdAxisMax,
-        `The third yAxis' max should be equal to the third point's high value.`
+        'The third yAxis\' max should be equal to the third point\'s high ' +
+        'value.'
     );
+
+    const pathArray = chart.yAxis[0].ticks['8'].gridLine.pathArray;
+
+    assert.ok(
+        pathArray[0][1] !== pathArray[1][1],
+        'Parallel yAxis grid line path should have non-zero length, #24442.'
+    );
+
+});
+
+// Update unassigned points from y-axes (#13608)
+QUnit.test('#13608', function (assert) {
+    var chart = Highcharts.chart('container', {
+        chart: {
+            parallelCoordinates: true
+        },
+        series: [
+            {
+                data: [1, 2, 3]
+            }
+        ]
+    });
+
+    var oldMax = chart.yAxis.map(function (yAxis) {
+        return yAxis.max;
+    });
+
+    chart.update({
+        chart: {
+            parallelCoordinates: true
+        }
+    });
+
+    var newMax = chart.yAxis.map(function (yAxis) {
+        return yAxis.max;
+    });
+
+    assert.deepEqual(newMax, oldMax, 'Points should be kept on axes.');
 });

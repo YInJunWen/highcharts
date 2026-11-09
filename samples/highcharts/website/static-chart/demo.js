@@ -20,8 +20,14 @@ Math.easeOutBounce = pos => {
 };
 
 const countOffset = 2;
-const  icebergLabels = [180, 160, 140, 120, 100, 80, 60, 40, 20,
-    10, 0, 20, 40, 60, 80, 100, 120, 140, 160, 180];
+const  icebergLabels = [
+    180, 160, 140, 120, 100, 80, 60, 40, 20,
+    10, 0, 20, 40, 60, 80, 100, 120, 140, 160, 180
+];
+
+let chart;
+let tooltipPosition;
+
 
 const iceberg = {
     chart: {
@@ -30,25 +36,18 @@ const iceberg = {
             duration: 3000,
             easing: 'easeOutQuint'
         },
-        styledMode: (true),
         margin: 0,
         spacing: 0,
         events: {
             load: function () {
-                const chart = this;
-                const cover = document.getElementsByClassName('cover')[0];
-                const background = document.getElementsByClassName('highcharts-background')[0];
-                const plotBackground = document.getElementsByClassName('highcharts-plot-background')[0];
-                const title = document.getElementsByClassName('highcharts-title')[0];
+                chart = this;
 
-
-                cover.style.fill =  '#30426B';
-                background.style.fill = '#f0f0f0';
-                plotBackground.style.transition = 'none';
-                plotBackground.style.fill = '#f0f0f0';
-                title.style.opacity = 1;
-
-                //turn on tooltip
+                if (chart.chartHeight <= 400) {
+                    tooltipPosition = { x: 80, y: chart.chartHeight - 100 };
+                } else {
+                    tooltipPosition = { x: 110, y: chart.chartHeight - 140 };
+                }
+                // turn on tooltip
                 chart.update({
                     tooltip: {
                         enabled: true
@@ -66,11 +65,11 @@ const iceberg = {
                 [].forEach.call(
                     document.querySelectorAll('#charts .iceberg-types'),
                     function (elem) {
-                        elem.style.color = '#000';
+                        elem.style.color = 'var(--text-primary)';
                     }
                 );
 
-                ///style the labels
+                // /style the labels
                 [].forEach.call(
                     document.querySelectorAll('#charts .berg-label'),
                     function (elem) {
@@ -78,7 +77,7 @@ const iceberg = {
                     }
                 );
 
-                ///attach individual 'berg' classes to each berg
+                // /attach individual 'berg' classes to each berg
                 [].forEach.call(
                     document.querySelectorAll('.berg-depth'),
                     function (b, i) {
@@ -86,7 +85,7 @@ const iceberg = {
                     }
                 );
 
-                ///icebergs' opacity
+                // /icebergs' opacity
                 [].forEach.call(
                     document.querySelectorAll('#charts .berg-depth'),
                     function (elem) {
@@ -102,8 +101,8 @@ const iceberg = {
                     }
                 );
 
-                ///for use in redraw function
-                //done = true;
+                // /for use in redraw function
+                // done = true;
 
             },
             redraw: function () {
@@ -131,7 +130,12 @@ const iceberg = {
     },
     accessibility: {
         screenReaderSection: {
-            beforeChartFormat: '<h1>{chartTitle}</h1><p>Interactive chart displaying 5 different styles of icebergs, their approximate size, and how frequently they occur in Iceberg Alley.</p><p>The visualization has shapes of icebergs laid out next to each other on the X-axis, with the Y-axis showing size in meters, both above and below water.</p>'
+            beforeChartFormat: '<h1>{chartTitle}</h1><p>Interactive chart ' +
+                'displaying 5 different styles of icebergs, their ' +
+                'approximate size, and how frequently they occur in Iceberg ' +
+                'Alley.</p><p>The visualization has shapes of icebergs laid ' +
+                'out next to each other on the X-axis, with the Y-axis ' +
+                'showing size in meters, both above and below water.</p>'
         },
         landmarkVerbosity: 'disabled',
         series: {
@@ -144,18 +148,19 @@ const iceberg = {
         }
     },
     title: {
-        text: 'Distribution of Icebergs in Iceberg Alley <p style="text-align:center;margin:0px;font-weight:300;font-size:0.8em">Newfoundland, Canada</p>',
+        text: 'Distribution of Icebergs ' +
+            '<p style="text-align:center;margin:0px;font-weight:300;' +
+            'font-size:0.8em">Newfoundland, Canada</p>',
         useHTML: true,
-        floating: true
+        y: 50
 
     },
     subtitle: {
         text: '<p class="iceberg-subtitle"></p>',
-        useHTML: true,
-        floating: true
+        useHTML: true
     },
     xAxis: [
-        //0 -
+        // 0 -
         {
             min: 0,
             max: 20,
@@ -166,7 +171,7 @@ const iceberg = {
                 description: 'values from 0 to 20'
             }
         },
-        //1 -
+        // 1 -
         {
             min: 0,
             max: 20,
@@ -177,7 +182,7 @@ const iceberg = {
                 enabled: false
             }
         },
-        ///2 - for particle group 1
+        // /2 - for particle group 1
         {
             min: 0,
             max: 20,
@@ -187,7 +192,7 @@ const iceberg = {
                 enabled: false
             }
         },
-        ///3 - for particle group 2
+        // /3 - for particle group 2
         {
             min: 0,
             max: 20,
@@ -202,11 +207,12 @@ const iceberg = {
             min: -2,
             max: 18,
             gridZIndex: 20,
+            gridLineWidth: 0,
             title: {
-                text: 'Meters',
-                x: -12,
-                y: -75,
-                rotation: 0
+                text: '',
+                offset: -10,
+                rotation: 0,
+                y: -240
             },
             tickPositions: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13],
             zIndex: 1,
@@ -224,10 +230,10 @@ const iceberg = {
                     const label = icebergLabels[index];
                     let color = '#fff';
                     if (labelPos > 8) {
-                        color = '#000';
+                        color = 'var(--highcharts-neutral-color-100)';
                     }
                     return `
-                <p style="color:${color}">${label}</p>
+                <p style="color:${color};white-space:nowrap;">${label} m</p>
               `;
                 }
             },
@@ -239,6 +245,7 @@ const iceberg = {
             gridZIndex: 20,
             tickPositions: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13],
             gridLineColor: 'transparent',
+            gridLineWidth: 0,
             tickInterval: 1,
             startOnTick: false,
             endOnTick: false,
@@ -254,8 +261,7 @@ const iceberg = {
         useHTML: true,
         headerFormat: '',
         positioner: function () {
-            //return { x: 130, y: 365 };
-            return { x: 53, y: 1170 };
+            return tooltipPosition;
         }
     },
     plotOptions: {
@@ -318,6 +324,7 @@ const iceberg = {
         {
             type: 'arearange',
             name: 'bottom',
+            color: '#30426B',
             tooltip: {
                 pointFormatter: function () {
                     return '';
@@ -334,7 +341,7 @@ const iceberg = {
             visible: true
 
         },
-        //1 iceberg types
+        // 1 iceberg types
         {
             type: 'scatter',
             className: 'iceberg-typesX',
@@ -372,7 +379,7 @@ const iceberg = {
             zIndex: 150,
             visible: false
         },
-        ///2 berg 1 bottom
+        // /2 berg 1 bottom
         {
             type: 'line',
             name: 'Pinnacle Icebergs',
@@ -381,8 +388,8 @@ const iceberg = {
                 pointFormatter: function () {
                     return `<p class="berg-tip" aria-hidden="true">
                     <span>
-                    Pinnacle icebergs</span> - a 
-                    large central spire or pyramid.</p>`;
+                    Pinnacle icebergs</span><br> A
+                    large central spire or pyramid</p>`;
                 }
             },
             xAxis: 2,
@@ -393,7 +400,10 @@ const iceberg = {
             },
             accessibility: {
                 enabled: true,
-                description: 'Pinnacle icebergs have a large central spire or pyramid and comprise 33% of icebergs found in Iceberg Alley. They are the tallest style of iceberg, reaching over 120m above and below water.'
+                description: 'Pinnacle icebergs have a large central spire ' +
+                    'or pyramid and comprise 33% of icebergs found in ' +
+                    'Iceberg Alley. They are the tallest style of iceberg, ' +
+                    'reaching over 120m above and below water.'
             },
             data: [
                 {
@@ -412,7 +422,7 @@ const iceberg = {
                 }
             ]
         },
-        ///3 berg 1 top
+        // /3 berg 1 top
         {
             type: 'line',
             name: 'Pinnacle Icebergs',
@@ -423,6 +433,13 @@ const iceberg = {
             visible: true,
             marker: {
                 enabled: false
+            },
+            point: {
+                events: {
+                    mouseOver: function () {
+                        this.series.chart.series[2].setState('hover');
+                    }
+                }
             },
             data: [
                 {
@@ -435,12 +452,12 @@ const iceberg = {
                     dataLabels: {
                         enabled: true,
                         useHTML: true,
-                        x: 30,
+                        x: 40,
                         y: 50,
                         formatter: function () {
                             const htmlString =
                                 `<div class="berg-label">
-                                    <p class="label-title" 
+                                    <p class="label-title"
                                     style="font-weight:700;">Pinnacle</p>
                                     <p  class="label-percent">33%</p>
                                 </div>`;
@@ -454,12 +471,15 @@ const iceberg = {
                 }
             ]
         },
-        //4 berg-2 bottom
+        // 4 berg-2 bottom
         {
             type: 'line',
             accessibility: {
                 enabled: true,
-                description: 'Tabular icebergs are horizontal and flat-topped and comprise 23% of icebergs found in Iceberg Alley. They are medium sized, and often reach 60m above and below water.'
+                description: 'Tabular icebergs are horizontal and ' +
+                    'flat-topped and comprise 23% of icebergs found in ' +
+                    'Iceberg Alley. They are medium sized, and often reach ' +
+                    '60m above and below water.'
             },
             name: 'Tabular Icebergs',
             className: 'berg-depth',
@@ -472,8 +492,8 @@ const iceberg = {
             tooltip: {
                 pointFormatter: function () {
                     return `<p class="berg-tip" aria-hidden="true">
-                            <span>Tabular icebergs</span> - 
-                            horizontal and flat-topped.</p>`;
+                            <span>Tabular icebergs</span><br>
+                            horizontal and flat-topped</p>`;
 
                 }
             },
@@ -499,7 +519,7 @@ const iceberg = {
                 }
             ]
         },
-        ///5 berg-2 top
+        // /5 berg-2 top
         {
             type: 'line',
             name: 'Tabular Icebergs',
@@ -510,6 +530,13 @@ const iceberg = {
             visible: true,
             marker: {
                 enabled: false
+            },
+            point: {
+                events: {
+                    mouseOver: function () {
+                        this.series.chart.series[4].setState('hover');
+                    }
+                }
             },
             data: [
                 {
@@ -527,7 +554,7 @@ const iceberg = {
                         formatter: function () {
                             const htmlString =
                                 `<div class="berg-label">
-                                    <p class="label-title" 
+                                    <p class="label-title"
                                     style="font-weight:700;">Tabular</p>
                                     <p  class="label-percent">23%</p>
                                 </div>`;
@@ -545,7 +572,7 @@ const iceberg = {
                 }
             ]
         },
-        //6 - berg 3 bottom
+        // 6 - berg 3 bottom
         {
             type: 'line',
             name: 'Dry Dock Icebergs',
@@ -559,13 +586,16 @@ const iceberg = {
             tooltip: {
                 pointFormatter: function () {
                     return `<p class="berg-tip" aria-hidden="true">
-                    <span>Dry Dock icebergs</span> - eroded into a 
-                    U shape.</p>`;
+                    <span>Dry Dock icebergs</span><br> Eroded into a
+                    U shape</p>`;
                 }
             },
             accessibility: {
                 enabled: true,
-                description: 'Dry Dock icebergs have eroded into a U shape and comprise 19% of icebergs found in Iceberg Alley. They are medium sized, and often reach 60m above and below water.'
+                description: 'Dry Dock icebergs have eroded into a U shape ' +
+                    'and comprise 19% of icebergs found in Iceberg Alley. ' +
+                    'They are medium sized, and often reach 60m above and ' +
+                    'below water.'
             },
             data: [
                 {
@@ -594,7 +624,7 @@ const iceberg = {
                 }
             ]
         },
-        //7 - berg 3 top
+        // 7 - berg 3 top
         {
             type: 'line',
             name: 'Dry Dock Icebergs',
@@ -605,6 +635,13 @@ const iceberg = {
             visible: true,
             marker: {
                 enabled: false
+            },
+            point: {
+                events: {
+                    mouseOver: function () {
+                        this.series.chart.series[6].setState('hover');
+                    }
+                }
             },
             data: [
                 {
@@ -622,7 +659,7 @@ const iceberg = {
                         formatter: function () {
                             const htmlString =
                                 `<div class="berg-label">
-                                    <p class="label-title" 
+                                    <p class="label-title"
                                     style="font-weight:700;">Dry Dock</p>
                                     <p  class="label-percent">19%</p>
                                 </div>`;
@@ -644,7 +681,7 @@ const iceberg = {
                 }
             ]
         },
-        //8 berg 4 bottom
+        // 8 berg 4 bottom
         {
             type: 'line',
             name: 'Dome Icebergs',
@@ -658,13 +695,16 @@ const iceberg = {
             tooltip: {
                 pointFormatter: function () {
                     return `<p class="berg-tip" aria-hidden="true">
-                                <span>Dome icebergs</span> - large, 
-                                smooth, rounded tops.</p>`;
+                                <span>Dome icebergs</span> <br>Large,
+                                smooth, rounded tops</p>`;
                 }
             },
             accessibility: {
                 enabled: true,
-                description: 'Dome icebergs have smooth, rounded tops and comprise 15% of icebergs found in Iceberg Alley. They are medium sized, and often reach 60m above water, and 40m below.'
+                description: 'Dome icebergs have smooth, rounded tops and ' +
+                    'comprise 15% of icebergs found in Iceberg Alley. They ' +
+                    'are medium sized, and often reach 60m above water, and ' +
+                    '40m below.'
             },
             data: [{
                 x: 12.5,
@@ -692,7 +732,7 @@ const iceberg = {
             }
             ]
         },
-        //9 berg 4 top
+        // 9 berg 4 top
         {
             type: 'line',
             name: 'Dome Icebergs',
@@ -703,6 +743,13 @@ const iceberg = {
             visible: true,
             marker: {
                 enabled: false
+            },
+            point: {
+                events: {
+                    mouseOver: function () {
+                        this.series.chart.series[8].setState('hover');
+                    }
+                }
             },
             data: [{
                 x: 12.5,
@@ -719,7 +766,7 @@ const iceberg = {
                     formatter: function () {
                         const htmlString =
                             `<div class="berg-label">
-                                <p class="label-title" 
+                                <p class="label-title"
                                 style="font-weight:700;">Dome</p>
                                 <p  class="label-percent">15%</p>
                             </div>`;
@@ -741,7 +788,7 @@ const iceberg = {
             }
             ]
         },
-        { //10 berg 5 bottom
+        { // 10 berg 5 bottom
             type: 'line',
             name: 'Wedge Icebergs',
             className: 'berg-depth',
@@ -754,15 +801,18 @@ const iceberg = {
             tooltip: {
                 pointFormatter: function () {
                     return `<p class="berg-tip" aria-hidden="true">
-                            <span>Wedge icebergs</span> - tabular 
+                            <span>Wedge icebergs</span><br> Tabular
                             icebergs that have
-                            tilted.</p>`;
+                            tilted</p>`;
 
                 }
             },
             accessibility: {
                 enabled: true,
-                description: 'Wedge icebergs are tabular icebergs that have tilted and comprise 10% of icebergs found in Iceberg Alley. They are smaller sized than the others, reaching just a few metres below water, and around 40m above.'
+                description: 'Wedge icebergs are tabular icebergs that have ' +
+                    'tilted and comprise 10% of icebergs found in Iceberg ' +
+                    'Alley. They are smaller sized than the others, reaching ' +
+                    'just a few metres below water, and around 40m above.'
             },
             data: [{
                 x: 16.12,
@@ -779,7 +829,7 @@ const iceberg = {
                 accessibility: { enabled: false }
             }]
         },
-        { //11 berg 5 top
+        { // 11 berg 5 top
             type: 'line',
             name: 'Wedge Icebergs',
             className: 'berg-depth',
@@ -789,6 +839,13 @@ const iceberg = {
             visible: true,
             marker: {
                 enabled: false
+            },
+            point: {
+                events: {
+                    mouseOver: function () {
+                        this.series.chart.series[10].setState('hover');
+                    }
+                }
             },
             data: [{
                 x: 16.12,
@@ -805,7 +862,7 @@ const iceberg = {
                     formatter: function () {
                         const htmlString =
                             `<div class="berg-label">
-                                <p class="label-title" 
+                                <p class="label-title"
                                 style="font-weight:700;">Wedge</p>
                                 <p  class="label-percent">10%</p>
                             </div>`;
@@ -818,78 +875,92 @@ const iceberg = {
                 y: 8
             }]
         }
-    ],
-    responsive: {
-        rules: [{
-            condition: {
-                maxWidth: 250
-            },
-            chartOptions: {
-                tooltip: {
-                    positioner: function () {
-                        //return { x: 130, y: 365 };
-                        return { x: 50, y: 165 };
-                    }
-                },
-                subtitle: {
-                    y: 200,
-                    x: 0
-                }
-            }
-        },
-        {
-            condition: {
-                minWidth: 251,
-                maxWidth: 300 ///up to 300
-            },
-            chartOptions: {
-                tooltip: {
-                    positioner: function () {
-                        return { x: 50, y: 200 };
-                    }
-                },
-                subtitle: {
-                    y: 240,
-                    x: 0
-                }
-            }
-        },
-        {
-            condition: {
-                minWidth: 301,
-                maxWidth: 499
-            },
-            chartOptions: {
-                tooltip: {
-                    positioner: function () {
-                        //return { x: 130, y: 365 };
-                        return { x: 70, y: 265 };
-                    }
-                },
-                subtitle: {
-                    y: 280,
-                    x: 20
-                }
-            }
-        },
-        {
-            condition: {
-                minWidth: 500
-            },
-            chartOptions: {
-                tooltip: {
-                    positioner: function () {
-                        return { x: 105, y: 360 };
-                    }
-                },
-                subtitle: {
-                    y: 360,
-                    x: 10
-                }
-            }
-        }
-        ]
-    }
+    ]
+    // responsive: {
+    //     rules: [{
+    //         condition: {
+    //             maxWidth: 250
+    //         },
+    //         chartOptions: {
+    //             tooltip: {
+    //                 positioner: function () {
+    //                     // return { x: 130, y: 365 };
+    //                     return { x: 50, y: 165 };
+    //                 }
+    //             },
+    //             subtitle: {
+    //                 y: 200,
+    //                 x: 0
+    //             }
+    //         }
+    //     },
+    //     {
+    //         condition: {
+    //             minWidth: 251,
+    //             maxWidth: 300 // /up to 300
+    //         },
+    //         chartOptions: {
+    //             tooltip: {
+    //                 positioner: function () {
+    //                     return { x: 50, y: 200 };
+    //                 }
+    //             },
+    //             subtitle: {
+    //                 y: 240,
+    //                 x: 0
+    //             }
+    //         }
+    //     },
+    //     {
+    //         condition: {
+    //             minWidth: 301,
+    //             maxWidth: 499
+    //         },
+    //         chartOptions: {
+    //             tooltip: {
+    //                 positioner: function () {
+    //                     // return { x: 130, y: 365 };
+    //                     return { x: 70, y: 265 };
+    //                 }
+    //             },
+    //             subtitle: {
+    //                 y: 280,
+    //                 x: 20
+    //             }
+    //         }
+    //     },
+    //     {
+    //         condition: {
+    //             minWidth: 500,
+    //             maxWidth: 599
+    //         },
+    //         chartOptions: {
+    //             tooltip: {
+    //                 positioner: function () {
+    //                     return { x: 105, y: 360 };
+    //                 }
+    //             },
+    //             subtitle: {
+    //                 y: 360,
+    //                 x: 10
+    //             }
+    //         }
+    //     },
+    //     {
+    //         condition: {
+    //             minWidth: 600,
+    //             maxWidth: 699
+    //         },
+    //         chartOptions: {
+    //             tooltip: {
+    //                 positioner: function () {
+    //                     return { x: 105, y: 460 };
+    //                 }
+    //             }
+    //         }
+    //     }
+    //     ]
+    // }
 };
 
 Highcharts.chart('charts', iceberg);

@@ -1,8 +1,9 @@
 /* *
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -19,20 +20,14 @@ import type {
     AroonParamsOptions
 } from '../Aroon/AroonOptions';
 import type AroonPoint from '../Aroon/AroonPoint';
+import type { IndicatorLinkedSeriesBase } from '../IndicatorBase';
 import type IndicatorValuesObject from '../IndicatorValuesObject';
 import type LineSeries from '../../../Series/Line/LineSeries';
 
 import MultipleLinesComposition from '../MultipleLinesComposition.js';
+import SMAIndicator from '../SMA/SMAIndicator.js';
 import SeriesRegistry from '../../../Core/Series/SeriesRegistry.js';
-const {
-    sma: SMAIndicator
-} = SeriesRegistry.seriesTypes;
-import U from '../../../Core/Utilities.js';
-const {
-    extend,
-    merge,
-    pick
-} = U;
+import { extend, merge } from '../../../Shared/Utilities.js';
 
 /* *
  *
@@ -43,9 +38,7 @@ const {
 // Utils
 
 // Index of element with extreme value from array (min or max)
-/**
- * @private
- */
+/** @internal */
 function getExtremeIndexInArray(arr: Array<number>, extreme: string): number {
     let extremeValue = arr[0],
         valueIndex = 0,
@@ -73,7 +66,6 @@ function getExtremeIndexInArray(arr: Array<number>, extreme: string): number {
 /**
  * The Aroon series type.
  *
- * @private
  * @class
  * @name Highcharts.seriesTypes.aroon
  *
@@ -101,18 +93,19 @@ class AroonIndicator extends SMAIndicator {
      *               navigatorOptions, pointInterval, pointIntervalUnit,
      *               pointPlacement, pointRange, pointStart, showInNavigator,
      *               stacking
-     * @requires     stock/indicators/indicators
-     * @requires     stock/indicators/aroon
+     * @requires     indicators/indicators
+     * @requires     indicators/aroon
      * @optionparent plotOptions.aroon
+     * @internal
      */
     public static defaultOptions: AroonOptions = merge(SMAIndicator.defaultOptions, {
         /**
-         * Paramters used in calculation of aroon series points.
+         * Parameters used in calculation of aroon series points.
          *
          * @excluding index
          */
         params: {
-            index: void 0, // unchangeable index, do not inherit (#15362)
+            index: void 0, // Unchangeable index, do not inherit (#15362)
             period: 25
         },
         marker: {
@@ -122,7 +115,7 @@ class AroonIndicator extends SMAIndicator {
             pointFormat: '<span style="color:{point.color}">\u25CF</span><b> {series.name}</b><br/>Aroon Up: {point.y}<br/>Aroon Down: {point.aroonDown}<br/>'
         },
         /**
-         * aroonDown line options.
+         * AroonDown line options.
          */
         aroonDown: {
             /**
@@ -153,11 +146,11 @@ class AroonIndicator extends SMAIndicator {
      *
      * */
 
-    public data: Array<AroonPoint> = void 0 as any;
+    public data!: Array<AroonPoint>;
 
-    public options: AroonOptions = void 0 as any;
+    public options!: AroonOptions;
 
-    public points: Array<AroonPoint> = void 0 as any;
+    public points!: Array<AroonPoint>;
 
     /* *
      *
@@ -165,11 +158,12 @@ class AroonIndicator extends SMAIndicator {
      *
      * */
 
+    /** @internal */
     public getValues<TLinkedSeries extends LineSeries>(
-        series: TLinkedSeries,
+        series: TLinkedSeries&IndicatorLinkedSeriesBase,
         params: AroonParamsOptions
     ): IndicatorValuesObject<TLinkedSeries> {
-        let period = (params.period as any),
+        const period = (params.period as any),
             xVal: Array<number> = (series.xData as any),
             yVal: Array<Array<number>> = (series.yData as any),
             yValLen = yVal ? yVal.length : 0,
@@ -177,14 +171,14 @@ class AroonIndicator extends SMAIndicator {
             AR: Array<Array<number>> = [],
             xData: Array<number> = [],
             yData: Array<Array<number>> = [],
-            slicedY: Array<Array<number>>,
             low = 2,
-            high = 1,
-            aroonUp: number,
+            high = 1;
+        let aroonUp: number,
             aroonDown: number,
             xLow: number,
             xHigh: number,
-            i: number;
+            i: number,
+            slicedY: Array<Array<number>>;
 
         // For a N-period, we start from N-1 point, to calculate Nth point
         // That is why we later need to comprehend slice() elements list
@@ -194,12 +188,12 @@ class AroonIndicator extends SMAIndicator {
 
             xLow = getExtremeIndexInArray(slicedY.map(
                 function (elem): number {
-                    return pick(elem[low], (elem as any));
+                    return (elem[low] ?? (elem as any));
                 }), 'min');
 
             xHigh = getExtremeIndexInArray(slicedY.map(
                 function (elem): number {
-                    return pick(elem[high], (elem as any));
+                    return (elem[high] ?? (elem as any));
                 }), 'max');
 
             aroonUp = (xHigh / period) * 100;
@@ -226,9 +220,10 @@ class AroonIndicator extends SMAIndicator {
  *
  * */
 
+/** @internal */
 interface AroonIndicator extends MultipleLinesComposition.IndicatorComposition {
     linesApiNames: Array<string>;
-    nameComponents: Array<string>;
+    nameComponents: Array<string>|undefined;
     pointArrayMap: Array<keyof AroonPoint>;
     pointValKey: string;
     pointClass: typeof AroonPoint;
@@ -277,12 +272,12 @@ export default AroonIndicator;
  * @extends   series,plotOptions.aroon
  * @since     7.0.0
  * @product   highstock
- * @excluding allAreas, colorAxis, compare, compareBase, dataParser, dataURL,
+ * @excluding allAreas, colorAxis, compare, compareBase,
  *            joinBy, keys, navigatorOptions, pointInterval, pointIntervalUnit,
  *            pointPlacement, pointRange, pointStart, showInNavigator, stacking
- * @requires  stock/indicators/indicators
- * @requires  stock/indicators/aroon
+ * @requires  indicators/indicators
+ * @requires  indicators/aroon
  * @apioption series.aroon
  */
 
-''; // to avoid removal of the above jsdoc
+''; // To avoid removal of the above jsdoc

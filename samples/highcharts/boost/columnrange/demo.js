@@ -1,12 +1,13 @@
-function getData(n) {
-    var arr = [],
-        i,
-        a,
+function getDataTableOptions(n) {
+    const xColumn = new Float64Array(n),
+        lowColumn = new Float64Array(n),
+        highColumn = new Float64Array(n);
+    let a,
         b,
         c,
         low,
         spike;
-    for (i = 0; i < n; i = i + 1) {
+    for (let i = 0; i < n; i = i + 1) {
         if (i % 100 === 0) {
             a = 2 * Math.random();
         }
@@ -22,24 +23,32 @@ function getData(n) {
             spike = 0;
         }
         low = 2 * Math.sin(i / 100) + a + b + c + spike + Math.random();
-        arr.push([
-            i,
-            low,
-            low + 5 + 5 * Math.random()
-        ]);
+        xColumn[i] = i;
+        lowColumn[i] = low;
+        highColumn[i] = low + 5 + 5 * Math.random();
     }
-    return arr;
+    return {
+        columns: {
+            x: xColumn,
+            low: lowColumn,
+            high: highColumn
+        }
+    };
 }
-var n = 500000,
-    data = getData(n);
+const n = 500000,
+    dataTable = getDataTableOptions(n);
 
 
 console.time('columnrange');
 Highcharts.chart('container', {
 
+    dataTable,
+
     chart: {
         type: 'columnrange',
-        zoomType: 'x',
+        zooming: {
+            type: 'x'
+        },
         panning: true,
         panKey: 'shift'
     },
@@ -64,9 +73,7 @@ Highcharts.chart('container', {
         valueDecimals: 2
     },
 
-    series: [{
-        data: data
-    }]
+    series: [{}]
 
 });
 console.timeEnd('columnrange');

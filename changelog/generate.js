@@ -1,17 +1,20 @@
 /* eslint-env node, es6 */
-/* eslint func-style: 0, valid-jsdoc: 0, no-console: 0, require-jsdoc: 0 */
+/* eslint func-style: 0, valid-jsdoc: 0, no-console: 0, require-jsdoc: 0
+consistent-return: 0 */
 
 /**
  * This node script copies commit messages since the last release and
  * generates a draft for a changelog.
  *
  * Parameters
- * --since String  The tag to start from, defaults to latest commit.
+ * --since String  The tag to start from, defaults to latest annotated tag.
  * --after String  The start date.
  * --before String Optional. The end date for the changelog, defaults to today.
  * --review        Create a review page with edit links and a list of all PRs
  *                 that are not used in the changelog.
- * --fromCache     Re-format pulls from cache, do not load new from GitHub.
+ * --fromCache     Re-format pulls from tmp/changelog-pulls.json in this checkout.
+ * --product       The product to generate the changelog for (defaults to
+ *                 Highcharts) for example --product Grid.
  */
 const https = require('https');
 const marked = require('marked');
@@ -20,7 +23,11 @@ const params = require('yargs').argv;
 const childProcess = require('child_process');
 
 const getFile = url => new Promise((resolve, reject) => {
-    https.get(url, resp => {
+    https.get(url, {
+        headers: {
+            Referer: 'https://www.highcharts.com'
+        }
+    }, resp => {
         let data = '';
 
         // A chunk of data has been received.
@@ -39,12 +46,21 @@ const getFile = url => new Promise((resolve, reject) => {
     });
 });
 
+
 (function () {
     'use strict';
 
     var fs = require('fs'),
-        path = require('path'),
-        tree = require('../tree.json');
+        path = require('path');
+
+    if (!fs.existsSync('./tree.json')) {
+        console.error('File tree.json doesn\'t exist in your repository, run ' +
+        'npx gulp jsdoc-options and try to generate changelog again.');
+        return false;
+    }
+
+    // eslint-disable-next-line node/no-missing-require
+    var tree = require('../tree.json');
 
     /**
      * Return a list of options so that we can auto-link option references in
@@ -78,11 +94,14 @@ const getFile = url => new Promise((resolve, reject) => {
      * Get the log from Git
      */
     async function getLog(callback) {
+        const product = params.product || 'Highcharts';
+
         var log = await prLog(
             params.since,
-            params.fromCache
+            params.fromCache,
+            params.branches,
+            product
         ).catch(e => console.error(e));
-
         callback(log);
     }
 
@@ -137,19 +156,19 @@ const getFile = url => new Promise((resolve, reject) => {
             // objects
             if (replacements.length > 1) {
                 replacements = replacements.filter(
-                    longKey => longKey.lastIndexOf(shortKey) === longKey.length - shortKey.length
+                    longKey => longKey.startsWith(shortKey)
                 );
 
                 // Check if it is a member on the root series options
                 if (
                     replacements.length > 1 &&
-                    replacements.indexOf(`plotOptions.series.${shortKey}`) !== -1
+                    replacements.includes(`plotOptions.series.${shortKey}`)
                 ) {
                     replacements = replacements.filter(longKey => {
                         // Remove series-specific members so that we may isolate
                         // it to plotOptions.series.shortKey
                         const m = longKey.match(
-                            new RegExp('plotOptions\.([a-zA-Z\.]+)\.' + shortKey)
+                            new RegExp('plotOptions\\.([a-zA-Z\\.]+)\\.' + shortKey)
                         );
                         return !m || m[1] === 'series';
                     });
@@ -171,7 +190,7 @@ const getFile = url => new Promise((resolve, reject) => {
     /**
      * Build the output
      */
-    function buildMarkdown(name, version, date, log, products) {
+    function buildMarkdown(name, version, date, log, products, productName) {
         var outputString,
             filename = path.join(
                 __dirname,
@@ -182,42 +201,67 @@ const getFile = url => new Promise((resolve, reject) => {
                 Highcharts: 'highcharts',
                 'Highcharts Stock': 'highstock',
                 'Highcharts Maps': 'highmaps',
-                'Highcharts Gantt': 'gantt'
+                'Highcharts Gantt': 'gantt',
+                'Highcharts Dashboards': 'dashboards',
+                'Highcharts Grid': 'grid'
             }[name];
 
+        log = log || [];
         log = washPRLog(name, log);
 
-        const upgradeNotes = log
-            .filter(change => typeof change.upgradeNote === 'string')
-            .map(change => addLinks(`- ${change.upgradeNote}`, apiFolder))
-            .join('\n');
+        const upgradeNotes = [];
+        log
+            .filter(change => Array.isArray(change.upgradeNotes))
+            .forEach(change => {
+                change.upgradeNotes.forEach(note => {
+                    upgradeNotes.push(addLinks(`- ${note}`, apiFolder));
+                });
+            });
 
         // Start the output string
         outputString = '# Changelog for ' + name + ' v' + version + ' (' + date + ')\n\n';
 
-        if (name !== 'Highcharts') {
-            outputString += `- Most changes listed under Highcharts ${products.Highcharts.nr} above also apply to ${name} ${version}.\n`;
-        } else if (log.length === 0) {
-            outputString += '- No changes for the basic Highcharts package.';
+        // Only add changes for Highcharts
+        if (!['Highcharts Dashboards', 'Highcharts Grid'].includes(name)) {
+            if (name !== 'Highcharts') {
+                outputString += `- Most changes listed under Highcharts ${products.Highcharts.nr} above also apply to ${name} ${version}.\n`;
+            } else if (log.length === 0) {
+                outputString += '- No changes for the basic Highcharts package.';
+            }
         }
 
         log.forEach((change, i) => {
+            let desc = addLinks(change.description || change, apiFolder);
 
-            const desc = addLinks(change.description || change, apiFolder);
-
+            if (productName === 'Grid') {
+                if (change.labels.find(l => l.name === 'Grid Pro')) {
+                    desc = '**Grid Pro:** ' + desc;
+                } else {
+                    desc = '**Grid:** ' + desc;
+                }
+            }
 
             // Start fixes
             if (i === log.startFixes) {
 
-                if (upgradeNotes) {
-                    outputString += `\n## Upgrade notes\n${upgradeNotes}\n`;
+                if (upgradeNotes.length) {
+                    outputString += [
+                        '',
+                        '## Upgrade notes',
+                        ...upgradeNotes,
+                        ''
+                    ].join('\n');
                 }
 
                 outputString += '\n## Bug fixes\n';
             }
 
             const edit = params.review ?
-                ` [Edit](https://github.com/highcharts/highcharts/pull/${change.number}).` :
+                ` <a href="https://github.com/highcharts/highcharts/pull/${change.number}"
+                        title="Edit entry on GitHub"
+                        class="edit-link"
+                        target="_blank"
+                    ><i class="fa fa-pencil-square-o" aria-hidden="true"></i></a>` :
                 '';
 
             // All items
@@ -248,12 +292,35 @@ const getFile = url => new Promise((resolve, reject) => {
     function saveReview(md) {
 
         const filename = path.join(__dirname, 'review.html');
+        const html = `<html>
+        <head>
+            <title>Changelog Review</title>
+            <style>
+            * {
+                font-family: sans-serif
+            }
+            code {
+                font-family: monospace;
+                color: green;
+            }
+            .edit-link {
+                text-decoration: none;
+                opacity: 0;
+                transition: opacity 0.3s;
+            }
+            li:hover .edit-link {
+                opacity: 1;
+            }
+            </style>
+            <link rel="stylesheet" href="https://netdna.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.css">
+        </head>
+        <body>
+        ${marked.parse(md)}
+        </body>
+        </html>`;
 
-        fs.writeFileSync(
-            filename,
-            marked.parse(md),
-            'utf8'
-        );
+
+        fs.writeFileSync(filename, html, 'utf8');
 
         console.log(`Review: ${filename}`);
     }
@@ -264,49 +331,79 @@ const getFile = url => new Promise((resolve, reject) => {
 
     // Get the Git log
     getLog(function (log) {
-
+        const product = params.product || 'Highcharts';
         const pack = require(path.join(__dirname, '/../package.json'));
         const d = new Date();
         const review = [];
+        const productPaths = {
+            Grid: '../tools/gulptasks/grid/build-properties.json',
+            Dashboards: '../tools/gulptasks/dashboards/build-properties.json'
+        };
 
-        // Load the current products and versions, and create one log each
-        getFile('https://code.highcharts.com/products.js')
-            .then(products => {
-                var name;
+        if (productPaths[product]) {
+            const { version } = require(productPaths[product]);
 
-                if (products) {
-                    products = products.replace('var products = ', '');
-                    products = JSON.parse(products);
-                }
+            if (!version) {
+                throw new Error('Check `build-properties.json` for `version` property.');
+            }
 
-                for (name in products) {
+            if (!/^\d+\.\d+\.\d+(?:-\w+)?$/su.test(version)) {
+                throw new Error('No valid release version provided.');
+            }
 
-                    if (products.hasOwnProperty(name)) { // eslint-disable-line no-prototype-builtins
-                        const version = params.buildMetadata ? `${pack.version}+build.${getLatestGitSha()}` : pack.version;
+            review.push(buildMarkdown(
+                `Highcharts ${product}`,
+                version,
+                `${d.getFullYear()}-${pad(d.getMonth() + 1, 2)}-${pad(d.getDate(), 2)}`,
+                log,
+                void 0,
+                product
+            ));
 
-                        products[name].nr = version;
-                        products[name].date =
-                            d.getFullYear() + '-' +
-                            pad(d.getMonth() + 1, 2) + '-' +
-                            pad(d.getDate(), 2);
+            if (params.review) {
+                saveReview(review.join('\n\n___\n'));
+            }
+        } else {
+            // Load the current products and versions, and create one log each
+            getFile('https://code.highcharts.com/products.js')
+                .then(products => {
+                    let name;
+                    const version = params.buildMetadata ?
+                        `${pack.version}+build.${getLatestGitSha()}` :
+                        pack.version;
 
-                        review.push(buildMarkdown(
-                            name,
-                            version,
-                            products[name].date,
-                            log,
-                            products,
-                            optionKeys
-                        ));
+                    if (products) {
+                        products = products.replace('var products = ', '');
+                        products = JSON.parse(products);
+
+                        delete products['Highcharts Dashboards'];
+
+                        for (name in products) {
+                            if (products.hasOwnProperty(name)) { // eslint-disable-line no-prototype-builtins
+
+                                products[name].date =
+                                    d.getFullYear() + '-' +
+                                    pad(d.getMonth() + 1, 2) + '-' +
+                                    pad(d.getDate(), 2);
+
+                                review.push(buildMarkdown(
+                                    name,
+                                    products[name].nr || version,
+                                    products[name].date,
+                                    log,
+                                    products
+                                ));
+                            }
+                        }
                     }
-                }
 
-                if (params.review) {
-                    saveReview(review.join('\n\n___\n'));
-                }
-            })
-            .catch(err => {
-                throw err;
-            });
+                    if (params.review) {
+                        saveReview(review.join('\n\n___\n'));
+                    }
+                })
+                .catch(err => {
+                    throw err;
+                });
+        }
     });
 }());

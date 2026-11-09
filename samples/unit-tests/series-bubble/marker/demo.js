@@ -36,6 +36,29 @@ QUnit.test('Global marker is null (#6321)', function (assert) {
     );
 });
 
+QUnit.test('Bubble data label rank follows bubble radius', function (assert) {
+    const chart = Highcharts.chart('container', {
+        series: [{
+            type: 'bubble',
+            dataLabels: {
+                enabled: true,
+                allowOverlap: false
+            },
+            data: [
+                [1, 1, 1],
+                [1, 1, 10]
+            ]
+        }]
+    });
+
+    const points = chart.series[0].points;
+
+    assert.ok(
+        points[1].dataLabel.labelrank > points[0].dataLabel.labelrank,
+        'The larger bubble has the higher data label rank'
+    );
+});
+
 QUnit.test('Clicking marker (#6705)', function (assert) {
     var clicked;
 
@@ -165,7 +188,8 @@ QUnit.test('Bubble animation and async redraws (#13494)', assert => {
             assert.strictEqual(
                 chart.series[0].points[0].graphic.attr('width'),
                 chart.series[1].points[0].graphic.attr('width'),
-                'Equal weight points for both series should now be the same size'
+                'Equal weight points for both series should now be the same ' +
+                'size'
             );
         }, 200);
 
@@ -176,9 +200,9 @@ QUnit.test('Bubble animation and async redraws (#13494)', assert => {
 });
 
 QUnit.test('Bubble with custom symbol markers, #17281.', function (assert) {
-    Highcharts.chart("container", {
+    const chart = Highcharts.chart('container', {
         series: [{
-            type: "bubble",
+            type: 'bubble',
             data: [
                 [1, 1, 1],
                 [2, 2, 2],
@@ -191,9 +215,56 @@ QUnit.test('Bubble with custom symbol markers, #17281.', function (assert) {
         }]
     });
 
-    assert.ok(
-        true,
+    assert.strictEqual(
+        typeof chart.series[0].points[0].graphic,
+        'undefined',
         `When the custom marker is set and the point is out of zThreshold, the
         symbol should not be displayed and there should be no errors.`
+    );
+});
+
+QUnit.test('Inverted bubble halos, #21315.', function (assert) {
+    const chart = Highcharts.chart('container', {
+        chart: {
+            inverted: true
+        },
+        series: [{
+            type: 'bubble',
+            data: [
+                [1, 1, 3],
+                [4, 2, 3]
+            ]
+        }]
+    });
+    const {
+            xAxis,
+            yAxis,
+            plotLeft,
+            plotTop,
+            series
+        } = chart,
+        points = series[0].points,
+        { plotX, plotY, graphic } = points[0],
+        graphicPath = graphic.pathArray,
+        controller = new TestController(chart);
+
+    controller.mouseOver(
+        plotLeft + (yAxis[0].len - plotY),
+        plotTop + (xAxis[0].len - plotX)
+    );
+
+    const haloPath = series[0].halo.pathArray;
+
+    assert.close(
+        graphicPath[0][0],
+        haloPath[0][0],
+        5,
+        'Halo\'s X should be close to point\'s X'
+    );
+
+    assert.deepEqual(
+        graphicPath[0][1],
+        haloPath[0][1],
+        'Halo\'s Y should be same as point\'s Y'
     );
 });

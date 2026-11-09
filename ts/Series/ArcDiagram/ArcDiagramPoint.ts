@@ -2,11 +2,13 @@
  *
  *  Arc diagram module
  *
- *  (c) 2018-2021 Torstein Honsi
+ *  (c) 2018-2026 Highsoft AS
+ *  Author: Torstein Hønsi
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -19,21 +21,20 @@
  * */
 
 import type ArcDiagramPointOptions from './ArcDiagramPointOptions';
+import type ArcDiagramSeries from './ArcDiagramSeries';
 import type SVGAttributes from '../../Core/Renderer/SVG/SVGAttributes';
-import ArcDiagramSeries from './ArcDiagramSeries';
+
 import NodesComposition from '../NodesComposition.js';
-import SeriesRegistry from '../../Core/Series/SeriesRegistry.js';
-const {
-    seriesTypes: {
-        sankey: {
-            prototype: {
-                pointClass: SankeyPoint
-            }
-        }
-    }
-} = SeriesRegistry;
-import U from '../../Core/Utilities.js';
-const { extend } = U;
+import SankeySeries from '../Sankey/SankeySeries.js';
+import { extend } from '../../Shared/Utilities.js';
+
+/* *
+ *
+ *  Constants
+ *
+ * */
+
+const SankeyPoint = SankeySeries.prototype.pointClass;
 
 /* *
  *
@@ -49,23 +50,31 @@ class ArcDiagramPoint extends SankeyPoint {
      *
      * */
 
-    public fromNode: ArcDiagramPoint = void 0 as any;
+    /** @internal */
+    public fromNode!: ArcDiagramPoint;
 
-    public index: number = void 0 as any;
+    /** @internal */
+    public index!: number;
 
-    public linksFrom: Array<ArcDiagramPoint> = void 0 as any;
+    /** @internal */
+    public linksFrom!: Array<ArcDiagramPoint>;
 
-    public linksTo: Array<ArcDiagramPoint> = void 0 as any;
+    /** @internal */
+    public linksTo!: Array<ArcDiagramPoint>;
 
-    public options: ArcDiagramPointOptions = void 0 as any;
+    public options!: ArcDiagramPointOptions;
 
-    public series: ArcDiagramSeries = void 0 as any;
+    /** @internal */
+    public series!: ArcDiagramSeries;
 
-    public scale: number = void 0 as any;
+    /** @internal */
+    public scale!: number;
 
-    public shapeArgs: SVGAttributes = void 0 as any;
+    /** @internal */
+    public shapeArgs!: SVGAttributes;
 
-    public toNode: ArcDiagramPoint = void 0 as any;
+    /** @internal */
+    public toNode!: ArcDiagramPoint;
 
 
     /* *
@@ -74,14 +83,13 @@ class ArcDiagramPoint extends SankeyPoint {
      *
      * */
 
-    /* eslint-disable valid-jsdoc */
 
+    /** @internal */
     public isValid(): boolean {
         // No null points here
         return true;
     }
 
-    /* eslint-enable valid-jsdoc */
 
 }
 
@@ -91,7 +99,9 @@ class ArcDiagramPoint extends SankeyPoint {
  *
  * */
 
+/** @internal */
 interface ArcDiagramPoint {
+    /** @internal */
     setState: typeof NodesComposition['setNodeState'];
 }
 extend(ArcDiagramPoint.prototype, {

@@ -154,4 +154,105 @@ QUnit.test('getUnionExtremes', function (assert) {
         2419200000,
         'Correct button selected when preserveDataGrouping=true (#8433).'
     );
+
+    // #23911
+    chart.update({
+        rangeSelector: {
+            buttons: [{
+                text: 'M1',
+                title: 'Set timeframe to 1 minute',
+                dataGrouping: {
+                    forced: true,
+                    units: [
+                        ['minute', [1]]
+                    ]
+                }
+            }]
+        }
+    });
+    chart.rangeSelector.clickButton(0);
+
+    assert.strictEqual(
+        chart.series[0].points?.length,
+        18,
+        'All points should be present when dataGrouping is 1 min (#23911)'
+    );
 });
+
+(async () => {
+
+    // Load the dataset
+    const data = await fetch(
+        'https://cdn.jsdelivr.net/gh/highcharts/highcharts@v7.0.0/samples/data/aapl-ohlcv.json'
+    ).then(response => response.json());
+
+    QUnit.test('Range selector with Stock charts', function (assert) {
+        const ohlc = [],
+            volume = [],
+            dataLength = data.length;
+
+        for (let i = 0; i < dataLength; i += 1) {
+            ohlc.push([
+                data[i][0], // the date
+                data[i][1], // open
+                data[i][2], // high
+                data[i][3], // low
+                data[i][4] // close
+            ]);
+
+            volume.push([
+                data[i][0], // the date
+                data[i][5] // the volume
+            ]);
+        }
+
+        const chart = Highcharts.stockChart('container', {
+            yAxis: [{
+                labels: {
+                    align: 'left'
+                }
+            }, {
+                labels: {
+                    align: 'left'
+                },
+                top: '80%',
+                height: '20%',
+                offset: 0
+            }],
+            navigator: {
+                enabled: true
+            },
+            // Two series are needed for this test due to how getGroupPixelWidth
+            // works
+            series: [{
+                type: 'heikinashi',
+                id: 'aapl-ohlc',
+                name: 'AAPL Stock Price',
+                data: ohlc
+            }, {
+                type: 'column',
+                id: 'aapl-volume',
+                name: 'AAPL Volume',
+                data: volume,
+                yAxis: 1
+            }]
+        });
+
+        chart.rangeSelector.clickButton(0);
+        assert.ok(
+            true, 'HeikinAshi chart should not throw errors after ' +
+            'selecting 1m.'
+        );
+
+        chart.rangeSelector.clickButton(5); // Reset rangeSelector to all
+
+        chart.series[0].update({
+            type: 'hollowcandlestick'
+        });
+        chart.rangeSelector.clickButton(0);
+        assert.ok(
+            true, 'Hollow candlestick chart should not throw errors ' +
+            'after selecting 1m.'
+        );
+    });
+})();

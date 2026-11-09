@@ -1,11 +1,12 @@
-function getData(n) {
-    var arr = [],
-        i,
-        a,
+function getDataTableOptions(n) {
+    const xColumn = new Float64Array(n),
+        y1Column = new Float64Array(n),
+        y2Column = new Float64Array(n);
+    let a,
         b,
         c,
         spike;
-    for (i = 0; i < n; i = i + 1) {
+    for (let i = 0; i < n; i = i + 1) {
         if (i % 100 === 0) {
             a = 2 * Math.random();
         }
@@ -20,22 +21,46 @@ function getData(n) {
         } else {
             spike = 0;
         }
-        arr.push([
-            i,
-            2 * Math.sin(i / 100) + a + b + c + spike + Math.random()
-        ]);
+        xColumn[i] = i;
+        y1Column[i] = 2 * Math.sin(i / 100) + a + b + c + spike + Math.random();
     }
-    return arr;
+    for (let i = 0; i < n; i = i + 1) {
+        if (i % 100 === 0) {
+            a = 2 * Math.random();
+        }
+        if (i % 1000 === 0) {
+            b = 2 * Math.random();
+        }
+        if (i % 10000 === 0) {
+            c = 2 * Math.random();
+        }
+        if (i % 50000 === 0) {
+            spike = 10;
+        } else {
+            spike = 0;
+        }
+        y2Column[i] = 2 * Math.sin(i / 100) + a + b + c + spike + Math.random();
+    }
+    return {
+        columns: {
+            x: xColumn,
+            y1: y1Column,
+            y2: y2Column
+        }
+    };
 }
-var data1 = getData(25000),
-    data2 = getData(25000);
+const dataTable = getDataTableOptions(25000);
 
 console.time('area');
 Highcharts.chart('container', {
 
+    dataTable,
+
     chart: {
         type: 'area',
-        zoomType: 'x'
+        zooming: {
+            type: 'x'
+        }
     },
 
     boost: {
@@ -43,7 +68,7 @@ Highcharts.chart('container', {
     },
 
     title: {
-        text: 'Highcharts drawing ' + (data1.length + data2.length) + ' points'
+        text: 'Highcharts drawing 50000 points'
     },
 
     subtitle: {
@@ -61,9 +86,13 @@ Highcharts.chart('container', {
     },
 
     series: [{
-        data: data1
+        dataMapping: {
+            y: 'y1'
+        }
     }, {
-        data: data2
+        dataMapping: {
+            y: 'y2'
+        }
     }]
 
 });

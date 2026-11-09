@@ -1,13 +1,14 @@
 /* *
  *
- *  Tilemaps module
+ *  Tilemap module
  *
- *  (c) 2010-2021 Highsoft AS
+ *  (c) 2010-2026 Highsoft AS
  *  Author: Øystein Moseng
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -24,23 +25,18 @@ import type TilemapPointOptions from './TilemapPointOptions';
 import type TilemapSeries from './TilemapSeries';
 
 import ColorAxisComposition from '../../Core/Axis/Color/ColorAxisComposition.js';
-import SeriesRegistry from '../../Core/Series/SeriesRegistry.js';
-const {
-    series: {
-        prototype: {
-            pointClass: Point
-        }
-    },
-    seriesTypes: {
-        heatmap: {
-            prototype: {
-                pointClass: HeatmapPoint
-            }
-        }
-    }
-} = SeriesRegistry;
-import U from '../../Core/Utilities.js';
-const { extend } = U;
+import HeatmapSeries from '../Heatmap/HeatmapSeries.js';
+import Series from '../../Core/Series/Series.js';
+import { extend } from '../../Shared/Utilities.js';
+
+/* *
+ *
+ *  Constants
+ *
+ * */
+
+const Point = Series.prototype.pointClass;
+const HeatmapPoint = HeatmapSeries.prototype.pointClass;
 
 /* *
  *
@@ -56,15 +52,19 @@ class TilemapPoint extends HeatmapPoint {
      *
      * */
 
-    public options: TilemapPointOptions = void 0 as any;
+    public options!: TilemapPointOptions;
 
+    /** @internal */
     public pointPadding?: number;
 
-    public radius: number = void 0 as any;
+    /** @internal */
+    public radius!: number;
 
-    public series: TilemapSeries = void 0 as any;
+    /** @internal */
+    public series!: TilemapSeries;
 
-    public tileEdges: Record<string, number> = void 0 as any;
+    /** @internal */
+    public tileEdges!: Record<string, number>;
 
     /* *
      *
@@ -72,17 +72,13 @@ class TilemapPoint extends HeatmapPoint {
      *
      * */
 
-    /* eslint-disable valid-jsdoc */
-
     /**
-     * @private
+     * @internal
      * @function Highcharts.Point#haloPath
      */
     public haloPath(): SVGPath {
         return this.series.tileShape.haloPath.apply(this, arguments);
     }
-
-    /* eslint-enable valid-jsdoc */
 
 }
 
@@ -95,6 +91,7 @@ class TilemapPoint extends HeatmapPoint {
 interface TilemapPoint {
     setVisible: ColorAxisComposition.PointComposition['setVisible'];
 }
+
 extend(TilemapPoint.prototype, {
     setState: Point.prototype.setState,
     setVisible: ColorAxisComposition.pointSetVisible

@@ -20,7 +20,7 @@ const gulp = require('gulp');
  * Promise to keep.
  */
 function getDownloadTask(wrapper) {
-    const process = require('./lib/process');
+    const process = require('../libs/process');
 
     switch (wrapper.toLowerCase()) {
         case 'android':
@@ -51,8 +51,8 @@ function getDownloadTask(wrapper) {
  * Promise to keep
  */
 function jsdocWrappers() {
-    const log = require('./lib/log');
-    const process = require('./lib/process');
+    const log = require('../libs/log');
+    const process = require('../libs/process');
 
     const argv = require('yargs').argv;
     const promises = [];
@@ -76,7 +76,7 @@ function jsdocWrappers() {
         .then(() => process.exec('mkdir -p build/api'))
         .then(() => log.warn('Downloading', 'Wrapper documentation...'))
         .then(() => Promise.all(promises))
-        .then(() => log.warn('Done. Upload with gulp task "upload-wrapper-apidocs".'))
+        .then(() => log.warn('Done. Upload with gulp task "api-upload".'))
         .catch(e => log.failure(e));
 }
 

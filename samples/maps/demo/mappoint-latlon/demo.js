@@ -16,7 +16,8 @@
         },
 
         accessibility: {
-            description: 'Map where city locations have been defined using latitude/longitude.'
+            description: 'Map where city locations have been defined using ' +
+                'latitude/longitude.'
         },
 
         mapNavigation: {
@@ -25,7 +26,8 @@
 
         tooltip: {
             headerFormat: '',
-            pointFormat: '<b>{point.name}</b><br>Lat: {point.lat}, Lon: {point.lon}'
+            pointFormat: '<b>{point.name}</b><br>Lat: {point.lat}, Lon: ' +
+                '{point.lon}'
         },
 
         series: [{
@@ -49,10 +51,11 @@
             name: 'Cities',
             accessibility: {
                 point: {
-                    valueDescriptionFormat: '{xDescription}. Lat: {point.lat:.2f}, lon: {point.lon:.2f}.'
+                    valueDescriptionFormat: '{xDescription}. Lat: ' +
+                        '{point.lat:.2f}, lon: {point.lon:.2f}.'
                 }
             },
-            color: Highcharts.getOptions().colors[1],
+            color: 'var(--highcharts-color-1)',
             data: [{
                 name: 'London',
                 lat: 51.507222,

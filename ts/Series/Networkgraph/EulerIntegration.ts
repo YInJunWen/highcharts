@@ -2,11 +2,13 @@
  *
  *  Networkgraph series
  *
- *  (c) 2010-2021 Paweł Fus
+ *  (c) 2010-2026 Highsoft AS
+ *  Author: Paweł Fus
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -31,8 +33,8 @@ import type ReingoldFruchtermanLayout from './ReingoldFruchtermanLayout';
  *
  * */
 
-declare module '../../Core/Series/PointLike' {
-    interface PointLike {
+declare module '../../Core/Series/PointBase' {
+    interface PointBase {
         temperature?: number;
     }
 }
@@ -53,7 +55,7 @@ declare module '../../Core/Series/PointLike' {
  * @param {Highcharts.Point} link
  *        Link that connects two nodes
  * @param {number} force
- *        Force calcualated in `repulsiveForceFunction`
+ *        Force calculated in `repulsiveForceFunction`
  * @param {Highcharts.PositionObject} distanceXY
  *        Distance between two nodes e.g. `{x, y}`
  * @param {number} distanceR
@@ -84,7 +86,7 @@ function attractive(
 }
 
 /**
- * Attractive force funtion. Can be replaced by API's
+ * Attractive force function. Can be replaced by API's
  * `layoutAlgorithm.attractiveForce`
  *
  * Other forces that can be used:
@@ -105,7 +107,7 @@ function attractiveForceFunction(
 }
 
 /**
- * Barycenter force. Calculate and applys barycenter forces on the
+ * Barycenter force. Calculate and apply barycenter forces on the
  * nodes. Making them closer to the center of their barycenter point.
  *
  * In Euler integration, force is stored in a node, not changing it's
@@ -141,7 +143,7 @@ function barycenter(
 }
 
 /**
- * Estiamte the best possible distance between two nodes, making graph
+ * Estimate the best possible distance between two nodes, making graph
  * readable.
  * @private
  */
@@ -164,7 +166,7 @@ function getK(
  *
  * Basic form: `x(n+1) = x(n) + v(n)`
  *
- * With Rengoild-Fruchterman we get:
+ * With Reingold-Fruchterman we get:
  * `x(n+1) = x(n) + v(n) / length(v(n)) * min(v(n), temperature(n))`
  * where:
  * - `x(n+1)`: next position
@@ -190,14 +192,12 @@ function integrate(
     layout: ReingoldFruchtermanLayout,
     node: NetworkgraphPoint
 ): void {
-    let distanceR: number;
-
     (node.dispX as any) +=
         (node.dispX as any) * (layout.options.friction as any);
     (node.dispY as any) +=
         (node.dispY as any) * (layout.options.friction as any);
 
-    distanceR = node.temperature = layout.vectorLength({
+    const distanceR = node.temperature = layout.vectorLength({
         x: node.dispX as any,
         y: node.dispY as any
     });
@@ -227,7 +227,7 @@ function integrate(
  * @param {Highcharts.Point} node
  *        Node that should be translated by force.
  * @param {number} force
- *        Force calcualated in `repulsiveForceFunction`
+ *        Force calculated in `repulsiveForceFunction`
  * @param {Highcharts.PositionObject} distanceXY
  *        Distance between two nodes e.g. `{x, y}`
  */
@@ -244,7 +244,7 @@ function repulsive(
 }
 
 /**
- * Repulsive force funtion. Can be replaced by API's
+ * Repulsive force function. Can be replaced by API's
  * `layoutAlgorithm.repulsiveForce`.
  *
  * Other forces that can be used:

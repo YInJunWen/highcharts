@@ -2,11 +2,13 @@
  *
  *  Sankey diagram module
  *
- *  (c) 2010-2021 Torstein Honsi
+ *  (c) 2010-2026 Highsoft AS
+ *  Author: Torstein Hønsi
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -23,14 +25,8 @@ import type SankeySeries from './SankeySeries';
 
 import NodesComposition from '../NodesComposition.js';
 import Point from '../../Core/Series/Point.js';
-import SeriesRegistry from '../../Core/Series/SeriesRegistry.js';
-const {
-    seriesTypes: {
-        column: ColumnSeries
-    }
-} = SeriesRegistry;
-import U from '../../Core/Utilities.js';
-const { defined } = U;
+import ColumnSeries from '../Column/ColumnSeries.js';
+import { defined } from '../../Shared/Utilities.js';
 
 /* *
  *
@@ -39,53 +35,88 @@ const { defined } = U;
  * */
 
 class SankeyPoint extends ColumnSeries.prototype.pointClass {
+
     /* *
      *
      *  Properties
      *
      * */
 
-    public className: string = void 0 as any;
+    /** @internal */
+    public className!: string;
 
+    /** @internal */
     public column?: number;
 
-    public fromNode: SankeyPoint = void 0 as any;
+    /** @internal */
+    public fromNode!: SankeyPoint;
 
+    /** @internal */
     public hangsFrom?: SankeyPoint;
 
-    public level: number = void 0 as any;
+    /** @internal */
+    public isCircular?: boolean;
 
-    public linkBase: Array<number> = void 0 as any;
+    public level!: number;
 
-    public linksFrom: Array<SankeyPoint> = void 0 as any;
+    /** @internal */
+    public linkBase!: Array<number>;
 
-    public linksTo: Array<SankeyPoint> = void 0 as any;
+    /** @internal */
+    public linkColorMode!: ('from'|'gradient'|'to');
 
-    public mass: number = void 0 as any;
+    /** @internal */
+    public linksFrom!: Array<SankeyPoint>;
 
-    public nodeX: number = void 0 as any;
+    /** @internal */
+    public linksTo!: Array<SankeyPoint>;
 
-    public nodeY: number = void 0 as any;
+    /** @internal */
+    public mass!: number;
 
-    public options: SankeyPointOptions = void 0 as any;
+    /** @internal */
+    public nodeX!: number;
 
+    /** @internal */
+    public nodeY!: number;
+
+    public options!: SankeyPointOptions;
+
+    /** @internal */
     public outgoing?: boolean;
 
-    public series: SankeySeries = void 0 as any;
+    /** @internal */
+    public series!: SankeySeries;
 
+    /** @internal */
     public sum?: number;
 
-    public toNode: SankeyPoint = void 0 as any;
+    /** @internal */
+    public toNode!: SankeyPoint;
 
+    /** @internal */
     public weight?: number;
+
+    /**
+     * Depth of a backward link's lane from the plot edge it runs along.
+     * @internal
+     */
+    public wrapLane?: number;
+
+    /**
+     * Flow-axis room a node reserves in its column for its self-link laps.
+     * @internal
+     */
+    public wrapLap?: number;
+
+    /** @internal */
+    public wrapUp?: boolean;
 
     /* *
      *
      *  Functions
      *
      * */
-
-    /* eslint-disable valid-jsdoc */
 
     /**
      * @private
@@ -113,7 +144,9 @@ class SankeyPoint extends ColumnSeries.prototype.pointClass {
 
     /**
      * If there are incoming links, place it to the right of the
-     * highest order column that links to this one.
+     * highest order column that links to this one. Circular links are
+     * ignored, so a node reached only through a cycle still anchors to its
+     * non-circular predecessors (or column 0 when it has none).
      *
      * @private
      */
@@ -124,13 +157,18 @@ class SankeyPoint extends ColumnSeries.prototype.pointClass {
             fromNode;
 
         for (let i = 0; i < node.linksTo.length; i++) {
-            const point = node.linksTo[i];
+            const point = node.linksTo[i],
+                // A link may be missing its `from` end
+                column = point.fromNode?.column;
+
             if (
-                (point.fromNode.column as any) > fromColumn &&
-                point.fromNode !== node // #16080
+                defined(column) &&
+                column > fromColumn &&
+                point.fromNode !== node && // #16080
+                !point.isCircular
             ) {
                 fromNode = point.fromNode;
-                fromColumn = (fromNode.column as any);
+                fromColumn = column;
             }
         }
 
@@ -162,8 +200,6 @@ class SankeyPoint extends ColumnSeries.prototype.pointClass {
         return this.isNode || typeof this.weight === 'number';
     }
 
-    /* eslint-enable valid-jsdoc */
-
 }
 
 /* *
@@ -172,8 +208,8 @@ class SankeyPoint extends ColumnSeries.prototype.pointClass {
  *
  * */
 
+/** @internal */
 interface SankeyPoint extends NodesComposition.PointComposition {
-    init(series: SankeySeries, options: SankeyPointOptions): SankeyPoint;
 }
 
 /* *

@@ -1,14 +1,16 @@
 /* *
  *
- *  (c) 2020-2022 Highsoft AS
+ *  (c) 2009-2026 Highsoft AS
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  *  Authors:
  *  - Sophie Bremer
  *  - Gøran Slettemark
+ *  - Dawid Draguła
  *
  * */
 
@@ -20,20 +22,17 @@
  *
  * */
 
-import type DataEventEmitter from '../DataEventEmitter';
+import type {
+    DataEventCallback,
+    DataEventDetail,
+    DataEventEmitter
+} from '../DataEvent';
+import type DataModifierEvent from './DataModifierEvent';
+import type DataModifierOptions from './DataModifierOptions';
 import type DataTable from '../DataTable';
-import type JSON from '../../Core/JSON';
-import type ModifierType from './ModifierType';
+import type { DataModifierTypes } from './DataModifierType';
 
-import DataPromise from '../DataPromise.js';
-import U from '../../Core/Utilities.js';
-const {
-    addEvent,
-    fireEvent,
-    merge
-} = U;
-
-/** eslint-disable valid-jsdoc */
+import { addEvent, fireEvent, merge } from '../../Shared/Utilities.js';
 
 /* *
  *
@@ -43,11 +42,8 @@ const {
 
 /**
  * Abstract class to provide an interface for modifying a table.
- *
- * @private
  */
-abstract class DataModifier<TEvent extends DataEventEmitter.Event = DataModifier.Event>
-implements DataEventEmitter<(TEvent|DataModifier.Event)> {
+abstract class DataModifier implements DataEventEmitter<DataModifierEvent> {
 
     /* *
      *
@@ -56,102 +52,37 @@ implements DataEventEmitter<(TEvent|DataModifier.Event)> {
      * */
 
     /**
-     * Regular expression to extract the modifier name (group 1) from the
-     * stringified class type.
+     * Registry as a record object with modifier names and their class
+     * constructor.
      */
-    private static readonly nameRegExp = (
-        /^function\s+(\w*?)(?:Data)?(?:Modifier)?\s*\(/
-    );
+    public static types = {} as DataModifierTypes;
 
     /**
-     * Registry as a record object with modifier names and their class.
-     */
-    private static readonly registry = {} as Record<string, ModifierType>;
-
-    /* *
+     * Adds a modifier class to the registry. The modifier class has to provide
+     * the `DataModifier.options` property and the `DataModifier.modifyTable`
+     * method to modify the table.
      *
-     *  Static Functions
+     * @private
      *
-     * */
-
-    /**
-     * Adds a modifier class to the registry. The modifier has to provide the
-     * `DataModifier.options` property and the `DataModifier.execute` method to
-     * modify the table.
+     * @param {string} key
+     * Registry key of the modifier class.
      *
-     * @param {DataModifier} modifier
+     * @param {DataModifierType} DataModifierClass
      * Modifier class (aka class constructor) to register.
      *
      * @return {boolean}
      * Returns true, if the registration was successful. False is returned, if
-     * their is already a modifier registered with this name.
+     * their is already a modifier registered with this key.
      */
-    public static addModifier(modifier: ModifierType): boolean {
-        const name = DataModifier.getName(modifier),
-            registry = DataModifier.registry;
-
-        if (
-            typeof name === 'undefined' ||
-            registry[name]
-        ) {
-            return false;
-        }
-
-        registry[name] = modifier;
-
-        return true;
-    }
-
-    /**
-     * Returns all registered modifier names.
-     *
-     * @return {Array<string>}
-     * All registered modifier names.
-     */
-    public static getAllModifierNames(): Array<string> {
-        return Object.keys(DataModifier.registry);
-    }
-
-    /**
-     * Returns a copy of the modifier registry as record object with
-     * modifier names and their modifier class.
-     *
-     * @return {Record<string,DataModifierRegistryType>}
-     * Copy of the modifier registry.
-     */
-    public static getAllModifiers(): Record<string, ModifierType> {
-        return merge(DataModifier.registry);
-    }
-
-    /**
-     * Returns a modifier class (aka class constructor) of the given modifier
-     * name.
-     *
-     * @param {string} name
-     * Registered class name of the class type.
-     *
-     * @return {DataModifier|undefined}
-     * Class type, if the class name was found, otherwise `undefined`.
-     */
-    public static getModifier(name: string): (ModifierType|undefined) {
-        return DataModifier.registry[name];
-    }
-
-    /**
-     * Extracts the name from a given modifier class.
-     *
-     * @param {DataModifier} modifier
-     * Modifier class to extract the name from.
-     *
-     * @return {string}
-     * Modifier name, if the extraction was successful, otherwise an empty
-     * string.
-     */
-    private static getName(modifier: (NewableFunction|ModifierType)): string {
+    public static registerType<T extends keyof DataModifierTypes>(
+        key: T,
+        DataModifierClass: DataModifierTypes[T]
+    ): boolean {
         return (
-            modifier.toString().match(DataModifier.nameRegExp) ||
-            ['', '']
-        )[1];
+            !!key &&
+            !DataModifier.types[key] &&
+            !!(DataModifier.types[key] = DataModifierClass)
+        );
     }
 
     /* *
@@ -163,7 +94,7 @@ implements DataEventEmitter<(TEvent|DataModifier.Event)> {
     /**
      * Modifier options.
      */
-    public abstract readonly options: DataModifier.Options;
+    public abstract readonly options: DataModifierOptions;
 
     /* *
      *
@@ -178,7 +109,7 @@ implements DataEventEmitter<(TEvent|DataModifier.Event)> {
      * @param {DataTable} dataTable
      * The datatable to execute
      *
-     * @param {DataModifier.BenchmarkOptions} options
+     * @param {BenchmarkOptions} options
      * Options. Currently supports `iterations` for number of iterations.
      *
      * @return {Array<number>}
@@ -187,13 +118,15 @@ implements DataEventEmitter<(TEvent|DataModifier.Event)> {
      */
     public benchmark(
         dataTable: DataTable,
-        options?: DataModifier.BenchmarkOptions
+        options?: BenchmarkOptions
     ): Array<number> {
         const results: Array<number> = [];
-        const modifier = this as DataModifier<DataModifier.BenchmarkEvent|DataModifier.Event>;
+        const modifier = this;
         const execute = (): void => {
             modifier.modifyTable(dataTable);
-            modifier.emit({ type: 'afterBenchmarkIteration' });
+            modifier.emit<DataModifierEvent>({
+                type: 'afterBenchmarkIteration'
+            });
         };
 
         const defaultOptions = {
@@ -207,7 +140,10 @@ implements DataEventEmitter<(TEvent|DataModifier.Event)> {
 
         modifier.on('afterBenchmarkIteration', (): void => {
             if (results.length === iterations) {
-                modifier.emit({ type: 'afterBenchmark', results });
+                modifier.emit<DataModifierEvent>({
+                    type: 'afterBenchmark',
+                    results
+                });
                 return;
             }
 
@@ -215,10 +151,7 @@ implements DataEventEmitter<(TEvent|DataModifier.Event)> {
             execute();
         });
 
-        const times: {
-            startTime: number;
-            endTime: number;
-        } = {
+        const times = {
             startTime: 0,
             endTime: 0
         };
@@ -242,152 +175,68 @@ implements DataEventEmitter<(TEvent|DataModifier.Event)> {
     /**
      * Emits an event on the modifier to all registered callbacks of this event.
      *
-     * @param {DataEventEmitter.Event} [e]
-     * Event object containing additonal event information.
+     * @param {DataModifierEvent} [e]
+     * Event object containing additional event information.
      */
-    public emit(e: (TEvent|DataModifier.Event)): void {
+    public emit<E extends DataModifierEvent>(e: E): void {
         fireEvent(this, e.type, e);
     }
 
     /**
-     * Returns a modified copy of the given table.
+     * Modifies the given table and sets its `modified` property as a reference
+     * to the modified table. If `modified` property does not exist on the
+     * original table, it's always created.
      *
      * @param {Highcharts.DataTable} table
      * Table to modify.
      *
-     * @param {DataEventEmitter.EventDetail} [eventDetail]
+     * @param {DataEventDetail} [eventDetail]
      * Custom information for pending events.
      *
      * @return {Promise<Highcharts.DataTable>}
      * Table with `modified` property as a reference.
      */
-    public modify<T extends DataTable>(
-        table: T,
-        eventDetail?: DataEventEmitter.EventDetail
-    ): DataPromise<T> {
+    public modify(
+        table: DataTable,
+        eventDetail?: DataEventDetail
+    ): Promise<DataTable> {
         const modifier = this;
-        return new DataPromise((resolve, reject): void => {
-            if (table.modified === table) {
+        return new Promise((resolve, reject): void => {
+            if (!table.modified) {
                 table.modified = table.clone(false, eventDetail);
             }
             try {
                 resolve(modifier.modifyTable(table, eventDetail));
             } catch (e) {
-                modifier.emit({
+                modifier.emit<DataModifierEvent>({
                     type: 'error',
                     detail: eventDetail,
                     table
                 });
-                reject(e);
+                reject(e instanceof Error ? e : new Error('' + e));
             }
         });
     }
 
     /**
-     * Applies partial modifications of a cell change to the property `modified`
-     * of the given modified table.
-     *
-     * @param {Highcharts.DataTable} table
-     * Modified table.
-     *
-     * @param {string} columnName
-     * Column name of changed cell.
-     *
-     * @param {number|undefined} rowIndex
-     * Row index of changed cell.
-     *
-     * @param {Highcharts.DataTableCellType} cellValue
-     * Changed cell value.
-     *
-     * @param {Highcharts.DataTableEventDetail} [eventDetail]
-     * Custom information for pending events.
-     *
-     * @return {Highcharts.DataTable}
-     * Table with `modified` property as a reference.
-     */
-    public modifyCell<T extends DataTable>(
-        table: T,
-        columnName: string,
-        rowIndex: number,
-        cellValue: DataTable.CellType,
-        eventDetail?: DataEventEmitter.EventDetail
-    ): T {
-        return this.modifyTable(table);
-    }
-
-    /**
-     * Applies partial modifications of column changes to the property
-     * `modified` of the given table.
-     *
-     * @param {Highcharts.DataTable} table
-     * Modified table.
-     *
-     * @param {Highcharts.DataTableColumnCollection} columns
-     * Changed columns as a collection, where the keys are the column names.
-     *
-     * @param {number} [rowIndex=0]
-     * Index of the first changed row.
-     *
-     * @param {Highcharts.DataTableEventDetail} [eventDetail]
-     * Custom information for pending events.
-     *
-     * @return {Highcharts.DataTable}
-     * Table with `modified` property as a reference.
-     */
-    public modifyColumns<T extends DataTable>(
-        table: T,
-        columns: DataTable.ColumnCollection,
-        rowIndex: number,
-        eventDetail?: DataEventEmitter.EventDetail
-    ): T {
-        return this.modifyTable(table);
-    }
-
-    /**
-     * Applies partial modifications of row changes to the property `modified`
-     * of the given table.
-     *
-     * @param {Highcharts.DataTable} table
-     * Modified table.
-     *
-     * @param {Array<(Highcharts.DataTableRow|Highcharts.DataTableRowObject)>} rows
-     * Changed rows.
-     *
-     * @param {number} [rowIndex]
-     * Index of the first changed row.
-     *
-     * @param {Highcharts.DataTableEventDetail} [eventDetail]
-     * Custom information for pending events.
-     *
-     * @return {Highcharts.DataTable}
-     * Table with `modified` property as a reference.
-     */
-    public modifyRows<T extends DataTable>(
-        table: T,
-        rows: Array<(DataTable.Row|DataTable.RowObject)>,
-        rowIndex: number,
-        eventDetail?: DataEventEmitter.EventDetail
-    ): T {
-        return this.modifyTable(table);
-    }
-
-    /**
-     * Applies modifications of row changes to the property `modified` of the
-     * given table.
+     * Creates a modified copy of the given table and sets its `modified`
+     * property as a reference to the modified table. If `modified` property
+     * does not exist, the original table is changed.
      *
      * @param {Highcharts.DataTable} table
      * Table to modify.
      *
-     * @param {DataEventEmitter.EventDetail} [eventDetail]
+     * @param {DataEventDetail} [eventDetail]
      * Custom information for pending events.
      *
      * @return {Highcharts.DataTable}
-     * Table with `modified` property as a reference.
+     * Table with `modified` property as a reference or modified table, if
+     * `modified` property of the original table is undefined.
      */
-    public abstract modifyTable<T extends DataTable>(
-        table: T,
-        eventDetail?: DataEventEmitter.EventDetail
-    ): T;
+    public abstract modifyTable(
+        table: DataTable,
+        eventDetail?: DataEventDetail
+    ): DataTable;
 
     /**
      * Registers a callback for a specific modifier event.
@@ -395,15 +244,17 @@ implements DataEventEmitter<(TEvent|DataModifier.Event)> {
      * @param {string} type
      * Event type as a string.
      *
-     * @param {DataEventEmitter.EventCallback} callback
+     * @param {DataEventCallback} callback
      * Function to register for an modifier callback.
      *
      * @return {Function}
      * Function to unregister callback from the modifier event.
      */
-    public on(
-        type: TEvent['type'],
-        callback: DataEventEmitter.EventCallback<this, TEvent>
+    public on<T extends DataModifierEvent['type']>(
+        type: T,
+        callback: DataEventCallback<this, Extract<DataModifierEvent, {
+            type: T
+        }>>
     ): Function {
         return addEvent(this, type, callback);
     }
@@ -412,94 +263,20 @@ implements DataEventEmitter<(TEvent|DataModifier.Event)> {
 
 /* *
  *
- *  Namespace
+ *  Declarations
  *
  * */
 
 /**
- * Additionally provided types for modifier events and options, and JSON
- * conversion.
+ * Additionally provided types for modifier events and options.
  */
-namespace DataModifier {
-
-    /**
-     * Class constructor of modifiers.
-     *
-     * @param {DeepPartial<Options>} [options]
-     * Options to configure the modifier.
-     */
-    export interface ClassConstructor {
-        new(options?: DeepPartial<Options>): DataModifier;
-    }
-
-    /**
-     * Benchmark event with additional event information.
-     */
-    export interface BenchmarkEvent extends DataEventEmitter.Event {
-        readonly type: (
-            'afterBenchmark'|
-            'afterBenchmarkIteration'
-        );
-        readonly results?: Array<number>;
-    }
-
-    /**
-     * Benchmark options.
-     */
-    export interface BenchmarkOptions {
-        iterations: number;
-    }
-
-    /**
-     * Error event with additional event information.
-     */
-    export interface ErrorEvent extends DataEventEmitter.Event {
-        readonly type: 'error';
-        readonly table: DataTable;
-    }
-
-    /**
-     * Event information.
-     */
-    export type Event = (BenchmarkEvent|ErrorEvent|ModifyEvent);
-
-    /**
-     * Modify event with additional event information.
-     */
-    export interface ModifyEvent extends DataEventEmitter.Event {
-        readonly type: (
-            'modify'|'afterModify'
-        );
-        readonly table: DataTable;
-    }
-
-    /**
-     * Options to configure the modifier.
-     */
-    export interface Options extends JSON.Object {
-        /**
-         * Name of the related modifier for these options.
-         */
-        modifier: string;
-    }
-
+export interface BenchmarkOptions {
+    iterations: number;
 }
 
 /* *
  *
- *  Register
- *
- * */
-
-declare module './ModifierType' {
-    interface ModifierTypeRegistry {
-        '': typeof DataModifier;
-    }
-}
-
-/* *
- *
- *  Export
+ *  Default Export
  *
  * */
 

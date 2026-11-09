@@ -2,11 +2,13 @@
  *
  *  Networkgraph series
  *
- *  (c) 2010-2021 Paweł Fus
+ *  (c) 2010-2026 Highsoft AS
+ *  Author: Paweł Fus
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -26,23 +28,21 @@ import type SVGAttributes from '../../Core/Renderer/SVG/SVGAttributes';
 import type SVGPath from '../../Core/Renderer/SVG/SVGPath';
 
 import NodesComposition from '../NodesComposition.js';
-import SeriesRegistry from '../../Core/Series/SeriesRegistry.js';
-const {
-    series: {
-        prototype: seriesProto,
-        prototype: {
-            pointClass: Point
-        }
-    }
-} = SeriesRegistry;
-import U from '../../Core/Utilities.js';
-const {
+import Series from '../../Core/Series/Series.js';
+import {
     addEvent,
     css,
     defined,
-    extend,
-    pick
-} = U;
+    extend
+} from '../../Shared/Utilities.js';
+
+/* *
+ *
+ *  Constants
+ *
+ * */
+
+const Point = Series.prototype.pointClass;
 
 /* *
  *
@@ -58,14 +58,19 @@ class NetworkgraphPoint extends Point implements DragNodesPoint {
      *
      * */
 
+    /** @internal */
     public dispX?: number;
 
+    /** @internal */
     public dispY?: number;
 
+    /** @internal */
     public fixedPosition: DragNodesPoint['fixedPosition'];
 
+    /** @internal */
     public prevX?: number;
 
+    /** @internal */
     public prevY?: number;
 
     /* *
@@ -122,21 +127,14 @@ class NetworkgraphPoint extends Point implements DragNodesPoint {
             pointOptions = this.options;
 
         return {
-            'stroke-width': pick(
-                pointOptions.width,
-                (linkOptions as any).width
-            ),
+            'stroke-width': (pointOptions.width ?? (linkOptions as any).width),
             stroke: (
                 pointOptions.color || (linkOptions as any).color
             ),
             dashstyle: (
                 pointOptions.dashStyle || (linkOptions as any).dashStyle
             ),
-            opacity: pick(
-                pointOptions.opacity,
-                (linkOptions as any).opacity,
-                1
-            )
+            opacity: (pointOptions.opacity ?? (linkOptions as any).opacity ?? 1)
         };
     }
 
@@ -199,12 +197,12 @@ class NetworkgraphPoint extends Point implements DragNodesPoint {
      * `series.draggable` is enabled.
      * @private
      */
-    public init(
+    public constructor(
         series: NetworkgraphSeries,
         options: (NetworkgraphPointOptions|PointShortOptions),
         x?: number
-    ): NetworkgraphPoint {
-        super.init(series, options, x);
+    ) {
+        super(series, options, x);
 
         if (
             this.series.options.draggable &&
@@ -219,8 +217,6 @@ class NetworkgraphPoint extends Point implements DragNodesPoint {
                 );
             });
         }
-
-        return this;
     }
 
     /**
@@ -235,8 +231,8 @@ class NetworkgraphPoint extends Point implements DragNodesPoint {
      * @private
      */
     public redrawLink(): void {
-        let path = this.getLinkPath(),
-            attribs: SVGAttributes;
+        const path = this.getLinkPath();
+        let attribs: SVGAttributes;
 
         if (this.graphic) {
             this.shapeArgs = {
@@ -287,10 +283,11 @@ class NetworkgraphPoint extends Point implements DragNodesPoint {
         redraw?: boolean,
         animation?: boolean
     ): void {
-        let point = this,
+        const point = this,
             series = point.series,
-            nodesOptions = series.options.nodes || [],
-            index: number,
+            nodesOptions = series.options.nodes || [];
+
+        let index: number,
             i = nodesOptions.length;
 
         // For nodes, remove all connected links:
@@ -330,7 +327,7 @@ class NetworkgraphPoint extends Point implements DragNodesPoint {
                         }
 
                         // Remove link from data/points collections
-                        seriesProto.removePoint.call(
+                        Series.prototype.removePoint.call(
                             series,
                             series.data.indexOf(linkFromTo),
                             false,
@@ -413,9 +410,12 @@ class NetworkgraphPoint extends Point implements DragNodesPoint {
  *
  * */
 
+/** @internal */
 interface NetworkgraphPoint extends NodesComposition.PointComposition {
+    /** @internal */
     className: NodesComposition.PointComposition['className'];
     degree: number;
+    /** @internal */
     formatPrefix: NodesComposition.PointComposition['formatPrefix'];
     from: NodesComposition.PointComposition['from'];
     fromNode: NetworkgraphPoint;

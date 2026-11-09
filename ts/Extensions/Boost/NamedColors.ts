@@ -1,12 +1,11 @@
 /* *
  *
- *  Copyright (c) 2019-2021 Highsoft AS
+ *  (c) 2019-2026 Highsoft AS
  *
  *  Boost module: stripped-down renderer for higher performance
  *
  *  License: highcharts.com/license
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -26,8 +25,11 @@ import type ColorString from '../../Core/Color/ColorString';
  *
  * */
 
-// Register color names since GL can't render those directly.
-// TODO: When supporting modern syntax, make this a named export
+/**
+ * Register color names since GL can't render those directly.
+ * @todo When supporting modern syntax, make this a named export
+ * @internal
+ */
 const defaultHTMLColorMap: Record<string, ColorString> = {
     aliceblue: '#f0f8ff',
     antiquewhite: '#faebd7',
@@ -80,6 +82,7 @@ const defaultHTMLColorMap: Record<string, ColorString> = {
     gold: '#ffd700',
     goldenrod: '#daa520',
     gray: '#808080',
+    grey: '#808080',
     green: '#008000',
     greenyellow: '#adff2f',
     honeydew: '#f0fff0',
@@ -178,8 +181,10 @@ const defaultHTMLColorMap: Record<string, ColorString> = {
  *
  * */
 
+/** @internal */
 const namedColors = {
     defaultHTMLColorMap
 };
 
+/** @internal */
 export default namedColors;

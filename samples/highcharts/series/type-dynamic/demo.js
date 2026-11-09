@@ -1,4 +1,4 @@
-var chart = Highcharts.chart('container', {
+const chart = Highcharts.chart('container', {
     title: {
         text: 'Fruits'
     },
@@ -22,7 +22,7 @@ var chart = Highcharts.chart('container', {
     }]
 });
 
-document.querySelectorAll('#button-row button').forEach(function (button) {
+document.querySelectorAll('.button-row button').forEach(function (button) {
     button.addEventListener('click', function () {
         chart.series[0].update({
             type: button.className.split('-')[0]

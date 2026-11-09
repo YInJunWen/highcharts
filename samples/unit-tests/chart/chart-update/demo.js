@@ -8,6 +8,12 @@
                 height: 300
             },
 
+            plotOptions: {
+                column: {
+                    cursor: 'default'
+                }
+            },
+
             series: [
                 {
                     data: [1, 3, 2, 4],
@@ -86,7 +92,7 @@
             }
         });
         assert.strictEqual(
-            chart.series[0].legendItem.styles.fill,
+            chart.series[0].legendItem.label.styles.color,
             'gray',
             'Text color is updated'
         );
@@ -148,7 +154,9 @@
             Highcharts.merge(getConfig(), {
                 chart: {
                     style: {
-                        fontFamily: 'ProximaNova, Arial, \'Helvetica Neue\', Helvetica, sans-serif'
+                        fontFamily:
+                            'ProximaNova, Arial, \'Helvetica Neue\', ' +
+                            'Helvetica, sans-serif'
                     }
                 },
                 title: {
@@ -175,6 +183,28 @@
             chart.renderer.style.fontFamily,
             'ProximaNova, Arial, \'Helvetica Neue\', Helvetica, sans-serif',
             '#16153: fontFamily should not reset when updating chart.style'
+        );
+
+        // Update collection with empty item
+        Highcharts.addEvent(chart.series[0], 'update', () => {
+            assert.notOk(
+                true,
+                'Update should not be called when updating with empty item'
+            );
+        });
+        chart.update({
+            series: [undefined, { color: 'green' }]
+        });
+
+        assert.strictEqual(
+            chart.series[0].color,
+            '#68266f',
+            'First series color should not be affected by empty item in update'
+        );
+        assert.strictEqual(
+            chart.series[1].color,
+            'green',
+            'Second series color should be updated to green'
         );
     });
 
@@ -325,14 +355,22 @@
         chart.update({
             plotOptions: {
                 column: {
+                    cursor: 'pointer',
                     colorByPoint: false
                 }
             }
         });
+
         assert.strictEqual(
             chart.series[0].points[0].graphic.attr('fill'),
             chart.series[0].points[1].graphic.attr('fill'),
             'Color by point was reset'
+        );
+
+        assert.strictEqual(
+            chart.series[1].group.element.style.cursor,
+            'pointer',
+            'Update should set correct cursor type for Column Series #17878'
         );
     });
 
@@ -409,7 +447,7 @@
             'ganttChart',
             'mapChart'
         ].forEach(constructor => {
-            if (constructor === 'mapChart') {
+            if (constructor === 'mapChart' || constructor === 'ganttChart') {
                 options.series[0].data = [];
                 cfg = JSON.stringify(options, null, '  ');
             }
@@ -419,7 +457,8 @@
             assert.strictEqual(
                 JSON.stringify(options, null, '  '),
                 cfg,
-                constructor + ': #15445: Options should not be mutated after chart creation'
+                constructor + ': #15445: Options should not be mutated after ' +
+                    'chart creation'
             );
 
             chart.update(options);
@@ -427,7 +466,8 @@
             assert.strictEqual(
                 JSON.stringify(options, null, '  '),
                 cfg,
-                constructor + ': Options should not be mutated after chart.update'
+                constructor + ': Options should not be mutated after ' +
+                    'chart.update'
             );
 
             chart.update({
@@ -439,7 +479,8 @@
             assert.strictEqual(
                 JSON.stringify(options, null, '  '),
                 cfg,
-                constructor + ': #14305: Options should not be mutated after actually changing something with chart.update'
+                constructor + ': #14305: Options should not be mutated after ' +
+                    'actually changing something with chart.update'
             );
         });
     });

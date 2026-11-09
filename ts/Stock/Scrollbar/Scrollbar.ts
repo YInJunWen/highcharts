@@ -1,10 +1,12 @@
 /* *
  *
- *  (c) 2010-2021 Torstein Honsi
+ *  (c) 2010-2026 Highsoft AS
+ *  Author: Torstein Hønsi
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -18,28 +20,33 @@
 
 import type Axis from '../../Core/Axis/Axis';
 import type Chart from '../../Core/Chart/Chart';
+import type { DeepPartial } from '../../Shared/Types';
 import type PointerEvent from '../../Core/PointerEvent';
 import type ScrollbarOptions from './ScrollbarOptions';
 import type SVGElement from '../../Core/Renderer/SVG/SVGElement';
 import type SVGPath from '../../Core/Renderer/SVG/SVGPath';
 import type SVGRenderer from '../../Core/Renderer/SVG/SVGRenderer';
 
-import D from '../../Core/DefaultOptions.js';
+import D from '../../Core/Defaults.js';
 const { defaultOptions } = D;
 import H from '../../Core/Globals.js';
+const {
+    composed
+} = H;
 import ScrollbarAxis from '../../Core/Axis/ScrollbarAxis.js';
 import ScrollbarDefaults from './ScrollbarDefaults.js';
-import U from '../../Core/Utilities.js';
-const {
+import {
     addEvent,
     correctFloat,
+    crisp,
     defined,
     destroyObjectProperties,
+    extend,
     fireEvent,
     merge,
-    pick,
+    pushUnique,
     removeEvent
-} = U;
+} from '../../Shared/Utilities.js';
 
 /* *
  *
@@ -47,8 +54,9 @@ const {
  *
  * */
 
-declare module '../../Core/Chart/ChartLike'{
-    interface ChartLike {
+/** @internal */
+declare module '../../Core/Chart/ChartBase'{
+    interface ChartBase {
         scrollbarsOffsets?: [number, number];
     }
 }
@@ -65,7 +73,7 @@ declare module '../../Core/Chart/ChartLike'{
  * A reusable scrollbar, internally used in Highcharts Stock's
  * navigator and optionally on individual axes.
  *
- * @private
+ * @internal
  * @class
  * @name Highcharts.Scrollbar
  * @param {Highcharts.SVGRenderer} renderer
@@ -90,6 +98,10 @@ class Scrollbar {
 
     public static compose(AxisClass: typeof Axis): void {
         ScrollbarAxis.compose(AxisClass, Scrollbar);
+
+        if (pushUnique(composed, 'Scrollbar')) {
+            extend(defaultOptions, { scrollbar: ScrollbarDefaults });
+        }
     }
 
     /**
@@ -160,7 +172,7 @@ class Scrollbar {
 
     public calculatedWidth?: number;
 
-    public chart: Chart = void 0 as any;
+    public chart!: Chart;
 
     private chartX: number = 0;
 
@@ -170,7 +182,7 @@ class Scrollbar {
 
     private grabbedCenter?: boolean;
 
-    public group: SVGElement = void 0 as any;
+    public group!: SVGElement;
 
     public hasDragged?: boolean;
 
@@ -178,21 +190,21 @@ class Scrollbar {
 
     private initPositions?: Array<number>;
 
-    public options: ScrollbarOptions = void 0 as any;
+    public options!: ScrollbarOptions;
 
     public rendered?: boolean;
 
-    public renderer: SVGRenderer = void 0 as any;
+    public renderer!: SVGRenderer;
 
-    public scrollbar: SVGElement = void 0 as any;
+    public scrollbar!: SVGElement;
 
     public scrollbarButtons: Array<SVGElement> = [];
 
-    public scrollbarGroup: SVGElement = void 0 as any;
+    public scrollbarGroup!: SVGElement;
 
     public scrollbarLeft: number = 0;
 
-    public scrollbarRifles: SVGElement = void 0 as any;
+    public scrollbarRifles!: SVGElement;
 
     public scrollbarStrokeWidth: number = 1;
 
@@ -202,11 +214,11 @@ class Scrollbar {
 
     public to: number = 0;
 
-    public track: SVGElement = void 0 as any;
+    public track!: SVGElement;
 
     public trackBorderWidth: number = 1;
 
-    public userOptions: DeepPartial<ScrollbarOptions> = void 0 as any;
+    public userOptions!: DeepPartial<ScrollbarOptions>;
 
     public width?: number;
 
@@ -227,7 +239,7 @@ class Scrollbar {
     /**
      * Set up the mouse and touch events for the Scrollbar
      *
-     * @private
+     * @internal
      * @function Highcharts.Scrollbar#addEvents
      */
     public addEvents(): void {
@@ -239,12 +251,12 @@ class Scrollbar {
             mouseMoveHandler = this.mouseMoveHandler.bind(this),
             mouseUpHandler = this.mouseUpHandler.bind(this);
 
-        // Mouse events
         const _events: Array<[
             any,
             string,
             (e: PointerEvent) => void
         ]> = [
+            // Mouse events
             [
                 buttons[buttonsOrder[0]].element,
                 'click',
@@ -258,17 +270,12 @@ class Scrollbar {
             [track, 'click', this.trackClick.bind(this)],
             [bar, 'mousedown', mouseDownHandler],
             [bar.ownerDocument, 'mousemove', mouseMoveHandler],
-            [bar.ownerDocument, 'mouseup', mouseUpHandler]
+            [bar.ownerDocument, 'mouseup', mouseUpHandler],
+            // Touch events
+            [bar, 'touchstart', mouseDownHandler],
+            [bar.ownerDocument, 'touchmove', mouseMoveHandler],
+            [bar.ownerDocument, 'touchend', mouseUpHandler]
         ];
-
-        // Touch events
-        if (H.hasTouch) {
-            _events.push(
-                [bar, 'touchstart', mouseDownHandler],
-                [bar.ownerDocument, 'touchmove', mouseMoveHandler],
-                [bar.ownerDocument, 'touchend', mouseUpHandler]
-            );
-        }
 
         // Add them all
         _events.forEach(function (args): void {
@@ -281,7 +288,7 @@ class Scrollbar {
         const scroller = this;
         const range = (
             (scroller.to - scroller.from) *
-            pick(scroller.options.step, 0.2)
+            (scroller.options.step ?? 0.2)
         );
 
         scroller.updatePosition(scroller.from + range, scroller.to + range);
@@ -296,7 +303,7 @@ class Scrollbar {
     private buttonToMinClick(e: PointerEvent): void {
         const scroller = this;
         const range = correctFloat(scroller.to - scroller.from) *
-            pick(scroller.options.step, 0.2);
+            (scroller.options.step ?? 0.2);
 
         scroller.updatePosition(
             correctFloat(scroller.from - range),
@@ -313,7 +320,7 @@ class Scrollbar {
     /**
      * Get normalized (0-1) cursor position over the scrollbar
      *
-     * @private
+     * @internal
      * @function Highcharts.Scrollbar#cursorToScrollbarPosition
      *
      * @param  {*} normalizedEvent
@@ -328,7 +335,7 @@ class Scrollbar {
             minWidthDifference =
                 (options.minWidth as any) > (scroller.calculatedWidth as any) ?
                     options.minWidth :
-                    0; // minWidth distorts translation
+                    0; // `minWidth` distorts translation
 
         return {
             chartX:
@@ -345,10 +352,10 @@ class Scrollbar {
     /**
      * Destroys allocated elements.
      *
-     * @private
+     * @internal
      * @function Highcharts.Scrollbar#destroy
      */
-    public destroy(): void {
+    public destroy(): undefined {
 
         const scroller: AnyRecord = this,
             navigator = scroller.chart.scroller;
@@ -383,7 +390,7 @@ class Scrollbar {
     /**
      * Draw the scrollbar buttons with arrows
      *
-     * @private
+     * @internal
      * @function Highcharts.Scrollbar#drawScrollbarButton
      * @param {number} index
      *        0 is left, 1 is right
@@ -396,60 +403,61 @@ class Scrollbar {
             size = scroller.size,
             group = renderer.g().add(scroller.group);
 
-        let tempElem;
-
         scrollbarButtons.push(group);
 
-        // Create a rectangle for the scrollbar button
-        tempElem = renderer.rect()
-            .addClass('highcharts-scrollbar-button')
-            .add(group);
+        if (options.buttonsEnabled) {
 
-        // Presentational attributes
-        if (!scroller.chart.styledMode) {
-            tempElem.attr({
-                stroke: options.buttonBorderColor,
-                'stroke-width': options.buttonBorderWidth,
-                fill: options.buttonBackgroundColor
-            });
-        }
+            // Create a rectangle for the scrollbar button
+            const rect = renderer.rect()
+                .addClass('highcharts-scrollbar-button')
+                .add(group);
 
-        // Place the rectangle based on the rendered stroke width
-        tempElem.attr(tempElem.crisp({
-            x: -0.5,
-            y: -0.5,
-            width: size + 1, // +1 to compensate for crispifying in rect method
-            height: size + 1,
-            r: options.buttonBorderRadius
-        } as any, tempElem.strokeWidth()));
+            // Presentational attributes
+            if (!scroller.chart.styledMode) {
+                rect.attr({
+                    stroke: options.buttonBorderColor,
+                    'stroke-width': options.buttonBorderWidth,
+                    fill: options.buttonBackgroundColor
+                });
+            }
 
-        // Button arrow
-        tempElem = renderer
-            .path(Scrollbar.swapXY([[
-                'M',
-                size / 2 + (index ? -1 : 1),
-                size / 2 - 3
-            ], [
-                'L',
-                size / 2 + (index ? -1 : 1),
-                size / 2 + 3
-            ], [
-                'L',
-                size / 2 + (index ? 2 : -2),
-                size / 2
-            ]], options.vertical))
-            .addClass('highcharts-scrollbar-arrow')
-            .add(scrollbarButtons[index]);
+            // Place the rectangle based on the rendered stroke width
+            rect.attr(rect.crisp({
+                x: -0.5,
+                y: -0.5,
+                width: size,
+                height: size,
+                r: options.buttonBorderRadius
+            } as any, rect.strokeWidth()));
 
-        if (!scroller.chart.styledMode) {
-            tempElem.attr({
-                fill: options.buttonArrowColor
-            });
+            // Button arrow
+            const arrow = renderer
+                .path(Scrollbar.swapXY([[
+                    'M',
+                    size / 2 + (index ? -1 : 1),
+                    size / 2 - 3
+                ], [
+                    'L',
+                    size / 2 + (index ? -1 : 1),
+                    size / 2 + 3
+                ], [
+                    'L',
+                    size / 2 + (index ? 2 : -2),
+                    size / 2
+                ]], options.vertical))
+                .addClass('highcharts-scrollbar-arrow')
+                .add(scrollbarButtons[index]);
+
+            if (!scroller.chart.styledMode) {
+                arrow.attr({
+                    fill: options.buttonArrowColor
+                });
+            }
         }
     }
 
     /**
-     * @private
+     * @internal
      * @function Highcharts.Scrollbar#init
      * @param {Highcharts.SVGRenderer} renderer
      * @param {Highcharts.ScrollbarOptions} options
@@ -472,14 +480,13 @@ class Scrollbar {
             defaultOptions.scrollbar,
             options
         );
+        scroller.options.margin = (scroller.options.margin ?? 10);
 
         scroller.chart = chart;
 
-        // backward compatibility
-        scroller.size = pick(
-            scroller.options.size,
-            scroller.options.height as any
-        );
+        // Backward compatibility
+        scroller.size = scroller.options.size ??
+            scroller.options.height as any;
 
         // Init
         if (options.enabled) {
@@ -490,7 +497,7 @@ class Scrollbar {
 
     private mouseDownHandler(e: PointerEvent): void {
         const scroller = this,
-            normalizedEvent = scroller.chart.pointer.normalize(e),
+            normalizedEvent = scroller.chart.pointer?.normalize(e) || e,
             mousePosition = scroller.cursorToScrollbarPosition(
                 normalizedEvent
             );
@@ -504,11 +511,11 @@ class Scrollbar {
 
     /**
      * Event handler for the mouse move event.
-     * @private
+     * @internal
      */
     private mouseMoveHandler(e: PointerEvent): void {
         const scroller = this,
-            normalizedEvent = scroller.chart.pointer.normalize(e),
+            normalizedEvent = scroller.chart.pointer?.normalize(e) || e,
             options = scroller.options,
             direction: ('chartY'|'chartX') = options.vertical ?
                 'chartY' : 'chartX',
@@ -553,7 +560,7 @@ class Scrollbar {
 
     /**
      * Event handler for the mouse up event.
-     * @private
+     * @internal
      */
     private mouseUpHandler(e: PointerEvent): void {
         const scroller = this;
@@ -576,7 +583,7 @@ class Scrollbar {
      * Position the scrollbar, method called from a parent with defined
      * dimensions.
      *
-     * @private
+     * @internal
      * @function Highcharts.Scrollbar#position
      * @param {number} x
      *        x-position on the chart
@@ -585,12 +592,12 @@ class Scrollbar {
      * @param {number} width
      *        width of the scrollbar
      * @param {number} height
-     *        height of the scorllbar
+     *        height of the scrollbar
      */
     public position(x: number, y: number, width: number, height: number): void {
         const scroller = this,
             options = scroller.options,
-            vertical = options.vertical,
+            { buttonsEnabled, margin = 0, vertical } = options,
             method = scroller.rendered ? 'animate' : 'attr';
 
         let xOffset = height,
@@ -600,7 +607,7 @@ class Scrollbar {
         scroller.group.show();
         scroller.x = x;
         scroller.y = y + this.trackBorderWidth;
-        scroller.width = width; // width with buttons
+        scroller.width = width; // Width with buttons
         scroller.height = height;
         scroller.xOffset = xOffset;
         scroller.yOffset = yOffset;
@@ -609,13 +616,16 @@ class Scrollbar {
         if (vertical) {
             scroller.width = scroller.yOffset = width = yOffset = scroller.size;
             scroller.xOffset = xOffset = 0;
-            scroller.barWidth = height - width * 2; // width without buttons
-            scroller.x = x = x + (scroller.options.margin as any);
+            scroller.yOffset = yOffset = buttonsEnabled ? scroller.size : 0;
+            // Width without buttons
+            scroller.barWidth = height - (buttonsEnabled ? width * 2 : 0);
+            scroller.x = x = x + margin;
         } else {
-            scroller.height = scroller.xOffset = height = xOffset =
-                scroller.size;
-            scroller.barWidth = width - height * 2; // width without buttons
-            scroller.y = scroller.y + (scroller.options.margin as any);
+            scroller.height = height = scroller.size;
+            scroller.xOffset = xOffset = buttonsEnabled ? scroller.size : 0;
+            // Width without buttons
+            scroller.barWidth = width - (buttonsEnabled ? height * 2 : 0);
+            scroller.y = scroller.y + margin;
         }
 
         // Set general position for a group:
@@ -630,7 +640,7 @@ class Scrollbar {
             height: height
         });
 
-        // Move right/bottom button ot it's place:
+        // Move right/bottom button to its place:
         scroller.scrollbarButtons[1][method]({
             translateX: vertical ? 0 : width - xOffset,
             translateY: vertical ? height - yOffset : 0
@@ -640,7 +650,7 @@ class Scrollbar {
     /**
      * Removes the event handlers attached previously with addEvents.
      *
-     * @private
+     * @internal
      * @function Highcharts.Scrollbar#removeEvents
      */
     public removeEvents(): void {
@@ -653,7 +663,7 @@ class Scrollbar {
     /**
      * Render scrollbar with all required items.
      *
-     * @private
+     * @internal
      * @function Highcharts.Scrollbar#render
      */
     public render(): void {
@@ -666,7 +676,7 @@ class Scrollbar {
                 .attr({
                     zIndex: options.zIndex
                 })
-                .hide() // initially hide the scrollbar #15863
+                .hide() // Initially hide the scrollbar #15863
                 .add();
 
         // Draw the scrollbar group
@@ -676,7 +686,6 @@ class Scrollbar {
         scroller.track = renderer.rect()
             .addClass('highcharts-scrollbar-track')
             .attr({
-                x: 0,
                 r: options.trackBorderRadius || 0,
                 height: size,
                 width: size
@@ -690,9 +699,11 @@ class Scrollbar {
             });
         }
 
-        scroller.trackBorderWidth = scroller.track.strokeWidth();
+        const trackBorderWidth = scroller.trackBorderWidth =
+            scroller.track.strokeWidth();
         scroller.track.attr({
-            y: -this.trackBorderWidth % 2 / 2
+            x: -crisp(0, trackBorderWidth),
+            y: -crisp(0, trackBorderWidth)
         });
 
 
@@ -702,8 +713,8 @@ class Scrollbar {
         scroller.scrollbar = renderer.rect()
             .addClass('highcharts-scrollbar-thumb')
             .attr({
-                height: size,
-                width: size,
+                height: size - trackBorderWidth,
+                width: size - trackBorderWidth,
                 r: options.barBorderRadius || 0
             }).add(scroller.scrollbarGroup);
 
@@ -733,8 +744,8 @@ class Scrollbar {
 
         scroller.scrollbarStrokeWidth = scroller.scrollbar.strokeWidth();
         scroller.scrollbarGroup.translate(
-            -scroller.scrollbarStrokeWidth % 2 / 2,
-            -scroller.scrollbarStrokeWidth % 2 / 2
+            -crisp(0, scroller.scrollbarStrokeWidth),
+            -crisp(0, scroller.scrollbarStrokeWidth)
         );
 
         // Draw the buttons:
@@ -745,7 +756,7 @@ class Scrollbar {
     /**
      * Set scrollbar size, with a given scale.
      *
-     * @private
+     * @internal
      * @function Highcharts.Scrollbar#setRange
      * @param {number} from
      *        scale (0-1) where bar should start
@@ -768,18 +779,18 @@ class Scrollbar {
             return;
         }
 
-        const toPX = (fullWidth as any) * Math.min(to, 1);
+        const toPX = fullWidth * Math.min(to, 1);
 
         let fromPX,
             newSize: number;
 
         from = Math.max(from, 0);
-        fromPX = Math.ceil((fullWidth as any) * from);
+        fromPX = Math.ceil(fullWidth * from);
         scroller.calculatedWidth = newSize = correctFloat(toPX - fromPX);
 
         // We need to recalculate position, if minWidth is used
         if (newSize < (minWidth as any)) {
-            fromPX = ((fullWidth as any) - (minWidth as any) + newSize) * from;
+            fromPX = (fullWidth - (minWidth as any) + newSize) * from;
             newSize = minWidth as any;
         }
         const newPos = Math.floor(
@@ -839,17 +850,16 @@ class Scrollbar {
      * Checks if the extremes should be updated in response to a scrollbar
      * change event.
      *
-     * @private
+     * @internal
      * @function Highcharts.Scrollbar#shouldUpdateExtremes
      */
     public shouldUpdateExtremes(eventType?: string): boolean {
         return (
-            pick(
-                this.options.liveRedraw,
+            (this.options.liveRedraw ?? (
                 H.svg &&
                 !H.isTouchDevice &&
                 !this.chart.boosted
-            ) ||
+            )) ||
             // Mouseup always should change extremes
             eventType === 'mouseup' ||
             eventType === 'touchend' ||
@@ -860,7 +870,7 @@ class Scrollbar {
 
     public trackClick(e: PointerEvent): void {
         const scroller = this;
-        const normalizedEvent = scroller.chart.pointer.normalize(e),
+        const normalizedEvent = scroller.chart.pointer?.normalize(e) || e,
             range = scroller.to - scroller.from,
             top = scroller.y + scroller.scrollbarTop,
             left = scroller.x + scroller.scrollbarLeft;
@@ -893,7 +903,7 @@ class Scrollbar {
     /**
      * Update the scrollbar with new options
      *
-     * @private
+     * @internal
      * @function Highcharts.Scrollbar#update
      * @param  {Highcharts.ScrollbarOptions} options
      */
@@ -909,7 +919,7 @@ class Scrollbar {
     /**
      * Update position option in the Scrollbar, with normalized 0-1 scale
      *
-     * @private
+     * @internal
      * @function Highcharts.Scrollbar#updatePosition
      * @param  {number} from
      * @param  {number} to
@@ -936,6 +946,7 @@ class Scrollbar {
  *
  * */
 
+/** @internal */
 namespace Scrollbar {
     export interface ChangedEvent {
         from: number;
@@ -951,20 +962,9 @@ namespace Scrollbar {
 
 /* *
  *
- *  Registry
- *
- * */
-
-defaultOptions.scrollbar = merge(
-    true,
-    Scrollbar.defaultOptions,
-    defaultOptions.scrollbar
-);
-
-/* *
- *
  *  Default Export
  *
  * */
 
+/** @internal */
 export default Scrollbar;

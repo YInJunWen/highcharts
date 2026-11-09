@@ -2,8 +2,7 @@ Highcharts.chart('container', {
     chart: {
         type: 'column',
         inverted: true,
-        polar: true,
-        marginTop: 25
+        polar: true
     },
     title: {
         text: 'Updating points'
@@ -29,10 +28,11 @@ Highcharts.chart('container', {
         data: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
     }]
 }, function () {
-    var chart = this,
+    const chart = this,
         series = chart.series[0],
-        newData = [],
-        numberOfPoints;
+        newData = [];
+
+    let numberOfPoints;
 
     setInterval(function () {
         numberOfPoints = series.points.length;

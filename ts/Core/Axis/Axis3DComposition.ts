@@ -1,12 +1,14 @@
 /* *
  *
- *  (c) 2010-2021 Torstein Honsi
+ *  (c) 2010-2026 Highsoft AS
+ *  Author: Torstein Hønsi
  *
- *  Extenstion for 3d axes
+ *  Extension for 3d axes
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -19,29 +21,24 @@
  * */
 
 import type Axis from './Axis';
-import type { OptionsPosition3dValue } from '../Options';
 import type Point from '../Series/Point';
 import type Position3DObject from '../Renderer/Position3DObject';
+import type RadialAxis from './RadialAxis';
 import type SVGPath from '../Renderer/SVG/SVGPath';
 import type Tick from './Tick.js';
 
 import Axis3DDefaults from './Axis3DDefaults.js';
+import D from '../Defaults.js';
+const { defaultOptions } = D;
 import H from '../Globals.js';
-const { deg2rad } = H;
-import Math3D from '../Math3D.js';
-const {
+const { composed, deg2rad } = H;
+import {
     perspective,
     perspective3D,
     shapeArea
-} = Math3D;
+} from '../Math3D.js';
 import Tick3D from './Tick3DComposition.js';
-import U from '../Utilities.js';
-const {
-    addEvent,
-    merge,
-    pick,
-    wrap
-} = U;
+import { addEvent, merge, pushUnique, wrap } from '../../Shared/Utilities.js';
 
 /* *
  *
@@ -49,31 +46,23 @@ const {
  *
  * */
 
+/** @internal */
 declare module './AxisComposition' {
     interface AxisComposition {
         axis3D?: Axis3DAdditions;
     }
 }
 
-declare module './AxisOptions' {
-    interface AxisLabelOptions {
-        position3d?: OptionsPosition3dValue;
-        skew3d?: boolean;
-    }
-    interface AxisTitleOptions {
-        position3d?: ('chart'|'flap'|'offset'|'ortho'|null);
-        skew3d?: (boolean|null);
-    }
-}
-
+/** @internal */
 declare module '../Renderer/Position3DObject' {
     interface Position3DObject {
         matrix?: Array<number>;
     }
 }
 
-declare module '../Series/PointLike' {
-    interface PointLike {
+/** @internal */
+declare module '../Series/PointBase' {
+    interface PointBase {
         crosshairPos?: number;
         axisXpos?: number;
         axisYpos?: number;
@@ -83,19 +72,11 @@ declare module '../Series/PointLike' {
 
 /**
  * Axis instance with 3D support.
- * @private
+ * @internal
  */
-export declare class Axis3DComposition extends Axis {
+export declare class Axis3DComposition extends RadialAxis.AxisComposition {
     axis3D: Axis3DAdditions;
 }
-
-/* *
- *
- *  Constants
- *
- * */
-
-const composedClasses: Array<Function> = [];
 
 /* *
  *
@@ -103,9 +84,7 @@ const composedClasses: Array<Function> = [];
  *
  * */
 
-/**
- * @private
- */
+/** @internal */
 function onAxisAfterSetOptions(
     this: Axis
 ): void {
@@ -113,15 +92,14 @@ function onAxisAfterSetOptions(
         chart = axis.chart,
         options = axis.options;
 
-    if (chart.is3d && chart.is3d() && axis.coll !== 'colorAxis') {
-        options.tickWidth = pick(options.tickWidth, 0);
-        options.gridLineWidth = pick(options.gridLineWidth, 1);
+    if (chart.is3d?.() && axis.coll !== 'colorAxis') {
+        this.clippable = false;
+        options.tickWidth = (options.tickWidth ?? 0);
+        options.gridLineWidth = (options.gridLineWidth ?? 1);
     }
 }
 
-/**
- * @private
- */
+/** @internal */
 function onAxisDrawCrosshair(
     this: Axis,
     e: {
@@ -143,9 +121,7 @@ function onAxisDrawCrosshair(
     }
 }
 
-/**
- * @private
- */
+/** @internal */
 function onAxisInit(this: Axis): void {
     const axis = this as Axis3DComposition;
 
@@ -155,8 +131,8 @@ function onAxisInit(this: Axis): void {
 }
 
 /**
- * Do not draw axislines in 3D.
- * @private
+ * Do not draw axis lines in 3D.
+ * @internal
  */
 function wrapAxisGetLinePath(
     this: Axis3DComposition,
@@ -172,9 +148,7 @@ function wrapAxisGetLinePath(
     return [];
 }
 
-/**
- * @private
- */
+/** @internal */
 function wrapAxisGetPlotBandPath(
     this: Axis3DComposition,
     proceed: Function
@@ -207,7 +181,7 @@ function wrapAxisGetPlotBandPath(
                     fromStartSeg,
                     fromEndSeg,
                     toEndSeg,
-                    // lineTo instead of moveTo
+                    // `lineTo` instead of `moveTo`
                     ['L', toStartSeg[1], toStartSeg[2]],
                     ['Z']
                 );
@@ -218,9 +192,7 @@ function wrapAxisGetPlotBandPath(
     return path;
 }
 
-/**
- * @private
- */
+/** @internal */
 function wrapAxisGetPlotLinePath(
     this: Axis3DComposition,
     proceed: Function
@@ -313,7 +285,7 @@ function wrapAxisGetPlotLinePath(
 /**
  * Wrap getSlotWidth function to calculate individual width value for each
  * slot (#8042).
- * @private
+ * @internal
  */
 function wrapAxisGetSlotWidth(
     this: Axis3DComposition,
@@ -321,35 +293,28 @@ function wrapAxisGetSlotWidth(
     tick: Tick
 ): number {
     const axis = this,
-        chart = axis.chart,
-        ticks = axis.ticks,
-        gridGroup = axis.gridGroup;
+        { chart, gridGroup, tickPositions, ticks } = axis;
 
     if (
         axis.categories &&
         chart.frameShapes &&
         chart.is3d() &&
         gridGroup &&
-        tick &&
-        tick.label
+        tick?.label
     ) {
-        const firstGridLine = (
-                (gridGroup.element.childNodes[0] as any).getBBox()
-            ),
-            frame3DLeft = chart.frameShapes.left.getBBox(),
-            options3d = chart.options.chart.options3d as any,
+        const options3d = chart.options.chart.options3d as any,
             origin = {
                 x: chart.plotWidth / 2,
                 y: chart.plotHeight / 2,
                 z: options3d.depth / 2,
                 vd: (
-                    pick(options3d.depth, 1) *
-                    pick(options3d.viewDistance, 0)
+                    (options3d.depth ?? 1) *
+                    (options3d.viewDistance ?? 0)
                 )
             },
-            tickId = tick.pos,
-            prevTick = ticks[tickId - 1],
-            nextTick = ticks[tickId + 1];
+            index = tickPositions.indexOf(tick.pos),
+            prevTick = ticks[tickPositions[index - 1]],
+            nextTick = ticks[tickPositions[index + 1]];
 
         let labelPos,
             prevLabelPos,
@@ -357,12 +322,7 @@ function wrapAxisGetSlotWidth(
 
         // Check whether the tick is not the first one and previous tick
         // exists, then calculate position of previous label.
-        if (
-            tickId !== 0 &&
-            prevTick &&
-            prevTick.label &&
-            prevTick.label.xy
-        ) {
+        if (prevTick?.label?.xy) {
             prevLabelPos = perspective3D({ // #8621
                 x: prevTick.label.xy.x,
                 y: prevTick.label.xy.y,
@@ -371,7 +331,7 @@ function wrapAxisGetSlotWidth(
         }
         // If next label position is defined, then recalculate its position
         // basing on the perspective.
-        if (nextTick && nextTick.label && nextTick.label.xy) {
+        if (nextTick?.label?.xy) {
             nextLabelPos = perspective3D({
                 x: nextTick.label.xy.x,
                 y: nextTick.label.xy.y,
@@ -386,24 +346,22 @@ function wrapAxisGetSlotWidth(
 
         labelPos = perspective3D(labelPos, origin, origin.vd);
 
-        // If tick is first one, check whether next label position is
-        // already calculated, then return difference between the first and
-        // the second label. If there is no next label position calculated,
-        // return the difference between the first grid line and left 3d
-        // frame.
+        // If the tick is the first one, check whether the next label position
+        // is already calculated, then return the difference between the first
+        // and the second label. If there is no next label position calculated,
+        // return the difference between the first grid line and left 3d frame.
         return Math.abs(
             prevLabelPos ?
-                labelPos.x - prevLabelPos.x : nextLabelPos ?
+                labelPos.x - prevLabelPos.x :
+                nextLabelPos ?
                     nextLabelPos.x - labelPos.x :
-                    firstGridLine.x - frame3DLeft.x
+                    axis.len / (tickPositions.length + 1)
         );
     }
     return proceed.apply(axis, [].slice.call(arguments, 1));
 }
 
-/**
- * @private
- */
+/** @internal */
 function wrapAxisGetTitlePosition(
     this: Axis3DComposition,
     proceed: Function
@@ -424,7 +382,7 @@ function wrapAxisGetTitlePosition(
 
 /**
  * Adds 3D support to axes.
- * @private
+ * @internal
  * @class
  */
 class Axis3DAdditions {
@@ -437,19 +395,17 @@ class Axis3DAdditions {
 
     /**
      * Extends axis class with 3D support.
-     * @private
+     * @internal
      */
     public static compose(
         AxisClass: typeof Axis,
         TickClass: typeof Tick
     ): void {
+
         Tick3D.compose(TickClass);
 
-        if (composedClasses.indexOf(AxisClass) === -1) {
-            composedClasses.push(AxisClass);
-
-            merge(true, AxisClass.defaultOptions, Axis3DDefaults);
-            AxisClass.keepProps.push('axis3D');
+        if (pushUnique(composed, 'Axis.3D')) {
+            merge(true, defaultOptions.xAxis, Axis3DDefaults);
 
             addEvent(AxisClass, 'init', onAxisInit);
             addEvent(AxisClass, 'afterSetOptions', onAxisAfterSetOptions);
@@ -472,9 +428,7 @@ class Axis3DAdditions {
      *
      * */
 
-    /**
-     * @private
-     */
+    /** @internal */
     public constructor(
         axis: Axis3DComposition
     ) {
@@ -496,9 +450,7 @@ class Axis3DAdditions {
      * */
 
     /**
-     * @private
-     * @param {Highcharts.Axis} axis
-     * Related axis.
+     * @internal
      * @param {Highcharts.Position3DObject} pos
      * Position to fix.
      * @param {boolean} [isTitle]
@@ -525,12 +477,12 @@ class Axis3DAdditions {
 
         const alpha = deg2rad * (chart.options.chart.options3d as any).alpha,
             beta = deg2rad * (chart.options.chart.options3d as any).beta,
-            positionMode = pick(
-                isTitle && (axis.options.title as any).position3d,
+            positionMode = (
+                (isTitle && (axis.options.title as any).position3d) ??
                 axis.options.labels.position3d
             ),
-            skew = pick(
-                isTitle && (axis.options.title as any).skew3d,
+            skew = (
+                (isTitle && (axis.options.title as any).skew3d) ??
                 axis.options.labels.skew3d
             ),
             frame = chart.chart3d.frame3d,
@@ -623,16 +575,13 @@ class Axis3DAdditions {
                 let sin = Math.sin(alpha);
                 const cos = Math.cos(alpha);
 
-                if (axis.opposite) {
-                    sin = -sin;
-                }
                 if (reverseFlap) {
                     sin = -sin;
                 }
                 vecY = { x: vecX.z * sin, y: cos, z: -vecX.x * sin };
             }
         } else if (positionMode === 'ortho') {
-            // Labels will be rotated to be ortogonal to the axis
+            // Labels will be rotated to be orthogonal to the axis
             if (!axis.horiz) { // Y Axis
                 vecX = { x: Math.cos(beta), y: 0, z: Math.sin(beta) };
             } else { // X and Z Axis
@@ -658,7 +607,7 @@ class Axis3DAdditions {
                     x: scale * vecY.x, y: scale * vecY.y, z: scale * vecY.z
                 };
             }
-        } else { // positionMode  == 'offset'
+        } else { // Position mode  == 'offset'
             // Labels will be skewd to maintain vertical / horizontal offsets
             // from axis
             if (!axis.horiz) { // Y Axis
@@ -712,9 +661,7 @@ class Axis3DAdditions {
         return projected;
     }
 
-    /**
-     * @private
-     */
+    /** @internal */
     public swapZ(
         p: Position3DObject,
         insidePlotArea?: boolean
@@ -741,4 +688,5 @@ class Axis3DAdditions {
  *
  * */
 
+/** @internal */
 export default Axis3DAdditions;

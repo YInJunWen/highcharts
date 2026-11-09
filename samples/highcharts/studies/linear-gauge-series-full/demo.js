@@ -5,12 +5,10 @@
  */
 
 'use strict';
-//import H from '../Core/Globals.js';
-//import '../Core/Utilities.js';
-var H = Highcharts;
+/* eslint-disable jsdoc/check-tag-names */
+const H = Highcharts;
 
-var pick = H.pick,
-    isNumber = H.isNumber,
+const isNumber = H.isNumber,
     addEvent = H.addEvent,
     seriesType = H.seriesType,
     seriesTypes = H.seriesTypes,
@@ -42,10 +40,11 @@ H.SVGRenderer.prototype.symbols.target = function (
 /**
  * The lineargauge series type.
  *
- * @constructor seriesTypes.lineargauge
+ * @class seriesTypes.lineargauge
  * @augments seriesTypes.column
  */
-seriesType('lineargauge', 'column',
+seriesType(
+    'lineargauge', 'column',
     /**
      * A lineargauge graph is used for visualizing data on linear scale
      * within the specific range. It uses special pointers (targets).
@@ -100,8 +99,10 @@ seriesType('lineargauge', 'column',
          */
         targetOptions: {
             /**
-             * The length of the base part of the target (similar to [dial.baseLength](#plotOptions.gauge.dial.baseLength)).
-             * Can be pixel value or percentage value based on [length](#plotOptions.lineargauge.targetOptions.length).
+             * The length of the base part of the target (similar to
+             * [dial.baseLength](#plotOptions.gauge.dial.baseLength)). Can be
+             * pixel value or percentage value based on
+             * [length](#plotOptions.lineargauge.targetOptions.length).
              *
              * @type {Number|String}
              * @since 6.0.0
@@ -110,12 +111,13 @@ seriesType('lineargauge', 'column',
              */
             baseLength: '50%',
 
-            /*= if (build.classic) { =*/
+            /* = if (build.classic) { =*/
             /**
-             * The border color of the symbol representing the target. When
-             * not set, point's border color is used.
+             * The border color of the symbol representing the target. When not
+             * set, point's border color is used.
              *
-             * In styled mode, target border color can be set with the `.highcharts-lineargauge-target-symbol` class.
+             * In styled mode, target border color can be set with the
+             * `.highcharts-lineargauge-target-symbol` class.
              *
              * @type {Color}
              * @since 6.0.0
@@ -124,10 +126,11 @@ seriesType('lineargauge', 'column',
              */
 
             /**
-             * The border width of the symbol representing the target. When
-             * not set, point's border width is used.
+             * The border width of the symbol representing the target. When not
+             * set, point's border width is used.
              *
-             * In styled mode, target border color can be set with the `.highcharts-lineargauge-target-symbol` class.
+             * In styled mode, target border color can be set with the
+             * `.highcharts-lineargauge-target-symbol` class.
              *
              * @type {Number}
              * @since 6.0.0
@@ -136,22 +139,24 @@ seriesType('lineargauge', 'column',
              */
 
             /**
-             * The color of the symbol representing the target. When
-             * not set, point's color is used.
+             * The color of the symbol representing the target. When not set,
+             * point's color is used.
              *
-             * In styled mode, target color can be set with the `.highcharts-lineargauge-target-symbol` class.
+             * In styled mode, target color can be set with the
+             * `.highcharts-lineargauge-target-symbol` class.
              *
              * @type {Color}
              * @since 6.0.0
              * @product highcharts
              * @apioption plotOptions.lineargauge.targetOptions.color
              */
-            /*= } =*/
+            /* = } =*/
 
             /**
              * The indentation on the upper part of the target symbol.
              *
-             * Can be pixel value or percentage value based on [length](#plotOptions.lineargauge.targetOptions.length).
+             * Can be pixel value or percentage value based on
+             * [length](#plotOptions.lineargauge.targetOptions.length).
              *
              * @type {Number|String}
              * @since 6.0.0
@@ -160,12 +165,13 @@ seriesType('lineargauge', 'column',
              */
             indent: '20%',
 
-            /*= if (build.classic) { =*/
+            /* = if (build.classic) { =*/
             /**
-             * The color of the additional target line. When
-             * not set, point's border color is used.
+             * The color of the additional target line. When not set, point's
+             * border color is used.
              *
-             * In styled mode, target color can be set with the `.highcharts-lineargauge-target-line` class.
+             * In styled mode, target color can be set with the
+             * `.highcharts-lineargauge-target-line` class.
              *
              * @type {Color}
              * @since 6.0.0
@@ -174,17 +180,18 @@ seriesType('lineargauge', 'column',
              */
 
             /**
-             * The width of the additional target line. When
-             * not set, point's border width is used.
+             * The width of the additional target line. When not set, point's
+             * border width is used.
              *
-             * In styled mode, target border color can be set with the `.highcharts-lineargauge-target-line` class.
+             * In styled mode, target border color can be set with the
+             * `.highcharts-lineargauge-target-line` class.
              *
              * @type {Number}
              * @since 6.0.0
              * @product highcharts
              * @apioption plotOptions.lineargauge.targetOptions.lineWidth
              */
-            /*= } =*/
+            /* = } =*/
 
             /**
              * The zIndex of the target line.
@@ -197,8 +204,8 @@ seriesType('lineargauge', 'column',
             lineZIndex: 1,
 
             /**
-             * The total length of the target.
-             * Can be pixel value or percentage value based on column point's width.
+             * The total length of the target. Can be pixel value or percentage
+             * value based on column point's width.
              *
              * @type {Number|String}
              * @since 6.0.0
@@ -208,8 +215,8 @@ seriesType('lineargauge', 'column',
             length: '50%',
 
             /**
-             * The width of the target.
-             * Can be pixel value or percentage value based on column point's width.
+             * The width of the target. Can be pixel value or percentage value
+             * based on column point's width.
              *
              * @type {Number|String}
              * @since 6.0.0
@@ -230,12 +237,13 @@ seriesType('lineargauge', 'column',
         }
     }, {
         /**
-         * Function responsible for creating or updating target symbol and target line.
+         * Function responsible for creating or updating target symbol and
+         * target line.
          */
         createUpdateGraphic: function (
             graphic, path, xPosition, yPosition, beginningAtrr, endAttr
         ) {
-            var series = this,
+            const series = this,
                 chart = series.chart,
                 seriesOptions = series.options,
                 updateGraphic = chart.pointCount < (
@@ -255,19 +263,20 @@ seriesType('lineargauge', 'column',
 
                 graphic[updateGraphic](
                     endAttr,
-                    pick(seriesOptions.animation, { duration: 1000 })
+                    seriesOptions.animation ?? { duration: 1000 }
                 );
             }
 
             return graphic;
         },
         /**
-         * The target symbol and line is created for each point and added to it. Inverting
-         * chart and reversing axes are taken into account in calculating their position on chart.
-         * This method is based on column series drawPoints function.
+         * The target symbol and line is created for each point and added to it.
+         * Inverting chart and reversing axes are taken into account in
+         * calculating their position on chart. This method is based on column
+         * series drawPoints function.
          */
         drawPoints: function () {
-            var series = this,
+            const series = this,
                 points = series.points,
                 xAxis = series.xAxis,
                 yAxis = series.yAxis,
@@ -289,15 +298,8 @@ seriesType('lineargauge', 'column',
             columnProto.drawPoints.apply(series);
 
             points.forEach(function (point) {
-                var targetSymGraphic = point.targetSymGraphic,
+                let targetSymGraphic = point.targetSymGraphic,
                     targetLinGraphic = point.targetLinGraphic,
-                    pointOptions = point.options,
-                    pointTargetOptions = pointOptions.targetOptions || {},
-                    dataLabel = point.dataLabel,
-                    valueX = point.x,
-                    valueY = point.y,
-                    target = point.target,
-                    targetEvents = [],
                     halfPointWidth,
                     dataLabelBox,
                     columnStart,
@@ -326,6 +328,14 @@ seriesType('lineargauge', 'column',
                     yPosition,
                     pixelX,
                     pixelY;
+
+                const pointOptions = point.options,
+                    pointTargetOptions = pointOptions.targetOptions || {},
+                    dataLabel = point.dataLabel,
+                    valueX = point.x,
+                    valueY = point.y,
+                    target = point.target,
+                    targetEvents = [];
 
                 if (isNumber(valueY) && valueY !== null) {
                     halfPointWidth = point.pointWidth / 2;
@@ -376,63 +386,58 @@ seriesType('lineargauge', 'column',
                     shapeArgs = point.shapeArgs;
                     shapeArgsWidth = shapeArgs.width;
 
-                    // The option which controls whether target should display on series or on axis
-                    onPoint = pick(pointOptions.onPoint, seriesOptions.onPoint);
+                    // The option which controls whether target should
+                    // display on series or on axis
+                    onPoint = pointOptions.onPoint ?? seriesOptions.onPoint;
 
                     // Show/hide additional column
-                    showColumn = pick(
-                        pointOptions.showColumn,
-                        seriesOptions.showColumn
+                    showColumn = (
+                        pointOptions.showColumn ?? seriesOptions.showColumn
                     );
 
-                    // The option which controls whether target should have an additional line
-                    showLine = pick(
-                        pointOptions.showLine,
-                        seriesOptions.showLine
+                    // The option which controls whether target should have
+                    // an additional line
+                    showLine = (
+                        pointOptions.showLine ?? seriesOptions.showLine
                     );
 
                     // Total length of a target
                     length = relativeLength(
-                        pick(
-                            pointTargetOptions.length,
-                            seriesTargetOptions.length
-                        ),
+                        pointTargetOptions.length ??
+                            seriesTargetOptions.length,
                         shapeArgsWidth
                     );
 
                     // Total width of a target
                     width = relativeLength(
-                        pick(
-                            pointTargetOptions.width,
-                            seriesTargetOptions.width
-                        ),
+                        pointTargetOptions.width ??
+                            seriesTargetOptions.width,
                         shapeArgsWidth
                     );
 
                     // Border width of a target
-                    borderWidth = pick(
-                        pointTargetOptions.borderWidth,
+                    borderWidth = (
+                        pointTargetOptions.borderWidth ??
                         seriesTargetOptions.borderWidth
                     );
 
                     // The zIndex of a target symbol
-                    zIndex = pick(
-                        pointTargetOptions.zIndex,
+                    zIndex = (
+                        pointTargetOptions.zIndex ??
                         seriesTargetOptions.zIndex
                     );
 
                     // Width of a target line
-                    lineWidth = pick(
-                        pointTargetOptions.lineWidth,
-                        seriesTargetOptions.lineWidth,
-                        seriesOptions.borderWidth,
-                        point.borderWidth,
-                        1
-                    );
+                    lineWidth =
+                        pointTargetOptions.lineWidth ??
+                        seriesTargetOptions.lineWidth ??
+                        seriesOptions.borderWidth ??
+                        point.borderWidth ??
+                        1;
 
                     // The zIndex of a target line
-                    lineZIndex = pick(
-                        pointTargetOptions.lineZIndex,
+                    lineZIndex = (
+                        pointTargetOptions.lineZIndex ??
                         seriesTargetOptions.lineZIndex
                     );
 
@@ -440,19 +445,15 @@ seriesType('lineargauge', 'column',
                     if (shape === 'target') {
                         // Base length of a target
                         baseLength = relativeLength(
-                            pick(
-                                pointTargetOptions.baseLength,
-                                seriesTargetOptions.baseLength
-                            ),
+                            pointTargetOptions.baseLength ??
+                                seriesTargetOptions.baseLength,
                             length
                         );
 
                         // Vertical indent of a target
                         indent = relativeLength(
-                            pick(
-                                pointTargetOptions.indent,
-                                seriesTargetOptions.indent
-                            ),
+                            pointTargetOptions.indent ??
+                                seriesTargetOptions.indent,
                             length
                         );
 
@@ -469,7 +470,10 @@ seriesType('lineargauge', 'column',
                             symbolPath,
                             borderWidth || 1
                         );
-                    } else if (shape === 'rectangle') { // Shape for bullet series
+                    } else if (
+                        shape ===
+                        'rectangle'
+                    ) { // Shape for bullet series
                         onPoint = true;
                         showLine = false;
                         showColumn = true;
@@ -512,7 +516,8 @@ seriesType('lineargauge', 'column',
                             xPosition,
                             yPosition,
                             beginningAtrr,
-                            (inverted ? xAttr : yAttr)
+                            (inverted ? xAttr : yAttr
+                            )
                         );
 
                     if (showLine) {
@@ -530,7 +535,8 @@ seriesType('lineargauge', 'column',
                             ['M', 0, 0],
                             ['L', offsetOnPoint, 0]
                         ];
-                        // linePath = renderer.crispLine(linePath, lineWidth || 1);
+                        // linePath = renderer.crispLine(linePath, lineWidth
+                        // || 1);
 
                         beginningAtrr.zIndex = lineZIndex;
 
@@ -542,7 +548,8 @@ seriesType('lineargauge', 'column',
                                 xPosition,
                                 yPosition,
                                 beginningAtrr,
-                                (inverted ? xAttr : yAttr)
+                                (inverted ? xAttr : yAttr
+                                )
                             );
                     }
 
@@ -607,49 +614,52 @@ seriesType('lineargauge', 'column',
                         series.targetEvents = targetEvents;
                     }
 
-                    /*= if (build.classic) { =*/
+                    /* = if (build.classic) { =*/
                     // Setting style to target symbol
                     targetSymGraphic.attr({
-                        fill: pick(
-                            pointTargetOptions.color,
-                            seriesTargetOptions.color,
-                            pointOptions.color,
-                            (series.zones.length && (point.getZone.call({
-                                series: series,
-                                x: valueX,
-                                y: valueY,
-                                options: {}
-                            }).color || series.color)) || undefined,
-                            point.color,
-                            series.color
-                        ),
-                        stroke: pick(
-                            pointTargetOptions.borderColor,
-                            seriesTargetOptions.borderColor,
-                            point.borderColor,
-                            seriesOptions.borderColor
-                        ),
-                        'stroke-width': pick(
-                            pointTargetOptions.borderWidth,
-                            seriesTargetOptions.borderWidth,
-                            point.borderWidth,
+                        fill:
+                            pointTargetOptions.color ??
+                            seriesTargetOptions.color ??
+                            pointOptions.color ??
+                            (
+                                (
+                                    series.zones.length &&
+                                    (
+                                        point.getZone.call({
+                                            series: series,
+                                            x: valueX,
+                                            y: valueY,
+                                            options: {}
+                                        }).color || series.color
+                                    )
+                                ) || void 0
+                            ) ??
+                            point.color ??
+                            series.color,
+                        stroke:
+                            pointTargetOptions.borderColor ??
+                            seriesTargetOptions.borderColor ??
+                            point.borderColor ??
+                            seriesOptions.borderColor,
+                        'stroke-width':
+                            pointTargetOptions.borderWidth ??
+                            seriesTargetOptions.borderWidth ??
+                            point.borderWidth ??
                             seriesOptions.borderWidth
-                        )
                     });
 
                     // Setting style to target line, if exists
                     if (showLine) {
                         targetLinGraphic.attr({
-                            stroke: pick(
-                                pointTargetOptions.lineColor,
-                                seriesTargetOptions.lineColor,
-                                point.borderColor,
-                                seriesOptions.borderColor
-                            ),
+                            stroke:
+                                pointTargetOptions.lineColor ??
+                                seriesTargetOptions.lineColor ??
+                                point.borderColor ??
+                                seriesOptions.borderColor,
                             'stroke-width': lineWidth
                         });
                     }
-                    /*= } =*/
+                    /* = } =*/
 
                     // Add styles
                     if (targetSymGraphic) {
@@ -685,8 +695,8 @@ seriesType('lineargauge', 'column',
          * Destroys target symbol and line graphics.
          */
         destroy: function () {
-            var point = this,
-                targetSymGraphic = point.targetSymGraphic,
+            const point = this;
+            let targetSymGraphic = point.targetSymGraphic,
                 targetLinGraphic = point.targetLinGraphic;
 
             if (targetSymGraphic) {
@@ -718,7 +728,6 @@ seriesType('lineargauge', 'column',
  * @type {Object}
  * @since 6.0.0
  * @extends series,plotOptions.lineargauge
- * @excluding dataParser,dataURL
  * @product highcharts
  * @apioption series.lineargauge
  */
@@ -733,7 +742,8 @@ seriesType('lineargauge', 'column',
  */
 
 /**
- * Whether to display or hide individual additional column along with the target.
+ * Whether to display or hide individual additional column along with the
+ * target.
  *
  * @type {Boolean}
  * @since 6.0.0
@@ -751,8 +761,10 @@ seriesType('lineargauge', 'column',
  */
 
 /**
- * Individual length of the base part of the target (similar to [dial.baseLength](#plotOptions.gauge.dial.baseLength)).
- * Can be pixel value or percentage value based on [length](#plotOptions.lineargauge.targetOptions.length).
+ * Individual length of the base part of the target (similar to
+ * [dial.baseLength](#plotOptions.gauge.dial.baseLength)). Can be pixel value or
+ * percentage value based on
+ * [length](#plotOptions.lineargauge.targetOptions.length).
  *
  * @type {Number|String}
  * @since 6.0.0
@@ -760,12 +772,13 @@ seriesType('lineargauge', 'column',
  * @apioption series.lineargauge.data.targetOptions.baseLength
  */
 
-/*= if (build.classic) { =*/
+/* = if (build.classic) { =*/
 /**
- * Individual border color of the symbol representing the target. When
- * not set, point's border color is used.
+ * Individual border color of the symbol representing the target. When not set,
+ * point's border color is used.
  *
- * In styled mode, target border color can be set with the `.highcharts-lineargauge-target-symbol` class.
+ * In styled mode, target border color can be set with the
+ * `.highcharts-lineargauge-target-symbol` class.
  *
  * @type {Color}
  * @since 6.0.0
@@ -774,10 +787,11 @@ seriesType('lineargauge', 'column',
  */
 
 /**
- * Individual border width of the symbol representing the target. When
- * not set, point's border width is used.
+ * Individual border width of the symbol representing the target. When not set,
+ * point's border width is used.
  *
- * In styled mode, target border color can be set with the `.highcharts-lineargauge-target-symbol` class.
+ * In styled mode, target border color can be set with the
+ * `.highcharts-lineargauge-target-symbol` class.
  *
  * @type {Number}
  * @since 6.0.0
@@ -786,22 +800,24 @@ seriesType('lineargauge', 'column',
  */
 
 /**
- * Individual color of the symbol representing the target. When
- * not set, point's color is used.
+ * Individual color of the symbol representing the target. When not set, point's
+ * color is used.
  *
- * In styled mode, target color can be set with the `.highcharts-lineargauge-target-symbol` class.
+ * In styled mode, target color can be set with the
+ * `.highcharts-lineargauge-target-symbol` class.
  *
  * @type {Color}
  * @since 6.0.0
  * @product highcharts
  * @apioption series.lineargauge.data.targetOptions.color
  */
-/*= } =*/
+/* = } =*/
 
 /**
  * Individual indentation on the upper part of the target symbol.
  *
- * Can be pixel value or percentage value based on [length](#plotOptions.lineargauge.targetOptions.length).
+ * Can be pixel value or percentage value based on
+ * [length](#plotOptions.lineargauge.targetOptions.length).
  *
  * @type {Number|String}
  * @since 6.0.0
@@ -809,12 +825,13 @@ seriesType('lineargauge', 'column',
  * @apioption series.lineargauge.data.targetOptions.indent
  */
 
-/*= if (build.classic) { =*/
+/* = if (build.classic) { =*/
 /**
- * Individual color of the additional target line. When
- * not set, point's border color is used.
+ * Individual color of the additional target line. When not set, point's border
+ * color is used.
  *
- * In styled mode, target color can be set with the `.highcharts-lineargauge-target-line` class.
+ * In styled mode, target color can be set with the
+ * `.highcharts-lineargauge-target-line` class.
  *
  * @type {Color}
  * @since 6.0.0
@@ -823,17 +840,18 @@ seriesType('lineargauge', 'column',
  */
 
 /**
- * Individual width of the additional target line. When
- * not set, point's border width is used.
+ * Individual width of the additional target line. When not set, point's border
+ * width is used.
  *
- * In styled mode, target border color can be set with the `.highcharts-lineargauge-target-line` class.
+ * In styled mode, target border color can be set with the
+ * `.highcharts-lineargauge-target-line` class.
  *
  * @type {Number}
  * @since 6.0.0
  * @product highcharts
  * @apioption series.lineargauge.data.targetOptions.lineWidth
  */
-/*= } =*/
+/* = } =*/
 
 /**
  * The zIndex of individual target line.
@@ -845,8 +863,8 @@ seriesType('lineargauge', 'column',
  */
 
 /**
- * Individual total length of the target.
- * Can be pixel value or percentage value based on column point's width.
+ * Individual total length of the target. Can be pixel value or percentage value
+ * based on column point's width.
  *
  * @type {Number|String}
  * @since 6.0.0
@@ -855,8 +873,8 @@ seriesType('lineargauge', 'column',
  */
 
 /**
- * Individual width of the target.
- * Can be pixel value or percentage value based on column point's width.
+ * Individual width of the target. Can be pixel value or percentage value based
+ * on column point's width.
  *
  * @type {Number|String}
  * @since 6.0.0
@@ -873,10 +891,10 @@ seriesType('lineargauge', 'column',
  * @apioption series.lineargauge.data.targetOptions.zIndex
  */
 
-////////////////////////////////////////////////////////////////////////////////
+// /////////////////////////////////////////////////////////////////////////////
 
 // Common options options for all the gauges
-var commonOptions = {
+const commonOptions = {
     chart: {
         inverted: true,
         type: 'lineargauge',

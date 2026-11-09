@@ -1,10 +1,12 @@
 /* *
  *
- *  (c) 2010-2021 Torstein Honsi
+ *  (c) 2010-2026 Highsoft AS
+ *  Author: Torstein Hønsi
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -21,16 +23,14 @@ import type SeriesOptions from '../Core/Series/SeriesOptions';
 import H from '../Core/Globals.js';
 const { deg2rad } = H;
 import Series from '../Core/Series/Series.js';
-import U from '../Core/Utilities.js';
-const {
+import {
     fireEvent,
     isNumber,
-    pick,
     relativeLength
-} = U;
+} from '../Shared/Utilities.js';
 
 /**
- * @private
+ * @internal
  */
 namespace CenteredUtilities {
 
@@ -63,13 +63,12 @@ namespace CenteredUtilities {
      *
      * */
 
-    /* eslint-disable valid-jsdoc */
 
     /**
      * Get the center of the pie based on the size and center options relative
      * to the plot area. Borrowed by the polar and gauge series types.
      *
-     * @private
+     * @internal
      * @function Highcharts.CenteredSeriesMixin.getCenter
      */
     export function getCenter(this: CenteredSeries): Array<number> {
@@ -79,7 +78,7 @@ namespace CenteredUtilities {
             slicingRoom = 2 * (options.slicedOffset || 0),
             plotWidth = chart.plotWidth - 2 * slicingRoom,
             plotHeight = chart.plotHeight - 2 * slicingRoom,
-            centerOption: Array<(number|string|null)> = options.center as any,
+            centerOption = options.center,
             smallestSize = Math.min(plotWidth, plotHeight),
             thickness = options.thickness;
 
@@ -98,27 +97,24 @@ namespace CenteredUtilities {
         }
 
         const positions: Array<number> = [
-            pick(centerOption[0] as any, '50%' as any),
-            pick(centerOption[1] as any, '50%' as any),
+            (centerOption?.[0] ?? '50%' as any),
+            (centerOption?.[1] ?? '50%' as any),
             // Prevent from negative values
-            pick(size && size < 0 ? void 0 : options.size, '100%'),
-            pick(
-                innerSize && innerSize < 0 ? void 0 : options.innerSize || 0,
-                '0%'
+            ((size && size < 0 ? void 0 : options.size) ?? '100%'),
+            (
+                (
+                    innerSize && innerSize < 0 ?
+                        void 0 :
+                        options.innerSize || 0
+                ) ?? '0%'
             )
         ];
-
-        // No need for inner size in angular (gauges) series but still required
-        // for pie series
-        if (chart.angular && !(this instanceof Series)) {
-            positions[3] = 0;
-        }
 
         for (i = 0; i < 4; ++i) {
             value = positions[i];
             handleSlicingRoom = i < 2 || (i === 2 && /%$/.test(value as any));
 
-            // i == 0: centerX, relative to width
+            // I == 0: centerX, relative to width
             // i == 1: centerY, relative to height
             // i == 2: size, relative to smallestSize
             // i == 3: innerSize, relative to size
@@ -128,11 +124,11 @@ namespace CenteredUtilities {
             ) + (handleSlicingRoom ? slicingRoom : 0);
 
         }
-        // innerSize cannot be larger than size (#3632)
+        // Inner size cannot be larger than size (#3632)
         if (positions[3] > positions[2]) {
             positions[3] = positions[2];
         }
-        // thickness overrides innerSize, need to be less than pie size (#6647)
+        // Thickness overrides innerSize, need to be less than pie size (#6647)
         if (
             isNumber(thickness) &&
             thickness * 2 < positions[2] && thickness > 0
@@ -146,10 +142,10 @@ namespace CenteredUtilities {
     }
 
     /**
-     * getStartAndEndRadians - Calculates start and end angles in radians.
+     * GetStartAndEndRadians - Calculates start and end angles in radians.
      * Used in series types such as pie and sunburst.
      *
-     * @private
+     * @internal
      * @function Highcharts.CenteredSeriesMixin.getStartAndEndRadians
      *
      * @param {number} [start]
@@ -165,11 +161,11 @@ namespace CenteredUtilities {
         start?: number,
         end?: number
     ): RadianAngles {
-        const startAngle = isNumber(start) ? start : 0, // must be a number
+        const startAngle = isNumber(start) ? start : 0, // Must be a number
             endAngle = (
                 (
-                    isNumber(end) && // must be a number
-                    end > startAngle && // must be larger than the start angle
+                    isNumber(end) && // Must be a number
+                    end > startAngle && // Must be larger than the start angle
                     // difference must be less than 360 degrees
                     (end - startAngle) < 360
                 ) ?
@@ -192,6 +188,7 @@ namespace CenteredUtilities {
  *
  * */
 
+/** @internal */
 export default CenteredUtilities;
 
 /* *
@@ -201,7 +198,7 @@ export default CenteredUtilities;
  * */
 
 /**
- * @private
+ * @internal
  * @interface Highcharts.RadianAngles
  *//**
  * @name Highcharts.RadianAngles#end
@@ -211,4 +208,4 @@ export default CenteredUtilities;
  * @type {number}
  */
 
-''; // keeps doclets above in JS file
+''; // Keeps doclets above in JS file

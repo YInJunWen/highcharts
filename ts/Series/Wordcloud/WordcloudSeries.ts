@@ -1,13 +1,14 @@
 /* *
  *
- *  Experimental Highcharts module which enables visualization of a word cloud.
+ *  Highcharts module which enables visualization of a word cloud.
  *
- *  (c) 2016-2021 Highsoft AS
- *  Authors: Jon Arild Nygard
+ *  (c) 2016-2026 Highsoft AS
+ *  Authors: Jon Arild Nygård
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  * */
 
 'use strict';
@@ -18,7 +19,6 @@
  *
  * */
 
-import type BBoxObject from '../../Core/Renderer/BBoxObject';
 import type PolygonBoxObject from '../../Core/Renderer/PolygonBoxObject';
 import type PositionObject from '../../Core/Renderer/PositionObject';
 import type SizeObject from '../../Core/Renderer/SizeObject';
@@ -34,22 +34,18 @@ import DPU from '../DrawPointUtilities.js';
 import H from '../../Core/Globals.js';
 const { noop } = H;
 import Series from '../../Core/Series/Series.js';
+import ColumnSeries from '../Column/ColumnSeries.js';
 import SeriesRegistry from '../../Core/Series/SeriesRegistry.js';
-const {
-    seriesTypes: {
-        column: ColumnSeries
-    }
-} = SeriesRegistry;
-import U from '../../Core/Utilities.js';
-const {
+import WordcloudPoint from './WordcloudPoint.js';
+import WordcloudSeriesDefaults from './WordcloudSeriesDefaults.js';
+import WU from './WordcloudUtils.js';
+import {
     extend,
     isArray,
     isNumber,
     isObject,
     merge
-} = U;
-import WordcloudPoint from './WordcloudPoint.js';
-import WordcloudUtils from './WordcloudUtils.js';
+} from '../../Shared/Utilities.js';
 const {
     archimedeanSpiral,
     extendPlayingField,
@@ -67,7 +63,7 @@ const {
     rotate2DToPoint,
     squareSpiral,
     updateFieldBoundaries
-} = WordcloudUtils;
+} = WU;
 
 /* *
  *
@@ -76,7 +72,6 @@ const {
  * */
 
 /**
- * @private
  * @class
  * @name Highcharts.seriesTypes.wordcloud
  *
@@ -86,161 +81,36 @@ class WordcloudSeries extends ColumnSeries {
 
     /* *
      *
-     * Static properties
+     *  Static properties
      *
      * */
 
-    /**
-     * A word cloud is a visualization of a set of words, where the size and
-     * placement of a word is determined by how it is weighted.
-     *
-     * @sample highcharts/demo/wordcloud Word Cloud chart
-     *
-     * @extends      plotOptions.column
-     * @excluding    allAreas, boostThreshold, clip, colorAxis, compare,
-     *               compareBase, crisp, cropThreshold, dataGrouping,
-     *               dataLabels, depth, dragDrop, edgeColor, findNearestPointBy,
-     *               getExtremesFromAll, grouping, groupPadding, groupZPadding,
-     *               joinBy, maxPointWidth, minPointLength, navigatorOptions,
-     *               negativeColor, pointInterval, pointIntervalUnit,
-     *               pointPadding, pointPlacement, pointRange, pointStart,
-     *               pointWidth, pointStart, pointWidth, shadow, showCheckbox,
-     *               showInNavigator, softThreshold, stacking, threshold,
-     *               zoneAxis, zones, dataSorting, boostBlending
-     * @product      highcharts
-     * @since        6.0.0
-     * @requires     modules/wordcloud
-     * @optionparent plotOptions.wordcloud
-     */
-    public static defaultOptions: WordcloudSeriesOptions = merge(ColumnSeries.defaultOptions, {
-        /**
-         * If there is no space for a word on the playing field, then this
-         * option will allow the playing field to be extended to fit the word.
-         * If false then the word will be dropped from the visualization.
-         *
-         * NB! This option is currently not decided to be published in the API,
-         * and is therefore marked as private.
-         *
-         * @ignore-option
-         */
-        allowExtendPlayingField: true,
-        animation: {
-            /** @internal */
-            duration: 500
-        },
-        borderWidth: 0,
-        /**
-         * @ignore-option
-         */
-        clip: false, // Something goes wrong with clip. // @todo fix this
-        colorByPoint: true,
-        cropThreshold: Infinity,
-        /**
-         * A threshold determining the minimum font size that can be applied to
-         * a word.
-         */
-        minFontSize: 1,
-        /**
-         * The word with the largest weight will have a font size equal to this
-         * value. The font size of a word is the ratio between its weight and
-         * the largest occuring weight, multiplied with the value of
-         * maxFontSize.
-         */
-        maxFontSize: 25,
-        /**
-         * This option decides which algorithm is used for placement, and
-         * rotation of a word. The choice of algorith is therefore a crucial
-         * part of the resulting layout of the wordcloud. It is possible for
-         * users to add their own custom placement strategies for use in word
-         * cloud. Read more about it in our
-         * [documentation](https://www.highcharts.com/docs/chart-and-series-types/word-cloud-series#custom-placement-strategies)
-         *
-         * @validvalue ["center", "random"]
-         */
-        placementStrategy: 'center',
-        /**
-         * Rotation options for the words in the wordcloud.
-         *
-         * @sample highcharts/plotoptions/wordcloud-rotation
-         *         Word cloud with rotation
-         */
-        rotation: {
-            /**
-             * The smallest degree of rotation for a word.
-             */
-            from: 0,
-            /**
-             * The number of possible orientations for a word, within the range
-             * of `rotation.from` and `rotation.to`. Must be a number larger
-             * than 0.
-             */
-            orientations: 2,
-            /**
-             * The largest degree of rotation for a word.
-             */
-            to: 90
-        },
-        showInLegend: false,
-        /**
-         * Spiral used for placing a word after the initial position
-         * experienced a collision with either another word or the borders.
-         * It is possible for users to add their own custom spiralling
-         * algorithms for use in word cloud. Read more about it in our
-         * [documentation](https://www.highcharts.com/docs/chart-and-series-types/word-cloud-series#custom-spiralling-algorithm)
-         *
-         * @validvalue ["archimedean", "rectangular", "square"]
-         */
-        spiral: 'rectangular',
-        /**
-         * CSS styles for the words.
-         *
-         * @type    {Highcharts.CSSObject}
-         * @default {"fontFamily":"sans-serif", "fontWeight": "900"}
-         */
-        style: {
-            /** @ignore-option */
-            fontFamily: 'sans-serif',
-            /** @ignore-option */
-            fontWeight: '900',
-            /** @ignore-option */
-            whiteSpace: 'nowrap'
-        },
-        tooltip: {
-            followPointer: true,
-            pointFormat: '<span style="color:{point.color}">\u25CF</span> {series.name}: <b>{point.weight}</b><br/>'
-        }
-    } as WordcloudSeriesOptions);
+    /** @internal */
+    public static defaultOptions: WordcloudSeriesOptions = merge(
+        ColumnSeries.defaultOptions,
+        WordcloudSeriesDefaults
+    );
 
     /* *
      *
      * Properties
      *
      * */
-    public data: Array<WordcloudPoint> = void 0 as any;
-    public options: WordcloudSeriesOptions = void 0 as any;
-    public points: Array<WordcloudPoint> = void 0 as any;
+    public data!: Array<WordcloudPoint>;
+    /** @internal */
+    public defaultScale?: number;
+    /** @internal */
+    public field?: WordcloudSeries.WordcloudFieldObject;
+    public options!: WordcloudSeriesOptions;
+    public points!: Array<WordcloudPoint>;
 
-    /**
+    /* *
      *
      * Functions
      *
-     */
-    public bindAxes(): void {
-        const wordcloudAxis = {
-            endOnTick: false,
-            gridLineWidth: 0,
-            lineWidth: 0,
-            maxPadding: 0,
-            startOnTick: false,
-            title: void 0,
-            tickPositions: []
-        };
+     * */
 
-        Series.prototype.bindAxes.call(this);
-        extend(this.yAxis.options, wordcloudAxis);
-        extend(this.xAxis.options, wordcloudAxis);
-    }
-
+    /** @internal */
     public pointAttribs(
         point: WordcloudPoint,
         state?: StatesOptionsKey
@@ -257,7 +127,7 @@ class WordcloudSeries extends ColumnSeries {
     /**
      * Calculates the fontSize of a word based on its weight.
      *
-     * @private
+     * @internal
      * @function Highcharts.Series#deriveFontSize
      *
      * @param {number} [relativeWeight=0]
@@ -285,8 +155,18 @@ class WordcloudSeries extends ColumnSeries {
         return Math.floor(Math.max(min, weight * max));
     }
 
+    /** @internal */
     public drawPoints(): void {
-        let series = this,
+        if (
+            this.zooming ||
+            (
+                this.defaultScale &&
+                this.group.scaleX !== this.defaultScale
+            )
+        ) {
+            return;
+        }
+        const series = this,
             hasRendered = series.hasRendered,
             xAxis = series.xAxis,
             yAxis = series.yAxis,
@@ -296,28 +176,24 @@ class WordcloudSeries extends ColumnSeries {
             animation = options.animation,
             allowExtendPlayingField = options.allowExtendPlayingField,
             renderer = chart.renderer,
-            testElement: SVGElement = renderer.text().add(group),
             placed: Array<WordcloudPoint> = [],
             placementStrategy = series.placementStrategy[
                 options.placementStrategy as any
             ],
-            spiral: WordcloudSeries.WordcloudSpiralFunction,
             rotation: WordcloudSeriesRotationOptions =
                 options.rotation as any,
-            scale,
             weights = series.points.map(function (
                 p: WordcloudPoint
             ): number {
                 return p.weight;
             }),
             maxWeight = Math.max.apply(null, weights),
-            // concat() prevents from sorting the original array.
-            data = series.points.concat().sort(function (
-                a: WordcloudPoint,
-                b: WordcloudPoint
-            ): number {
-                return b.weight - a.weight; // Sort descending
-            }),
+            // `concat()` prevents from sorting the original array.
+            points = series.points.concat().sort((a, b): number => (
+                b.weight - a.weight // Sort descending
+            ));
+
+        let testElement: SVGElement = renderer.text().add(group),
             field: WordcloudSeries.WordcloudFieldObject;
 
         // Reset the scale before finding the dimensions (#11993).
@@ -332,8 +208,8 @@ class WordcloudSeries extends ColumnSeries {
 
         // Get the dimensions for each word.
         // Used in calculating the playing field.
-        data.forEach(function (point: WordcloudPoint): void {
-            let relativeWeight = 1 / maxWeight * point.weight,
+        for (const point of points) {
+            const relativeWeight = 1 / maxWeight * point.weight,
                 fontSize = series.deriveFontSize(
                     relativeWeight,
                     options.maxFontSize,
@@ -341,29 +217,31 @@ class WordcloudSeries extends ColumnSeries {
                 ),
                 css = extend({
                     fontSize: fontSize + 'px'
-                }, options.style as any),
-                bBox: BBoxObject;
+                }, options.style as any);
 
             testElement.css(css).attr({
                 x: 0,
                 y: 0,
                 text: point.name
             });
-            bBox = testElement.getBBox(true);
+
+            const bBox = testElement.getBBox(true);
+
             point.dimensions = {
                 height: bBox.height,
                 width: bBox.width
             };
-        });
+        }
 
         // Calculate the playing field.
-        field = getPlayingField(xAxis.len, yAxis.len, data);
-        spiral = getSpiral(series.spirals[options.spiral as any], {
+        field = getPlayingField(xAxis.len, yAxis.len, points);
+        const spiral = getSpiral(series.spirals[options.spiral as any], {
             field: field
         });
+
         // Draw all the points.
-        data.forEach(function (point: WordcloudPoint): void {
-            let relativeWeight = 1 / maxWeight * point.weight,
+        for (const point of points) {
+            const relativeWeight = 1 / maxWeight * point.weight,
                 fontSize = series.deriveFontSize(
                     relativeWeight,
                     options.maxFontSize,
@@ -373,7 +251,7 @@ class WordcloudSeries extends ColumnSeries {
                     fontSize: fontSize + 'px'
                 }, options.style as any),
                 placement = placementStrategy(point, {
-                    data: data,
+                    data: points,
                     field: field,
                     placed: placed,
                     rotation: rotation
@@ -381,7 +259,8 @@ class WordcloudSeries extends ColumnSeries {
                 attr = extend(
                     series.pointAttribs(
                         point,
-                        (point.selected && 'select' as any)
+                        (point.selected && 'select' as any
+                        )
                     ),
                     {
                         align: 'center',
@@ -402,8 +281,9 @@ class WordcloudSeries extends ColumnSeries {
                     point.dimensions.height,
                     placement.rotation as any
                 ),
-                rectangle = getBoundingBoxFromPolygon(polygon),
-                delta: PositionObject = intersectionTesting(point, {
+                rectangle = getBoundingBoxFromPolygon(polygon);
+
+            let delta: PositionObject = intersectionTesting(point, {
                     rectangle: rectangle,
                     polygon: polygon,
                     field: field,
@@ -455,7 +335,7 @@ class WordcloudSeries extends ColumnSeries {
                 if (!hasRendered) {
                     attr.x = 0;
                     attr.y = 0;
-                // or animate from previous position
+                // Or animate from previous position
                 } else {
                     delete attr.x;
                     delete attr.y;
@@ -471,19 +351,23 @@ class WordcloudSeries extends ColumnSeries {
                 shapeArgs: void 0,
                 shapeType: 'text'
             });
-        });
+        }
 
         // Destroy the element after use.
         testElement = testElement.destroy() as any;
 
         // Scale the series group to fit within the plotArea.
-        scale = getScale(xAxis.len, yAxis.len, field);
+        series.defaultScale = getScale(xAxis.len, yAxis.len, field);
+
+        series.field = field;
+
         series.group.attr({
-            scaleX: scale,
-            scaleY: scale
+            scaleX: series.defaultScale,
+            scaleY: series.defaultScale
         });
     }
 
+    /** @internal */
     public hasData(): boolean {
         const series = this;
 
@@ -495,23 +379,138 @@ class WordcloudSeries extends ColumnSeries {
         );
     }
 
-    public getPlotBox(): Series.PlotBoxObject {
+    /** @internal */
+    public getPlotBox(name?: string): Series.PlotBoxTransform {
         const series = this,
-            chart = series.chart,
-            inverted = chart.inverted,
+            { chart, group, zooming } = this,
+            { plotSizeX = 0, plotSizeY = 0, inverted } = chart,
             // Swap axes for inverted (#2339)
             xAxis = series[(inverted ? 'yAxis' : 'xAxis')],
             yAxis = series[(inverted ? 'xAxis' : 'yAxis')],
             width = xAxis ? xAxis.len : chart.plotWidth,
             height = yAxis ? yAxis.len : chart.plotHeight,
             x = xAxis ? xAxis.left : chart.plotLeft,
-            y = yAxis ? yAxis.top : chart.plotTop;
+            y = yAxis ? yAxis.top : chart.plotTop,
+            field = series.field;
+
+        let left = 0,
+            top = 0,
+            translateX = x + width / 2,
+            translateY = y + height / 2,
+            initLeft = translateX,
+            initTop = translateY,
+            scale = series.defaultScale || 1,
+            seriesHeight = 0,
+            seriesWidth = 0;
+
+        if (field) {
+            seriesHeight =
+                Math.max(Math.abs(field.top), Math.abs(field.bottom)) * 2;
+            seriesWidth =
+                Math.max(Math.abs(field.left), Math.abs(field.right)) * 2;
+        }
+
+        if (inverted) {
+            [seriesWidth, seriesHeight] = [seriesHeight, seriesWidth];
+        }
+
+        if (group && zooming) {
+            // Uncomment this block to visualize the zooming
+            // bounding box and the point, which is normalized
+            // position to zoom-in
+            // chart.renderer.rect(
+            //    (plotSizeX - seriesWidth) / 2 + zooming.x * plotSizeX +
+            //        chart.plotLeft,
+            //    (plotSizeY - seriesHeight) / 2 + zooming.y * plotSizeY +
+            //        chart.plotTop,
+            //    zooming.width * plotSizeX,
+            //    zooming.height * plotSizeY,
+            //    0,
+            //    2
+            // ).attr({
+            //    stroke: 'red'
+            // }).add();
+
+            // chart.renderer.circle(
+            //    (plotSizeX - seriesWidth) / 2 + zooming.zoomX * plotSizeX +
+            //        chart.plotLeft,
+            //    (plotSizeY - seriesHeight) / 2 + zooming.zoomY * plotSizeY +
+            //        chart.plotTop,
+            //    2
+            // ).attr({
+            //    stroke: 'blue'
+            // }).add();
+
+            scale = Math.max(zooming.scale, series.defaultScale || 1);
+
+            const newWidth = Math.max(seriesWidth * scale, width),
+                newHeight = Math.max(seriesHeight * scale, height),
+                newMiddleX = x + newWidth / 2,
+                newMiddleY = y + newHeight / 2,
+                scaleDiff = scale - (group.scaleX || 1);
+
+            left = scaleDiff * (
+                (plotSizeX - seriesWidth) / 2 +
+                    zooming.zoomX * plotSizeX - width / 2
+            );
+            top = scaleDiff * (
+                (plotSizeY - seriesHeight) / 2 +
+                    zooming.zoomY * plotSizeY - height / 2
+            );
+
+            if (name === 'series') {
+                zooming.x = Math.max(
+                    0,
+                    Math.min(
+                        1 - zooming.width,
+                        zooming.x + (zooming.panX / zooming.scale)
+                    )
+                );
+                left += zooming.panX * plotSizeX;
+                zooming.panX = 0;
+                zooming.y = Math.max(
+                    0,
+                    Math.min(
+                        1 - zooming.height,
+                        zooming.y + (zooming.panY / zooming.scale)
+                    )
+                );
+                top += zooming.panY * plotSizeY;
+                zooming.panY = 0;
+            }
+
+            if (isNumber(group.translateX) && isNumber(group.translateY)) {
+                initLeft = group.translateX;
+                initTop = group.translateY;
+            }
+
+            translateX = initLeft - left;
+            translateY = initTop - top;
+
+            // Do not allow to move outside the chart
+            // Vertical lock
+            if (translateY > newMiddleY) {
+                translateY = newMiddleY;
+            } else if (
+                translateY < 2 * y + height - newMiddleY
+            ) {
+                translateY = 2 * y + height - newMiddleY;
+            }
+            // Horizontal lock
+            if (translateX > newMiddleX) {
+                translateX = newMiddleX;
+            } else if (
+                translateX < 2 * x + width - newMiddleX
+            ) {
+                translateX = 2 * x + width - newMiddleX;
+            }
+        }
 
         return {
-            translateX: x + (width / 2),
-            translateY: y + (height / 2),
-            scaleX: 1, // #1623
-            scaleY: 1
+            translateX: translateX,
+            translateY: translateY,
+            scaleX: scale,
+            scaleY: scale
         };
     }
 }
@@ -522,17 +521,23 @@ class WordcloudSeries extends ColumnSeries {
  *
  * */
 interface WordcloudSeries {
+    /** @internal */
     placementStrategy: Record<string, WordcloudSeries.WordcloudPlacementFunction>;
+    /** @internal */
     pointArrayMap: Array<string>;
+    /** @internal */
     pointClass: typeof WordcloudPoint;
+    /** @internal */
     spirals: Record<string, WordcloudSeries.WordcloudSpiralFunction>;
-    utils: typeof WordcloudUtils;
+    /** @internal */
+    utils: typeof WU;
 }
 
 extend(WordcloudSeries.prototype, {
     animate: noop,
     animateDrilldown: noop,
     animateDrillupFrom: noop,
+    isCartesian: false,
     pointClass: WordcloudPoint,
     setClip: noop,
 
@@ -603,6 +608,7 @@ SeriesRegistry.registerSeriesType('wordcloud', WordcloudSeries);
  *
  * */
 
+/** @internal */
 namespace WordcloudSeries {
     export interface WordcloudFieldObject extends PolygonBoxObject, SizeObject {
         ratioX: number;
@@ -635,7 +641,7 @@ namespace WordcloudSeries {
     export interface WordcloudTestOptionsObject {
         field: WordcloudFieldObject;
         placed: Array<WordcloudPoint>;
-        polygon: WordcloudUtils.PolygonObject;
+        polygon: WU.PolygonObject;
         rectangle: PolygonBoxObject;
         rotation: (boolean|number);
         spiral: WordcloudSpiralFunction;
@@ -644,79 +650,8 @@ namespace WordcloudSeries {
 
 /* *
  *
- * Export Default
+ *  Default Export
  *
  * */
+
 export default WordcloudSeries;
-
-/* *
- *
- * API Options
- *
- * */
-/**
- * A `wordcloud` series. If the [type](#series.wordcloud.type) option is not
- * specified, it is inherited from [chart.type](#chart.type).
- *
- * @extends   series,plotOptions.wordcloud
- * @exclude   dataSorting, boostThreshold, boostBlending
- * @product   highcharts
- * @requires  modules/wordcloud
- * @apioption series.wordcloud
- */
-
-/**
- * An array of data points for the series. For the `wordcloud` series type,
- * points can be given in the following ways:
- *
- * 1. An array of arrays with 2 values. In this case, the values correspond to
- *    `name,weight`.
- *    ```js
- *    data: [
- *        ['Lorem', 4],
- *        ['Ipsum', 1]
- *    ]
- *    ```
- *
- * 2. An array of objects with named values. The following snippet shows only a
- *    few settings, see the complete options set below. If the total number of
- *    data points exceeds the series'
- *    [turboThreshold](#series.arearange.turboThreshold), this option is not
- *    available.
- *    ```js
- *    data: [{
- *        name: "Lorem",
- *        weight: 4
- *    }, {
- *        name: "Ipsum",
- *        weight: 1
- *    }]
- *    ```
- *
- * @type      {Array<Array<string,number>|*>}
- * @extends   series.line.data
- * @excluding drilldown, marker, x, y
- * @product   highcharts
- * @apioption series.wordcloud.data
- */
-
-/**
- * The name decides the text for a word.
- *
- * @type      {string}
- * @since     6.0.0
- * @product   highcharts
- * @apioption series.wordcloud.data.name
- */
-
-/**
- * The weighting of a word. The weight decides the relative size of a word
- * compared to the rest of the collection.
- *
- * @type      {number}
- * @since     6.0.0
- * @product   highcharts
- * @apioption series.wordcloud.data.weight
- */
-
-''; // detach doclets above

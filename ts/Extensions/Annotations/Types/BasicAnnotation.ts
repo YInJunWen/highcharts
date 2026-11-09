@@ -1,6 +1,5 @@
 /* *
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -16,21 +15,16 @@ import type { AnnotationEventObject } from '../EventEmitter';
 import type Controllable from '../Controllables/Controllable';
 import type ControllableCircle from '../Controllables/ControllableCircle';
 import type ControllableEllipse from '../Controllables/ControllableEllipse';
-import type {
-    ControllableLabelOptions,
-    ControllableShapeOptions
-} from '../Controllables/ControllableOptions';
 import type ControllableRect from '../Controllables/ControllableRect';
 import type ControlPoint from '../ControlPoint';
-import type { ControlPointOptionsObject } from '../ControlPointOptions';
-import type MockPointOptions from '../MockPointOptions';
+import type ControlPointOptions from '../ControlPointOptions';
+import type { DeepPartial } from '../../../Shared/Types';
+import type MockPointOptions from '../AnnotationMockPointOptionsObject';
 import type PointerEvent from '../../../Core/PointerEvent';
 import type PositionObject from '../../../Core/Renderer/PositionObject';
 
 import Annotation from '../Annotation.js';
 import MockPoint from '../MockPoint.js';
-import U from '../../../Core/Utilities.js';
-const { merge } = U;
 
 /* *
  *
@@ -38,6 +32,7 @@ const { merge } = U;
  *
  * */
 
+/** @internal */
 class BasicAnnotation extends Annotation {
 
     /* *
@@ -62,8 +57,8 @@ class BasicAnnotation extends Annotation {
                 const xy = MockPoint
                     .pointToPixels(target.points[0]);
                 return {
-                    x: xy.x - this.graphic.width / 2,
-                    y: xy.y - this.graphic.height / 2
+                    x: xy.x - (this.graphic.width || 0) / 2,
+                    y: xy.y - (this.graphic.height || 0) / 2
                 };
             },
             // TRANSLATE POINT/ANCHOR
@@ -71,7 +66,7 @@ class BasicAnnotation extends Annotation {
                 drag: function (
                     this: Annotation,
                     e: AnnotationEventObject,
-                    target: Annotation
+                    target: Controllable
                 ): void {
                     const xy = this.mouseMoveToTranslation(e);
 
@@ -96,9 +91,9 @@ class BasicAnnotation extends Annotation {
                 }
                 return {
                     x: target.graphic.alignAttr.x -
-                        this.graphic.width / 2,
+                        (this.graphic.width || 0) / 2,
                     y: target.graphic.alignAttr.y -
-                        this.graphic.height / 2
+                        (this.graphic.height || 0) / 2
                 };
             },
             // TRANSLATE POSITION WITHOUT CHANGING THE
@@ -136,22 +131,28 @@ class BasicAnnotation extends Annotation {
                     target: ControllableRect
                 ): void {
                     const annotation = target.annotation,
-                        coords = this.chart.pointer.getCoordinates(e),
-                        x = coords.xAxis[0].value,
-                        y = coords.yAxis[0].value,
-                        points: Array<MockPointOptions> = target.options.points as any,
-                        shapes = annotation.userOptions.shapes;
+                        coords = this.chart.pointer?.getCoordinates(e),
+                        points: Array<MockPointOptions> =
+                            target.options.points as any,
+                        shapes = annotation.userOptions.shapes,
+                        xAxisIndex = annotation.clipXAxis?.index || 0,
+                        yAxisIndex = annotation.clipYAxis?.index || 0;
 
-                    // Top right point
-                    points[1].x = x;
-                    // Bottom right point (cursor position)
-                    points[2].x = x;
-                    points[2].y = y;
-                    // Bottom left
-                    points[3].y = y;
+                    if (coords) {
+                        const x = coords.xAxis[xAxisIndex].value,
+                            y = coords.yAxis[yAxisIndex].value;
 
-                    if (shapes && shapes[0]) {
-                        shapes[0].points = target.options.points;
+                        // Top right point
+                        points[1].x = x;
+                        // Bottom right point (cursor position)
+                        points[2].x = x;
+                        points[2].y = y;
+                        // Bottom left
+                        points[3].y = y;
+
+                        if (shapes?.[0]) {
+                            shapes[0].points = target.options.points as any;
+                        }
                     }
 
                     annotation.redraw(false);
@@ -168,9 +169,9 @@ class BasicAnnotation extends Annotation {
                     r: number = target.options.r as any;
                 return {
                     x: xy.x + r * Math.cos(Math.PI / 4) -
-                    this.graphic.width / 2,
+                    (this.graphic.width || 0) / 2,
                     y: xy.y + r * Math.sin(Math.PI / 4) -
-                    this.graphic.height / 2
+                    (this.graphic.height || 0) / 2
                 };
             },
             events: {
@@ -187,16 +188,15 @@ class BasicAnnotation extends Annotation {
 
                     target.setRadius(
                         Math.max(
-                            target.options.r +
-                                position.y /
-                                Math.sin(Math.PI / 4),
+                            (target.options.r || 0) +
+                                position.y / Math.sin(Math.PI / 4),
                             5
                         )
                     );
 
                     if (shapes && shapes[0]) {
                         shapes[0].r = target.options.r;
-                        shapes[0].point = target.options.point;
+                        shapes[0].point = target.options.point as any;
                     }
 
                     target.redraw(false);
@@ -211,8 +211,8 @@ class BasicAnnotation extends Annotation {
                 const position = target.getAbsolutePosition(target.points[0]);
 
                 return {
-                    x: position.x - this.graphic.width / 2,
-                    y: position.y - this.graphic.height / 2
+                    x: position.x - (this.graphic.width || 0) / 2,
+                    y: position.y - (this.graphic.height || 0) / 2
                 };
             },
             events: {
@@ -241,8 +241,8 @@ class BasicAnnotation extends Annotation {
                 const position = target.getAbsolutePosition(target.points[1]);
 
                 return {
-                    x: position.x - this.graphic.width / 2,
-                    y: position.y - this.graphic.height / 2
+                    x: position.x - (this.graphic.width || 0) / 2,
+                    y: position.y - (this.graphic.height || 0) / 2
                 };
             },
             events: {
@@ -274,9 +274,9 @@ class BasicAnnotation extends Annotation {
                     attrs = target.getAttrs(position, position2);
 
                 return {
-                    x: attrs.cx - this.graphic.width / 2 +
+                    x: attrs.cx - (this.graphic.width || 0) / 2 +
                         attrs.ry * Math.sin((attrs.angle * Math.PI) / 180),
-                    y: attrs.cy - this.graphic.height / 2 -
+                    y: attrs.cy - (this.graphic.height || 0) / 2 -
                         attrs.ry * Math.cos((attrs.angle * Math.PI) / 180)
                 };
             },
@@ -318,22 +318,13 @@ class BasicAnnotation extends Annotation {
      * */
 
     public addControlPoints(): void {
-        type ControllableOptionsType = (
-            ControllableLabelOptions|
-            ControllableShapeOptions
-        );
-
         const options = this.options,
             controlPoints = BasicAnnotation.basicControlPoints,
             annotationType = this.basicType,
-            optionsGroup: Array<ControllableOptionsType> = (
-                options.labels ||
-                options.shapes ||
-                []
-            );
+            optionsGroup = options.labels || options.shapes || [];
 
         optionsGroup.forEach((group): void => {
-            group.controlPoints = (controlPoints as any)[annotationType];
+            group.controlPoints = controlPoints[annotationType] as any;
         });
     }
 
@@ -343,10 +334,17 @@ class BasicAnnotation extends Annotation {
         if (options.shapes) {
             delete options.labelOptions;
             const type = options.shapes[0].type;
+
+            // TODO: Casting to be dropped by implementing this className
+            // option in both code and types. Currently neither work nor is
+            // documented properly.
+            (options.shapes[0] as any).className =
+                ((options.shapes[0] as any).className || '') +
+                ' highcharts-basic-shape';
             // The rectangle is rendered as a path, whereas other basic shapes
-            // are rendered as their respecitve SVG shapes.
+            // are rendered as their respective SVG shapes.
             if (type && type !== 'path') {
-                this.basicType = type;
+                this.basicType = type as keyof BasicAnnotation.ControlPoints;
             } else {
                 this.basicType = 'rectangle';
             }
@@ -354,7 +352,7 @@ class BasicAnnotation extends Annotation {
             delete options.shapes;
             this.basicType = 'label';
         }
-        Annotation.prototype.init.apply(this, arguments);
+        super.init.apply(this, arguments);
     }
 
 }
@@ -365,15 +363,11 @@ class BasicAnnotation extends Annotation {
  *
  * */
 
+/** @internal */
 interface BasicAnnotation {
-    basicType: string;
+    basicType: keyof BasicAnnotation.ControlPoints;
     defaultOptions: Annotation['defaultOptions'];
 }
-
-BasicAnnotation.prototype.defaultOptions = merge(
-    Annotation.prototype.defaultOptions,
-    {}
-);
 
 /* *
  *
@@ -381,12 +375,13 @@ BasicAnnotation.prototype.defaultOptions = merge(
  *
  * */
 
+/** @internal */
 namespace BasicAnnotation {
     export interface ControlPoints {
-        label: DeepPartial<ControlPointOptionsObject>[];
-        rectangle: DeepPartial<ControlPointOptionsObject>[];
-        ellipse: DeepPartial<ControlPointOptionsObject>[];
-        circle: DeepPartial<ControlPointOptionsObject>[];
+        label: DeepPartial<ControlPointOptions>[];
+        rectangle: DeepPartial<ControlPointOptions>[];
+        ellipse: DeepPartial<ControlPointOptions>[];
+        circle: DeepPartial<ControlPointOptions>[];
     }
 }
 
@@ -396,6 +391,7 @@ namespace BasicAnnotation {
  *
  * */
 
+/** @internal */
 declare module './AnnotationType' {
     interface AnnotationTypeRegistry {
         basicAnnotation: typeof BasicAnnotation;
@@ -410,4 +406,5 @@ Annotation.types.basicAnnotation = BasicAnnotation;
  *
  * */
 
+/** @internal */
 export default BasicAnnotation;

@@ -1,10 +1,12 @@
 /* *
  *
- *  (c) 2010-2021 Torstein Honsi
+ *  (c) 2010-2026 Highsoft AS
+ *  Author: Torstein Hønsi
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -22,22 +24,16 @@ import type SVGElement from '../../Core/Renderer/SVG/SVGElement';
 import type SVGLabel from '../../Core/Renderer/SVG/SVGLabel';
 import type SVGPath from '../../Core/Renderer/SVG/SVGPath';
 
-import SeriesRegistry from '../../Core/Series/SeriesRegistry.js';
-const {
-    area: {
-        prototype: {
-            pointClass: AreaPoint,
-            pointClass: {
-                prototype: areaProto
-            }
-        }
-    }
-} = SeriesRegistry.seriesTypes;
-import U from '../../Core/Utilities.js';
-const {
-    defined,
-    isNumber
-} = U;
+import AreaSeries from '../Area/AreaSeries.js';
+import { defined, isNumber } from '../../Shared/Utilities.js';
+
+/* *
+ *
+ *  Constants
+ *
+ * */
+
+const AreaPoint = AreaSeries.prototype.pointClass;
 
 /* *
  *
@@ -45,10 +41,23 @@ const {
  *
  * */
 
-declare module '../../Core/Series/PointLike' {
-    interface PointLike {
-        plotHigh?: AreaRangePoint['plotHigh'];
-        plotLow?: AreaRangePoint['plotLow'];
+declare module '../../Core/Series/PointBase' {
+    interface PointBase {
+        /**
+         * Range series only. The high or maximum value for each data point.
+         */
+        high?: number;
+
+        /**
+         * Range series only. The low or minimum value for each data point.
+         */
+        low?: number;
+
+        /** @internal */
+        plotHigh?: number;
+
+        /** @internal */
+        plotLow?: number;
     }
 }
 
@@ -66,45 +75,49 @@ class AreaRangePoint extends AreaPoint {
      *
      * */
 
+    /** @internal */
     public _plotY?: number;
 
+    /** @internal */
     public below?: boolean;
 
-    public dataLabelUpper?: SVGLabel;
+    /** @internal */
+    public dataLabelUpper?: SVGElement|SVGLabel;
 
+    /** @internal */
     public isInside?: boolean;
 
+    /** @internal */
     public isTopInside?: boolean;
 
-    /**
-     * Range series only. The high or maximum value for each data point.
-     * @name Highcharts.Point#high
-     * @type {number|undefined}
-     */
-    public high: number = void 0 as any;
+    /** @internal */
+    public high!: number;
 
-    /**
-     * Range series only. The low or minimum value for each data point.
-     * @name Highcharts.Point#low
-     * @type {number|undefined}
-     */
-    public low: number = void 0 as any;
+    /** @internal */
+    public low!: number;
 
-    public options: AreaRangePointOptions = void 0 as any;
+    public options!: AreaRangePointOptions;
 
+    /** @internal */
     public origProps?: Partial<AreaRangePoint>;
 
+    /** @internal */
     public plotHigh?: number;
 
+    /** @internal */
     public plotLow?: number;
 
+    /** @internal */
     public plotHighX?: number;
 
+    /** @internal */
     public plotLowX?: number;
 
-    public plotX: number = void 0 as any;
+    /** @internal */
+    public plotX!: number;
 
-    public series: AreaRangeSeries = void 0 as any;
+    /** @internal */
+    public series!: AreaRangeSeries;
 
     /* *
      *
@@ -113,7 +126,7 @@ class AreaRangePoint extends AreaPoint {
      * */
 
     /**
-     * @private
+     * @internal
      */
     public setState(): void {
         const prevState = this.state,
@@ -131,10 +144,8 @@ class AreaRangePoint extends AreaPoint {
             this.plotLow = this.plotY = series.yAxis.toPixels(this.low, true);
         }
 
-        if (series.stateMarkerGraphic) {
-            series.lowerStateMarkerGraphic = series.stateMarkerGraphic;
-            series.stateMarkerGraphic = series.upperStateMarkerGraphic;
-        }
+        series.lowerStateMarkerGraphic = series.stateMarkerGraphic;
+        series.stateMarkerGraphic = series.upperStateMarkerGraphic;
 
         // Change state also for the top marker
         this.graphic = this.graphics && this.graphics[1];
@@ -145,7 +156,7 @@ class AreaRangePoint extends AreaPoint {
         }
 
         // Top state:
-        areaProto.setState.apply(this, arguments as any);
+        super.setState.apply(this, arguments as any);
 
         this.state = prevState;
 
@@ -157,17 +168,22 @@ class AreaRangePoint extends AreaPoint {
             this.plotX = this.plotLowX;
         }
 
-        if (series.stateMarkerGraphic) {
-            series.upperStateMarkerGraphic = series.stateMarkerGraphic;
-            series.stateMarkerGraphic = series.lowerStateMarkerGraphic;
-            // Lower marker is stored at stateMarkerGraphic
-            // to avoid reference duplication (#7021)
-            series.lowerStateMarkerGraphic = void 0;
-        }
+        series.upperStateMarkerGraphic = series.stateMarkerGraphic;
+        series.stateMarkerGraphic = series.lowerStateMarkerGraphic;
+        // Lower marker is stored at stateMarkerGraphic
+        // to avoid reference duplication (#7021)
+        series.lowerStateMarkerGraphic = void 0;
 
-        areaProto.setState.apply(this, arguments as any);
+        const originalSettings = series.modifyMarkerSettings();
+
+        // Bottom state
+        super.setState.apply(this, arguments as any);
+
+        // Restore previous state
+        series.restoreMarkerSettings(originalSettings);
     }
 
+    /** @internal */
     public haloPath(): SVGPath {
         const isPolar = this.series.chart.polar;
 
@@ -180,7 +196,7 @@ class AreaRangePoint extends AreaPoint {
         }
 
         if (this.isInside) {
-            path = areaProto.haloPath.apply(this, arguments);
+            path = super.haloPath.apply(this, arguments);
         }
 
         // Top halo
@@ -190,13 +206,14 @@ class AreaRangePoint extends AreaPoint {
         }
         if (this.isTopInside) {
             path = path.concat(
-                areaProto.haloPath.apply(this, arguments)
+                super.haloPath.apply(this, arguments)
             );
         }
 
         return path;
     }
 
+    /** @internal */
     public isValid(): boolean {
         return isNumber(this.low) && isNumber(this.high);
     }
@@ -210,3 +227,24 @@ class AreaRangePoint extends AreaPoint {
  * */
 
 export default AreaRangePoint;
+
+/* *
+ *
+ *  API Options
+ *
+ * */
+
+/**
+ * Range series only. The high or maximum value for each data point.
+ *
+ * @name Highcharts.Point#high
+ * @type {number|undefined}
+ */
+/**
+ * Range series only. The low or minimum value for each data point.
+ *
+ * @name Highcharts.Point#low
+ * @type {number|undefined}
+ */
+
+''; // Keeps doclets above in JS file.

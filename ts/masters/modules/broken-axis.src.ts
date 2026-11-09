@@ -1,15 +1,19 @@
+// SPDX-License-Identifier: LicenseRef-Highcharts
 /**
  * @license Highcharts JS v@product.version@ (@product.date@)
  * @module highcharts/modules/broken-axis
  * @requires highcharts
  *
- * (c) 2009-2021 Torstein Honsi
+ * (c) 2009-2026 Highsoft AS
+ * Author: Torstein Hønsi
  *
- * License: www.highcharts.com/license
+ * A commercial license may be required depending on use,
+ * see www.highcharts.com/license
  */
 'use strict';
 import Highcharts from '../../Core/Globals.js';
 import BrokenAxis from '../../Core/Axis/BrokenAxis.js';
 const G: AnyRecord = Highcharts;
-// Compositions
-BrokenAxis.compose(G.Axis, G.Series);
+G.BrokenAxis = G.BrokenAxis || BrokenAxis;
+G.BrokenAxis.compose(G.Axis, G.Series);
+export default Highcharts;

@@ -1,8 +1,9 @@
 /* *
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -22,18 +23,10 @@ import type {
 } from './SlowStochasticOptions';
 import type SlowStochasticPoint from './SlowStochasticPoint';
 
+import SMAIndicator from '../SMA/SMAIndicator.js';
+import StochasticIndicator from '../Stochastic/StochasticIndicator.js';
 import SeriesRegistry from '../../../Core/Series/SeriesRegistry.js';
-const {
-    sma: {
-        prototype: smaProto
-    },
-    stochastic: StochasticIndicator
-} = SeriesRegistry.seriesTypes;
-import U from '../../../Core/Utilities.js';
-const {
-    extend,
-    merge
-} = U;
+import { extend, merge } from '../../../Shared/Utilities.js';
 
 /* *
  *
@@ -44,7 +37,6 @@ const {
 /**
  * The Slow Stochastic series type.
  *
- * @private
  * @class
  * @name Highcharts.seriesTypes.slowstochastic
  *
@@ -63,16 +55,17 @@ class SlowStochasticIndicator extends StochasticIndicator {
      * to be set and should be loaded after `stock/indicators/indicators.js`
      * and `stock/indicators/stochastic.js` files.
      *
-     * @sample stock/indicators/slow-stochastic
+     * @sample {highstock} stock/indicators/slow-stochastic
      *         Slow Stochastic oscillator
      *
      * @extends      plotOptions.stochastic
      * @since        8.0.0
      * @product      highstock
-     * @requires     stock/indicators/indicators
-     * @requires     stock/indicators/stochastic
-     * @requires     stock/indicators/slowstochastic
+     * @requires     indicators/indicators
+     * @requires     indicators/stochastic
+     * @requires     indicators/slow-stochastic
      * @optionparent plotOptions.slowstochastic
+     * @internal
      */
     public static defaultOptions: SlowStochasticOptions = merge(StochasticIndicator.defaultOptions, {
         params: {
@@ -92,9 +85,9 @@ class SlowStochasticIndicator extends StochasticIndicator {
      *
      * */
 
-    public data: Array<SlowStochasticPoint> = void 0 as any;
-    public options: SlowStochasticOptions = void 0 as any;
-    public points: Array<SlowStochasticPoint> = void 0 as any;
+    public data!: Array<SlowStochasticPoint>;
+    public options!: SlowStochasticOptions;
+    public points!: Array<SlowStochasticPoint>;
 
     /* *
      *
@@ -102,6 +95,7 @@ class SlowStochasticIndicator extends StochasticIndicator {
      *
      * */
 
+    /** @internal */
     public getValues <TLinkedSeries extends LineSeries>(
         series: TLinkedSeries,
         params: SlowStochasticParamsOptions
@@ -118,8 +112,6 @@ class SlowStochasticIndicator extends StochasticIndicator {
                 yData: [] as Array<Array<number>>
             };
 
-        let i = 0;
-
         if (!fastValues) {
             return;
         }
@@ -130,7 +122,7 @@ class SlowStochasticIndicator extends StochasticIndicator {
         // Get SMA(%D)
         const smoothedValues: (
             undefined|IndicatorValuesObject<LineSeries>
-        ) = smaProto.getValues.call(
+        ) = SMAIndicator.prototype.getValues.call(
             this,
             ({
                 xData: slowValues.xData,
@@ -146,10 +138,8 @@ class SlowStochasticIndicator extends StochasticIndicator {
             return;
         }
 
-        const xDataLen = slowValues.xData.length;
-
         // Format data
-        for (; i < xDataLen; i++) {
+        for (let i = 0, xDataLen = slowValues.xData.length; i < xDataLen; i++) {
 
             slowValues.yData[i] = [
                 fastYData[i][1],
@@ -217,10 +207,10 @@ export default SlowStochasticIndicator;
  * @extends   series,plotOptions.slowstochastic
  * @since     8.0.0
  * @product   highstock
- * @requires  stock/indicators/indicators
- * @requires  stock/indicators/stochastic
- * @requires  stock/indicators/slowstochastic
+ * @requires  indicators/indicators
+ * @requires  indicators/stochastic
+ * @requires  indicators/slow-stochastic
  * @apioption series.slowstochastic
  */
 
-''; // to include the above in the js output
+''; // To include the above in the js output

@@ -2,11 +2,13 @@
  *
  *  Dependency wheel module
  *
- *  (c) 2018-2021 Torstein Honsi
+ *  (c) 2018-2026 Highsoft AS
+ *  Author: Torstein Hønsi
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -20,25 +22,20 @@
 
 import type DependencyWheelSeriesOptions from './DependencyWheelSeriesOptions';
 
-import A from '../../Core/Animation/AnimationUtilities.js';
-const { animObject } = A;
+import { animObject } from '../../Core/Animation/AnimationUtilities.js';
+import { borderRadiusObject } from '../../Extensions/BorderRadius.js';
 import DependencyWheelPoint from './DependencyWheelPoint.js';
 import DependencyWheelSeriesDefaults from './DependencyWheelSeriesDefaults.js';
 import H from '../../Core/Globals.js';
 const { deg2rad } = H;
 import SankeyColumnComposition from '../Sankey/SankeyColumnComposition.js';
+import PieSeries from '../Pie/PieSeries.js';
+import SankeySeries from '../Sankey/SankeySeries.js';
 import SeriesRegistry from '../../Core/Series/SeriesRegistry.js';
-const {
-    seriesTypes: {
-        pie: PieSeries,
-        sankey: SankeySeries
-    }
-} = SeriesRegistry;
-import U from '../../Core/Utilities.js';
-const {
-    extend,
-    merge
-} = U;
+import SVGElement from '../../Core/Renderer/SVG/SVGElement.js';
+import { composeTextPath } from '../../Extensions/TextPath.js';
+import { extend, merge, relativeLength } from '../../Shared/Utilities.js';
+composeTextPath(SVGElement);
 
 /* *
  *
@@ -47,7 +44,6 @@ const {
  * */
 
 /**
- * @private
  * @class
  * @name Highcharts.seriesTypes.dependencywheel
  *
@@ -61,6 +57,7 @@ class DependencyWheelSeries extends SankeySeries {
      *
      * */
 
+    /** @internal */
     public static defaultOptions: DependencyWheelSeriesOptions = merge(
         SankeySeries.defaultOptions,
         DependencyWheelSeriesDefaults
@@ -72,15 +69,17 @@ class DependencyWheelSeries extends SankeySeries {
      *
      * */
 
-    public data: Array<DependencyWheelPoint> = void 0 as any;
+    public data!: Array<DependencyWheelPoint>;
 
-    public options: DependencyWheelSeriesOptions = void 0 as any;
+    public options!: DependencyWheelSeriesOptions;
 
-    public nodeColumns: Array<SankeyColumnComposition.ArrayComposition<DependencyWheelPoint>> = void 0 as any;
+    /** @internal */
+    public nodeColumns!: Array<SankeyColumnComposition.ArrayComposition<DependencyWheelPoint>>;
 
-    public nodes: Array<DependencyWheelPoint> = void 0 as any;
+    /** @internal */
+    public nodes!: Array<DependencyWheelPoint>;
 
-    public points: Array<DependencyWheelPoint> = void 0 as any;
+    public points!: Array<DependencyWheelPoint>;
 
     /* *
      *
@@ -88,93 +87,91 @@ class DependencyWheelSeries extends SankeySeries {
      *
      * */
 
-    /* eslint-disable valid-jsdoc */
-
+    /** @internal */
     public animate(init?: boolean): void {
+        const series = this;
+
         if (!init) {
-            const duration = animObject(this.options.animation).duration,
-                step = (duration / 2) / this.nodes.length;
-            this.nodes.forEach(function (point, i): void {
+            const duration = animObject(series.options.animation).duration,
+                step = (duration / 2) / series.nodes.length;
+
+            let i = 0;
+
+            for (const point of series.nodes) {
                 const graphic = point.graphic;
                 if (graphic) {
                     graphic.attr({ opacity: 0 });
-                    setTimeout(function (): void {
+                    setTimeout((): void => {
                         if (point.graphic) {
                             point.graphic.animate(
                                 { opacity: 1 },
                                 { duration: step }
                             );
                         }
-                    }, step * i);
+                    }, step * i++);
                 }
-            }, this);
-            this.points.forEach(function (point): void {
+            }
+
+            for (const point of series.points) {
                 const graphic = point.graphic;
                 if (!point.isNode && graphic) {
                     graphic.attr({ opacity: 0 })
                         .animate({
                             opacity: 1
-                        }, this.options.animation);
+                        }, series.options.animation);
                 }
-            }, this);
+            }
 
         }
     }
 
+    /** @internal */
     public createNode(id: string): DependencyWheelPoint {
-        const node = SankeySeries.prototype.createNode.call(
-            this,
-            id
-        ) as DependencyWheelPoint;
+        const node = super.createNode(id) as DependencyWheelPoint;
 
         /**
          * Return the sum of incoming and outgoing links.
-         * @private
+         * @internal
          */
-        node.getSum = function (
-            this: DependencyWheelPoint
-        ): number {
-            return node.linksFrom
-                .concat(node.linksTo)
-                .reduce(function (
-                    acc: number,
-                    link: DependencyWheelPoint
-                ): number {
-                    return acc + (link.weight as any);
-                }, 0);
+        node.getSum = (): number => {
+            let sum = 0;
+
+            for (const link of node.linksFrom) {
+                sum += link.weight || 0;
+            }
+            for (const link of node.linksTo) {
+                sum += link.weightTo || link.weight || 0;
+            }
+
+            return sum;
         };
 
         /**
          * Get the offset in weight values of a point/link.
-         * @private
+         * @internal
          */
-        node.offset = function (
+        node.offset = (
             point: DependencyWheelPoint
-        ): (number|undefined) {
+        ): (number|undefined) => {
+            const otherNode = (
+                link: DependencyWheelPoint
+            ): DependencyWheelPoint => (
+                link.fromNode === node ?
+                    link.toNode :
+                    link.fromNode
+            );
 
             let offset = 0,
-                i: number,
                 links = node.linksFrom.concat(node.linksTo),
                 sliced: (boolean|undefined);
 
-            /**
-             * @private
-             */
-            function otherNode(
-                link: DependencyWheelPoint
-            ): DependencyWheelPoint {
-                if (link.fromNode === node) {
-                    return link.toNode;
-                }
-                return link.fromNode;
-            }
-
             // Sort and slice the links to avoid links going out of each
             // node crossing each other.
-            links.sort(function (a, b): number {
-                return otherNode(a).index - otherNode(b).index;
-            });
-            for (i = 0; i < links.length; i++) {
+            links.sort((a, b): number => (
+                otherNode(a).index - otherNode(b).index
+            ));
+
+            for (let i = 0; i < links.length; i++) {
                 if (otherNode(links[i]).index > node.index) {
                     links = links.slice(0, i).reverse().concat(
                         links.slice(i).reverse()
@@ -183,15 +180,20 @@ class DependencyWheelSeries extends SankeySeries {
                     break;
                 }
             }
+
             if (!sliced) {
                 links.reverse();
             }
 
-            for (i = 0; i < links.length; i++) {
+            for (let i = 0; i < links.length; i++) {
                 if (links[i] === point) {
                     return offset;
                 }
-                offset += links[i].weight as any;
+
+                const baseWeight = links[i].weight || 0;
+                offset += links[i].to === node.id ?
+                    links[i].weightTo || baseWeight :
+                    baseWeight;
             }
         };
 
@@ -200,50 +202,56 @@ class DependencyWheelSeries extends SankeySeries {
 
     /**
      * Dependency wheel has only one column, it runs along the perimeter.
-     * @private
+     * @internal
      */
     public createNodeColumns(): Array<SankeyColumnComposition.ArrayComposition> {
-        const columns = [SankeyColumnComposition.compose([], this)];
-        this.nodes.forEach(function (
-            node: DependencyWheelPoint
-        ): void {
+        const series = this,
+            columns = [SankeyColumnComposition.compose([], series)];
+
+        for (const node of series.nodes) {
             node.column = 0;
             columns[0].push(node);
-        });
+        }
+
         return columns;
     }
 
     /**
      * Translate from vertical pixels to perimeter.
-     * @private
+     * @internal
      */
     public getNodePadding(): number {
         return (this.options.nodePadding as any) / Math.PI;
     }
 
     /**
-     * @private
+     * @ignore
      * @todo Override the refactored sankey translateLink and translateNode
      * functions instead of the whole translate function.
      */
     public translate(): void {
-
-        const options = this.options,
+        const series = this,
+            options = series.options,
             factor = 2 * Math.PI /
-                (this.chart.plotHeight + this.getNodePadding()),
-            center = this.getCenter(),
-            startAngle = ((options.startAngle as any) - 90) * deg2rad;
+                (series.chart.plotHeight + series.getNodePadding()),
+            center = series.getCenter(),
+            startAngle = ((options.startAngle || 0) - 90) * deg2rad,
+            borderRadius = borderRadiusObject(
+                options.borderRadius
+            ).radius;
 
-        SankeySeries.prototype.translate.call(this);
+        super.translate();
 
-        this.nodeColumns[0].forEach(function (node): void {
+        for (const node of this.nodeColumns[0]) {
             // Don't render the nodes if sum is 0 #12453
             if (node.sum) {
                 const shapeArgs = node.shapeArgs,
                     centerX = center[0],
                     centerY = center[1],
                     r = center[2] / 2,
-                    innerR = r - (options.nodeWidth as any),
+                    nodeWidth = options.nodeWidth === 'auto' ?
+                        20 : options.nodeWidth,
+                    innerR = r - relativeLength(nodeWidth || 0, r),
                     start = startAngle + factor * (shapeArgs.y || 0),
                     end = startAngle +
                         factor * ((shapeArgs.y || 0) + (shapeArgs.height || 0));
@@ -258,7 +266,8 @@ class DependencyWheelSeries extends SankeySeries {
                     r: r,
                     innerR: innerR,
                     start: start,
-                    end: end
+                    end: end,
+                    borderRadius
                 };
 
                 node.dlBox = {
@@ -269,21 +278,24 @@ class DependencyWheelSeries extends SankeySeries {
                 };
 
                 // Draw the links from this node
-                node.linksFrom.forEach(function (point): void {
+                for (const point of node.linksFrom) {
                     if (point.linkBase) {
-                        let distance;
-                        const corners = point.linkBase.map(function (
+                        let curveFactor: number,
+                            distance: number;
+
+                        const corners = point.linkBase.map((
                             top: number,
                             i: number
-                        ): Record<string, number> {
-                            let angle = factor * top,
+                        ): Record<string, number> => {
+                            const angle = factor * top,
                                 x = Math.cos(startAngle + angle) * (innerR + 1),
-                                y = Math.sin(startAngle + angle) * (innerR + 1),
-                                curveFactor: number = options.curveFactor || 0;
+                                y = Math.sin(startAngle + angle) * (innerR + 1);
+
+                            curveFactor = options.curveFactor || 0;
 
                             // The distance between the from and to node
                             // along the perimeter. This affect how curved
-                            // the link is, so that links between neighbours
+                            // the link is, so that links between neighbors
                             // don't extend too far towards the center.
                             distance = Math.abs(
                                 point.linkBase[3 - i] * factor - angle
@@ -295,7 +307,6 @@ class DependencyWheelSeries extends SankeySeries {
                             if (distance < innerR) {
                                 curveFactor *= (distance / innerR);
                             }
-
 
                             return {
                                 x: centerX + x,
@@ -313,8 +324,8 @@ class DependencyWheelSeries extends SankeySeries {
                                 'A',
                                 innerR, innerR,
                                 0,
-                                0, // long arc
-                                1, // clockwise
+                                0, // Long arc
+                                1, // Clockwise
                                 corners[1].x, corners[1].y
                             ], [
                                 'C',
@@ -336,14 +347,43 @@ class DependencyWheelSeries extends SankeySeries {
                             ]]
                         };
                     }
-
-                });
+                }
             }
-        });
+        }
     }
 
-    /* eslint-enable valid-jsdoc */
+    /**
+     * Run translation operations for one link.
+     * @internal
+     */
+    public translateLink(point: DependencyWheelPoint): void {
+        const linkToHeight = Math.max(
+            (point.weightTo || point.weight || 0) * this.translationFactor,
+            this.options.minLinkWidth || 0
+        );
+        const linkToY = this.getY(point, point.toNode, 'linksTo', linkToHeight);
 
+        // Translate the link
+        super.translateLink(point, linkToY);
+
+        // Override the last linkBase value
+        point.linkBase[3] = linkToY + linkToHeight;
+    }
+
+    /**
+     * Run translation operations for one node.
+     * @internal
+     */
+    public translateNode(
+        node: DependencyWheelPoint,
+        column: SankeyColumnComposition.ArrayComposition<DependencyWheelPoint>
+    ): void {
+        super.translateNode(node, column);
+
+        // Calculate the sum of incoming links weight and
+        // outgoing links weightTo.
+        node.sumTo = node.getSumTo();
+    }
 }
 
 /* *
@@ -353,13 +393,18 @@ class DependencyWheelSeries extends SankeySeries {
  * */
 
 interface DependencyWheelSeries {
+    /** @internal */
     getCenter: typeof PieSeries.prototype.getCenter;
+    /** @internal */
     orderNodes: boolean;
+    /** @internal */
     pointClass: typeof DependencyWheelPoint;
 }
 extend(DependencyWheelSeries.prototype, {
     orderNodes: false,
-    getCenter: PieSeries.prototype.getCenter
+    pointArrayMap: ['from', 'to', 'weight', 'weightTo'],
+    getCenter: PieSeries.prototype.getCenter,
+    useCircularLayout: false
 });
 
 /* *

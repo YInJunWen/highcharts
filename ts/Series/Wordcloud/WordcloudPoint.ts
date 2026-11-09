@@ -2,12 +2,13 @@
  *
  *  Experimental Highcharts module which enables visualization of a word cloud.
  *
- *  (c) 2016-2021 Highsoft AS
- *  Authors: Jon Arild Nygard
+ *  (c) 2016-2026 Highsoft AS
+ *  Authors: Jon Arild Nygård
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  * */
 
 'use strict';
@@ -23,45 +24,57 @@ import type SizeObject from '../../Core/Renderer/SizeObject';
 import type WordcloudPointOptions from './WordcloudPointOptions';
 import type WordcloudUtils from './WordcloudUtils';
 
-import SeriesRegistry from '../../Core/Series/SeriesRegistry.js';
-const {
-    seriesTypes: {
-        column: {
-            prototype: {
-                pointClass: ColumnPoint
-            }
-        }
-    }
-} = SeriesRegistry;
-import U from '../../Core/Utilities.js';
-const { extend } = U;
+import ColumnSeries from '../Column/ColumnSeries.js';
 import WordcloudSeries from './WordcloudSeries';
+import { extend } from '../../Shared/Utilities.js';
+
+/* *
+ *
+ *  Constants
+ *
+ * */
+
+const ColumnPoint = ColumnSeries.prototype.pointClass;
+
+/* *
+ *
+ *  Class
+ *
+ * */
 
 class WordcloudPoint extends ColumnPoint {
 
     /* *
      *
-     * Properties
+     *  Properties
      *
      * */
 
-    public dimensions: SizeObject = void 0 as any;
+    /** @internal */
+    public dimensions!: SizeObject;
+    /** @internal */
     public lastCollidedWith?: WordcloudPoint;
-    public options: WordcloudPointOptions = void 0 as any;
-    public polygon?: WordcloudUtils.PolygonObject = void 0 as any;
-    public rect?: PolygonBoxObject = void 0 as any;
+    public options!: WordcloudPointOptions;
+    /** @internal */
+    public polygon?: WordcloudUtils.PolygonObject;
+    /** @internal */
+    public rect?: PolygonBoxObject;
+    /** @internal */
     public rotation?: (boolean|number);
-    public series: WordcloudSeries = void 0 as any;
+    /** @internal */
+    public series!: WordcloudSeries;
 
     /* *
      *
-     * Functions
+     *  Functions
      *
      * */
 
+    /** @internal */
     public isValid(): boolean {
         return true;
     }
+
 }
 
 /* *
@@ -71,6 +84,7 @@ class WordcloudPoint extends ColumnPoint {
  * */
 
 interface WordcloudPoint {
+    /** @internal */
     weight: number;
 }
 

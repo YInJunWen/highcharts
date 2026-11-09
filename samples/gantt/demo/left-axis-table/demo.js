@@ -7,22 +7,22 @@ Highcharts.ganttChart('container', {
     lang: {
         accessibility: {
             axis: {
-                xAxisDescriptionPlural: 'The chart has a two-part X axis showing time in both week numbers and days.',
-                yAxisDescriptionSingular: 'The chart has a tabular Y axis showing a data table row for each point.'
+                xAxisDescriptionPlural: 'The chart has a two-part X axis ' +
+                    'showing time in both week numbers and days.',
+                yAxisDescriptionSingular: 'The chart has a tabular Y axis ' +
+                    'showing a data table row for each point.'
             }
         }
     },
 
     accessibility: {
         point: {
-            descriptionFormatter: function (point) {
-                return Highcharts.format(
-                    point.milestone ?
-                        '{point.name}, milestone for {point.assignee} at {point.x:%Y-%m-%d}.' :
-                        '{point.name}, assigned to {point.assignee} from {point.x:%Y-%m-%d} to {point.x2:%Y-%m-%d}.',
-                    { point }
-                );
-            }
+            descriptionFormat: '{#if milestone}' +
+                '{name}, milestone for {yCategory} at {x:%Y-%m-%d}.' +
+                '{else}' +
+                '{name}, assigned to {yCategory} from {x:%Y-%m-%d} to ' +
+                '{x2:%Y-%m-%d}.' +
+                '{/if}'
         }
     },
 
@@ -34,8 +34,6 @@ Highcharts.ganttChart('container', {
         type: 'category',
         grid: {
             enabled: true,
-            borderColor: 'rgba(0,0,0,0.3)',
-            borderWidth: 1,
             columns: [{
                 title: {
                     text: 'Project'
@@ -55,12 +53,8 @@ Highcharts.ganttChart('container', {
                     text: 'Est. days'
                 },
                 labels: {
-                    formatter: function () {
-                        var point = this.point,
-                            days = (1000 * 60 * 60 * 24),
-                            number = (point.x2 - point.x) / days;
-                        return Math.round(number * 100) / 100;
-                    }
+                    format: '{(divide (subtract point.x2 point.x) ' +
+                        '86400000):.2f}'
                 }
             }, {
                 labels: {
@@ -88,33 +82,33 @@ Highcharts.ganttChart('container', {
     series: [{
         name: 'Project 1',
         data: [{
-            start: Date.UTC(2017, 10, 18, 8),
-            end: Date.UTC(2017, 10, 25, 16),
+            start: '2017-11-18 08:00',
+            end: '2017-11-25 16:00',
             name: 'Start prototype',
             assignee: 'Richards',
             y: 0
         }, {
-            start: Date.UTC(2017, 10, 20, 8),
-            end: Date.UTC(2017, 10, 24, 16),
+            start: '2017-11-20 08:00',
+            end: '2017-11-24 16:00',
             name: 'Develop',
             assignee: 'Michaels',
             y: 1
         }, {
-            start: Date.UTC(2017, 10, 25, 16),
-            end: Date.UTC(2017, 10, 25, 16),
+            start: '2017-11-25 16:00',
+            end: '2017-11-25 16:00',
             name: 'Prototype done',
             assignee: 'Richards',
             milestone: true,
             y: 2
         }, {
-            start: Date.UTC(2017, 10, 27, 8),
-            end: Date.UTC(2017, 11, 3, 16),
+            start: '2017-11-27 08:00',
+            end: '2017-12-03 16:00',
             name: 'Test prototype',
             assignee: 'Richards',
             y: 3
         }, {
-            start: Date.UTC(2017, 10, 23, 8),
-            end: Date.UTC(2017, 11, 15, 16),
+            start: '2017-11-23 08:00',
+            end: '2017-12-15 16:00',
             name: 'Run acceptance tests',
             assignee: 'Halliburton',
             y: 4

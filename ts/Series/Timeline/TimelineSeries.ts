@@ -2,17 +2,20 @@
  *
  *  Timeline Series.
  *
- *  (c) 2010-2021 Highsoft AS
+ *  (c) 2010-2026 Highsoft AS
  *
  *  Author: Daniel Studencki
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
 'use strict';
+
+/* eslint @typescript-eslint/no-unused-vars: ["error", { "argsIgnorePattern": "^_" }] */
 
 /* *
  *
@@ -21,44 +24,28 @@
  * */
 
 import type BBoxObject from '../../Core/Renderer/BBoxObject';
+import type CSSObject from '../../Core/Renderer/CSSObject';
 import type RangeSelector from '../../Stock/RangeSelector/RangeSelector';
-import type {
-    TimelineDataLabelContextObject,
-    TimelineDataLabelOptions
-} from './TimelineDataLabelOptions';
+import type TimelineDataLabelOptions from './TimelineDataLabelOptions';
 import type TimelinePointOptions from './TimelinePointOptions';
 import type TimelineSeriesOptions from './TimelineSeriesOptions';
-import type Point from '../../Core/Series/Point';
-import type {
-    PointMarkerOptions,
-    PointStatesOptions
-} from '../../Core/Series/PointOptions';
-import type { SeriesStatesOptions } from '../../Core/Series/SeriesOptions';
 import type { StatesOptionsKey } from '../../Core/Series/StatesOptions';
 import type SVGAttributes from '../../Core/Renderer/SVG/SVGAttributes';
 import type SVGLabel from '../../Core/Renderer/SVG/SVGLabel';
 
-import LegendSymbol from '../../Core/Legend/LegendSymbol.js';
-import { Palette } from '../../Core/Color/Palettes.js';
+import ColumnSeries from '../Column/ColumnSeries.js';
+import LineSeries from '../Line/LineSeries.js';
 import SeriesRegistry from '../../Core/Series/SeriesRegistry.js';
-const {
-    seriesTypes: {
-        column: ColumnSeries,
-        line: LineSeries
-    }
-} = SeriesRegistry;
-import SVGElement from '../../Core/Renderer/SVG/SVGElement.js';
 import TimelinePoint from './TimelinePoint.js';
-import U from '../../Core/Utilities.js';
-const {
+import TimelineSeriesDefaults from './TimelineSeriesDefaults.js';
+import {
     addEvent,
     arrayMax,
     arrayMin,
     defined,
     extend,
-    merge,
-    pick
-} = U;
+    merge
+} from '../../Shared/Utilities.js';
 
 /* *
  *
@@ -83,181 +70,11 @@ class TimelineSeries extends LineSeries {
      *
      * */
 
-    /**
-     * The timeline series presents given events along a drawn line.
-     *
-     * @sample highcharts/series-timeline/alternate-labels
-     *         Timeline series
-     * @sample highcharts/series-timeline/inverted
-     *         Inverted timeline
-     * @sample highcharts/series-timeline/datetime-axis
-     *         With true datetime axis
-     *
-     * @extends      plotOptions.line
-     * @since        7.0.0
-     * @product      highcharts
-     * @excluding    animationLimit, boostThreshold, connectEnds, connectNulls,
-     *               cropThreshold, dashStyle, findNearestPointBy,
-     *               getExtremesFromAll, negativeColor, pointInterval,
-     *               pointIntervalUnit, pointPlacement, pointStart,
-     *               softThreshold, stacking, step, threshold, turboThreshold,
-     *               zoneAxis, zones, dataSorting, boostBlending
-     * @requires     modules/timeline
-     * @optionparent plotOptions.timeline
-     *
-     * @private
-     */
-    public static defaultOptions: TimelineSeriesOptions = merge(LineSeries.defaultOptions, {
-        colorByPoint: true,
-        stickyTracking: false,
-        ignoreHiddenPoint: true,
-        /**
-         * @ignore
-         * @private
-         */
-        legendType: 'point',
-        lineWidth: 4,
-        tooltip: {
-            headerFormat: '<span style="color:{point.color}">\u25CF</span> ' +
-                '<span style="font-size: 10px"> {point.key}</span><br/>',
-            pointFormat: '{point.description}'
-        },
-        states: {
-            hover: {
-                lineWidthPlus: 0
-            }
-        },
-        /**
-         * @declare Highcharts.TimelineDataLabelsOptionsObject
-         *
-         * @private
-         */
-        dataLabels: {
-
-            enabled: true,
-
-            allowOverlap: true,
-
-            /**
-             * Whether to position data labels alternately. For example, if
-             * [distance](#plotOptions.timeline.dataLabels.distance)
-             * is set equal to `100`, then data labels will be positioned
-             * alternately (on both sides of the point) at a distance of 100px.
-             *
-             * @sample {highcharts} highcharts/series-timeline/alternate-disabled
-             *         Alternate disabled
-             */
-            alternate: true,
-
-            backgroundColor: Palette.backgroundColor,
-
-            borderWidth: 1,
-
-            borderColor: Palette.neutralColor40,
-
-            borderRadius: 3,
-
-            color: Palette.neutralColor80,
-
-            /**
-             * The color of the line connecting the data label to the point.
-             * The default color is the same as the point's color.
-             *
-             * In styled mode, the connector stroke is given in the
-             * `.highcharts-data-label-connector` class.
-             *
-             * @sample {highcharts} highcharts/series-timeline/connector-styles
-             *         Custom connector width and color
-             *
-             * @type      {Highcharts.ColorString|Highcharts.GradientColorObject|Highcharts.PatternObject}
-             * @apioption plotOptions.timeline.dataLabels.connectorColor
-             */
-
-            /**
-             * The width of the line connecting the data label to the point.
-             *
-             * In styled mode, the connector stroke width is given in the
-             * `.highcharts-data-label-connector` class.
-             *
-             * @sample {highcharts} highcharts/series-timeline/connector-styles
-             *         Custom connector width and color
-             */
-            connectorWidth: 1,
-
-            /**
-             * A pixel value defining the distance between the data label and
-             * the point. Negative numbers puts the label on top of the point.
-             */
-            distance: 100,
-
-            // eslint-disable-next-line valid-jsdoc
-            /**
-             * @type    {Highcharts.TimelineDataLabelsFormatterCallbackFunction}
-             * @default function () {
-             *   let format;
-             *
-             *   if (!this.series.chart.styledMode) {
-             *       format = '<span style="color:' + this.point.color +
-             *           '">● </span>';
-             *   } else {
-             *       format = '<span>● </span>';
-             *   }
-             *   format += '<span>' + (this.key || '') + '</span><br/>' +
-             *       (this.point.label || '');
-             *   return format;
-             * }
-             */
-            formatter: function (
-                this: (Point.PointLabelObject|TimelineDataLabelContextObject)
-            ): string {
-                let format;
-
-                if (!this.series.chart.styledMode) {
-                    format = '<span style="color:' + this.point.color +
-                        '">● </span>';
-                } else {
-                    format = '<span>● </span>';
-                }
-                format += '<span class="highcharts-strong">' +
-                    ((this as any).key || '') + '</span><br/>' +
-                    ((this.point as any).label || '');
-                return format;
-            },
-
-            style: {
-                /** @internal */
-                textOutline: 'none',
-                /** @internal */
-                fontWeight: 'normal',
-                /** @internal */
-                fontSize: '12px'
-            },
-
-            /**
-             * Shadow options for the data label.
-             *
-             * @type {boolean|Highcharts.CSSObject}
-             */
-            shadow: false,
-
-            /**
-             * @type      {number}
-             * @apioption plotOptions.timeline.dataLabels.width
-             */
-
-            verticalAlign: 'middle'
-
-        },
-        marker: {
-            enabledThreshold: 0,
-            symbol: 'square',
-            radius: 6,
-            lineWidth: 2,
-            height: 15
-        },
-        showInLegend: false,
-        colorKey: 'x'
-    } as TimelineSeriesOptions);
+    /** @internal */
+    public static defaultOptions: TimelineSeriesOptions = merge(
+        LineSeries.defaultOptions,
+        TimelineSeriesDefaults
+    );
 
     /* *
      *
@@ -265,19 +82,20 @@ class TimelineSeries extends LineSeries {
      *
      * */
 
-    public data: Array<TimelinePoint> = void 0 as any;
+    public data!: Array<TimelinePoint>;
 
-    public options: TimelineSeriesOptions = void 0 as any;
+    public options!: TimelineSeriesOptions;
 
-    public points: Array<TimelinePoint> = void 0 as any;
+    public points!: Array<TimelinePoint>;
 
-    public userOptions: TimelineSeriesOptions = void 0 as any;
+    /** @internal */
+    public userOptions!: TimelineSeriesOptions;
 
-    public visibilityMap: Array<(boolean|TimelinePoint|TimelinePointOptions)> = void 0 as any;
+    /** @internal */
+    public visibilityMap!: Array<(boolean|TimelinePoint|TimelinePointOptions)>;
 
+    /** @internal */
     public visiblePointsCount?: number;
-
-    public yData?: Array<number>;
 
     /* *
      *
@@ -285,22 +103,19 @@ class TimelineSeries extends LineSeries {
      *
      * */
 
-    /* eslint-disable valid-jsdoc */
-
+    /** @internal */
     public alignDataLabel(
         point: TimelinePoint,
         dataLabel: SVGLabel,
         _options: TimelineDataLabelOptions,
         _alignTo: BBoxObject
     ): void {
-        let series = this,
+        const series = this,
             isInverted = series.chart.inverted,
-            visiblePoints = series.visibilityMap.filter(function (
-                point
-            ): boolean {
-                return point as any;
-            }),
-            visiblePointsCount: number = series.visiblePointsCount as any,
+            visiblePoints = series.visibilityMap.filter(
+                (point?): boolean => !!point
+            ),
+            visiblePointsCount = series.visiblePointsCount || 0,
             pointIndex = visiblePoints.indexOf(point),
             isFirstOrLast = (
                 !pointIndex || pointIndex === visiblePointsCount - 1
@@ -317,13 +132,14 @@ class TimelineSeries extends LineSeries {
             multiplier = dataLabelsOptions.alternate ?
                 (isFirstOrLast ? 1.5 : 2) :
                 1,
-            distance,
             availableSpace = Math.floor(
                 series.xAxis.len / visiblePointsCount
             ),
-            pad = dataLabel.padding,
-            targetDLWidth,
-            styles;
+            pad = dataLabel.padding;
+
+        let distance: number,
+            targetDLWidth: number,
+            styles: CSSObject;
 
         // Adjust data label width to the currently available space.
         if (point.visible) {
@@ -331,14 +147,16 @@ class TimelineSeries extends LineSeries {
                 userDLOptions.x || (point.options.dataLabels as any).x
             );
             if (isInverted) {
+
                 targetDLWidth = (
-                    (distance - pad) * 2 - ((point.itemHeight as any) / 2)
+                    (distance - pad) * 2 - ((point.itemHeight || 0) / 2)
                 );
                 styles = {
-                    width: targetDLWidth + 'px',
+                    width: (dataLabelsOptions.style?.width ?? `${series.yAxis.len * 0.4}px`),
                     // Apply ellipsis when data label height is exceeded.
-                    textOverflow: dataLabel.width / targetDLWidth *
-                        dataLabel.height / 2 > availableSpace * multiplier ?
+                    textOverflow: (dataLabel.width || 0) / targetDLWidth *
+                        (dataLabel.height || 0) / 2 > availableSpace *
+                        multiplier ?
                         'ellipsis' : 'none'
                 };
             } else {
@@ -359,74 +177,94 @@ class TimelineSeries extends LineSeries {
         super.alignDataLabel.apply(series, arguments);
     }
 
+    /** @internal */
     public bindAxes(): void {
         const series = this;
 
-        super.bindAxes.call(series);
+        super.bindAxes();
 
-        ['xAxis', 'yAxis'].forEach(function (axis): void {
-            // Initially set the linked xAxis type to category.
-            if (axis === 'xAxis' && !series[axis].userOptions.type) {
-                series[axis].categories = series[axis].hasNames = true as any;
-            }
-        });
-    }
-
-    public distributeDL(): void {
-        const series = this,
-            dataLabelsOptions = series.options.dataLabels;
-        let visibilityIndex = 1;
-
-        if (dataLabelsOptions) {
-            const distance = dataLabelsOptions.distance || 0;
-
-            series.points.forEach((point): void => {
-                point.options.dataLabels = merge({
-                    [series.chart.inverted ? 'x' : 'y']:
-                        dataLabelsOptions.alternate && visibilityIndex % 2 ?
-                            -distance : distance
-                }, point.userDLOptions);
-                visibilityIndex++;
-            });
+        // Initially set the linked xAxis type to category.
+        if (!series.xAxis.userOptions.type) {
+            series.xAxis.categories = series.xAxis.hasNames = true as any;
         }
     }
 
-    public generatePoints(): void {
-        const series = this;
+    /** @internal */
+    public distributeDL(): void {
+        const series = this,
+            dataLabelsOptions = series.options.dataLabels,
+            inverted = series.chart.inverted;
+        let visibilityIndex = 1;
 
-        super.generatePoints.apply(series);
-        series.points.forEach(function (point, i): void {
-            point.applyOptions({
-                x: (series.xData as any)[i]
-            }, (series.xData as any)[i]);
-        });
+        if (dataLabelsOptions) {
+            const distance = dataLabelsOptions.distance ??
+                (inverted ? 20 : 100);
+
+            for (const point of series.points) {
+                const defaults: TimelineDataLabelOptions = {
+                    [inverted ? 'x' : 'y']:
+                        dataLabelsOptions.alternate && visibilityIndex % 2 ?
+                            -distance : distance
+                };
+                if (inverted) {
+                    defaults.align = (
+                        dataLabelsOptions.alternate && visibilityIndex % 2
+                    ) ? 'right' : 'left';
+                }
+                point.options.dataLabels = merge(
+                    defaults,
+                    point.userDLOptions,
+                    // Forced. Point level limitations.
+                    { zIndex: void 0 }
+                );
+                // Delete so it doesn't override anything on merge.
+                delete point.options.dataLabels.zIndex;
+
+                visibilityIndex++;
+            }
+        }
     }
 
+    /** @internal */
+    public generatePoints(): void {
+        super.generatePoints();
+
+        const series = this,
+            points = series.points,
+            pointsLen = points.length,
+            xData = series.getColumn('x');
+
+        for (let i = 0, iEnd = pointsLen; i < iEnd; ++i) {
+            points[i].x = xData[i];
+        }
+    }
+
+    /** @internal */
     public getVisibilityMap(): Array<(boolean|TimelinePoint|TimelinePointOptions)> {
         const series = this,
-            map = (series.data.length ?
-                series.data : (series.userOptions.data as any)
-            ).map(function (
+            nullInteraction = series.options.nullInteraction,
+            map = (
+                (series.data.length ? series.data : series.options.data) || []
+            ).map((
                 point: (TimelinePoint|TimelinePointOptions)
-            ): (boolean|TimelinePoint|TimelinePointOptions) {
-                return (
-                    point &&
-                    point.visible !== false &&
-                    !point.isNull
-                ) ? point : false;
-            });
+            ): (boolean|TimelinePoint|TimelinePointOptions) => (
+                point &&
+                point.visible !== false &&
+                (!point.isNull || nullInteraction) ?
+                    point :
+                    false
+            ));
+
         return map;
     }
 
+    /** @internal */
     public getXExtremes(xData: Array<number>): RangeSelector.RangeObject {
         const series = this,
-            filteredData = xData.filter(function (
-                x: number,
-                i: number
-            ): boolean {
-                return series.points[i].isValid() &&
-                    series.points[i].visible;
-            });
+            filteredData = xData.filter((_x, i): boolean => (
+                series.points[i].isValid() &&
+                series.points[i].visible
+            ));
 
         return {
             min: arrayMin(filteredData),
@@ -434,6 +272,7 @@ class TimelineSeries extends LineSeries {
         };
     }
 
+    /** @internal */
     public init(): void {
         const series = this;
 
@@ -446,7 +285,7 @@ class TimelineSeries extends LineSeries {
                 let lastPlotX: (number|undefined),
                     closestPointRangePx = Number.MAX_VALUE;
 
-                series.points.forEach(function (point): void {
+                for (const point of series.points) {
                     // Set the isInside parameter basing also on the real point
                     // visibility, in order to avoid showing hidden points
                     // in drawPoints method.
@@ -454,7 +293,12 @@ class TimelineSeries extends LineSeries {
 
                     // New way of calculating closestPointRangePx value, which
                     // respects the real point visibility is needed.
-                    if (point.visible && !point.isNull) {
+                    if (
+                        point.visible && (
+                            !point.isNull ||
+                            series.options.nullInteraction
+                        )
+                    ) {
                         if (defined(lastPlotX)) {
                             closestPointRangePx = Math.min(
                                 closestPointRangePx,
@@ -463,7 +307,7 @@ class TimelineSeries extends LineSeries {
                         }
                         lastPlotX = point.plotX;
                     }
-                });
+                }
                 series.closestPointRangePx = closestPointRangePx;
             }
         ));
@@ -487,7 +331,7 @@ class TimelineSeries extends LineSeries {
                 let dataLabel; // @todo use this scope for series
 
                 // Draw or align connector for each point.
-                series.points.forEach(function (point): void {
+                for (const point of series.points) {
                     dataLabel = point.dataLabel;
 
                     if (dataLabel) {
@@ -502,24 +346,22 @@ class TimelineSeries extends LineSeries {
                             if (this.targetPosition) {
                                 this.targetPosition = params;
                             }
-                            return SVGElement.prototype.animate.apply(
-                                this,
-                                arguments
-                            ) as SVGLabel;
+                            return this.renderer.Element.prototype
+                                .animate.apply(this, arguments) as SVGLabel;
                         };
 
                         // Initialize the targetPosition field within data label
                         // object. It's necessary because there is need to know
                         // expected position of specific data label, when
-                        // aligning connectors. This field is overrided inside
-                        // of SVGElement.animate() wrapped  method.
+                        // aligning connectors. This field is overridden inside
+                        // of SVGElement.animate() wrapped method.
                         if (!dataLabel.targetPosition) {
                             dataLabel.targetPosition = {};
                         }
 
-                        return point.drawConnector();
+                        point.drawConnector();
                     }
-                });
+                }
             }
         ));
 
@@ -527,106 +369,108 @@ class TimelineSeries extends LineSeries {
             series.chart,
             'afterHideOverlappingLabel',
             function (): void {
-                series.points.forEach(function (p): void {
+                for (const p of series.points) {
                     if (
-                        p.connector &&
                         p.dataLabel &&
+                        p.dataLabel.connector &&
                         p.dataLabel.oldOpacity !== p.dataLabel.newOpacity
                     ) {
                         p.alignConnector();
                     }
-                });
+                }
             }
         ));
     }
 
+    /** @internal */
     public markerAttribs(
         point: TimelinePoint,
         state?: StatesOptionsKey
     ): SVGAttributes {
-        let series = this,
-            seriesMarkerOptions: PointMarkerOptions = (
-                series.options.marker as any
-            ),
-            seriesStateOptions: SeriesStatesOptions<TimelineSeries>,
+        const series = this,
+            seriesMarkerOptions = series.options.marker,
             pointMarkerOptions = point.marker || {},
             symbol = (
-                pointMarkerOptions.symbol || seriesMarkerOptions.symbol
+                pointMarkerOptions.symbol ||
+                seriesMarkerOptions?.symbol
             ),
-            pointStateOptions: PointStatesOptions<TimelinePoint>,
-            width = pick<number|undefined, number|undefined, number>(
-                pointMarkerOptions.width,
-                seriesMarkerOptions.width,
-                series.closestPointRangePx as any
+            width = (
+                pointMarkerOptions.width ??
+                seriesMarkerOptions?.width ??
+                (series.closestPointRangePx || 0)
             ),
-            height = pick<number|undefined, number>(
-                pointMarkerOptions.height,
-                seriesMarkerOptions.height as any
-            ),
-            radius = 0,
-            attribs: (SVGAttributes|undefined);
+            height = (
+                pointMarkerOptions.height ??
+                (seriesMarkerOptions?.height || 0)
+            );
+
+        let seriesStateOptions,
+            pointStateOptions,
+            radius = 0;
 
         // Call default markerAttribs method, when the xAxis type
         // is set to datetime.
         if (series.xAxis.dateTime) {
-            return super.markerAttribs.call(this, point, state);
+            return super.markerAttribs(point, state);
         }
 
         // Handle hover and select states
         if (state) {
-            seriesStateOptions =
-                (seriesMarkerOptions.states as any)[state] || {};
-            pointStateOptions = pointMarkerOptions.states &&
-                (pointMarkerOptions.states as any)[state] || {};
+            seriesStateOptions = seriesMarkerOptions?.states?.[state];
+            pointStateOptions = pointMarkerOptions.states?.[state];
 
-            radius = pick(
-                (pointStateOptions as any).radius,
-                (seriesStateOptions as any).radius,
-                radius + ((seriesStateOptions as any).radiusPlus as any || 0)
+            radius = (
+                pointStateOptions?.radius ??
+                seriesStateOptions?.radius ??
+                radius + (seriesStateOptions?.radiusPlus || 0)
             );
         }
 
-        point.hasImage = (symbol && symbol.indexOf('url') === 0) as any;
+        point.hasImage = !!(symbol && symbol.indexOf('url') === 0);
 
-        attribs = {
+        const attribs = {
             x: Math.floor(point.plotX as any) - (width / 2) - (radius / 2),
             y: (point.plotY as any) - (height / 2) - (radius / 2),
             width: width + radius,
             height: height + radius
         };
 
-        return attribs;
+        return (series.chart.inverted) ? {
+            y: (attribs.x && attribs.width) &&
+                series.xAxis.len - attribs.x - attribs.width,
+            x: attribs.y,
+            width: attribs.height,
+            height: attribs.width
+        } : attribs;
 
     }
-
-    public processData(): undefined {
-        let series = this,
-            visiblePoints = 0,
-            i: (number|undefined);
-
-        series.visibilityMap = series.getVisibilityMap();
-
-        // Calculate currently visible points.
-        series.visibilityMap.forEach(function (point): void {
-            if (point) {
-                visiblePoints++;
-            }
-        });
-
-        series.visiblePointsCount = visiblePoints;
-
-        for (i = 0; i < (series.xData as any).length; i++) {
-            (series.yData as any)[i] = 1;
-        }
-
-        super.processData.call(this, arguments as any);
-
-        return;
-    }
-
-    /* eslint-enable valid-jsdoc */
 
 }
+
+// Add series-specific properties after data is already processed, #17890
+addEvent(TimelineSeries, 'afterProcessData', function (): void {
+    const series = this,
+        yData: Array<number|null> = series.getColumn('y');
+
+    let visiblePoints = 0;
+
+    series.visibilityMap = series.getVisibilityMap();
+
+    // Calculate currently visible points.
+    for (const point of series.visibilityMap) {
+        if (point) {
+            visiblePoints++;
+        }
+    }
+
+    series.visiblePointsCount = visiblePoints;
+    yData.length = series.dataTable.rowCount;
+    for (let i = 0; i < yData.length; ++i) {
+        yData[i] = yData[i] === null ? null : 1;
+    }
+    this.dataTable.setColumn('y', yData);
+
+});
 
 /* *
  *
@@ -635,13 +479,12 @@ class TimelineSeries extends LineSeries {
  * */
 
 interface TimelineSeries {
-    drawLegendSymbol: typeof LegendSymbol.drawRectangle;
+    /** @internal */
     pointClass: typeof TimelinePoint;
+    /** @internal */
     trackerGroups: Array<string>;
 }
 extend(TimelineSeries.prototype, {
-    // Use a simple symbol from LegendSymbolMixin
-    drawLegendSymbol: LegendSymbol.drawRectangle,
     // Use a group of trackers from TrackerMixin
     drawTracker: ColumnSeries.prototype.drawTracker,
     pointClass: TimelinePoint,
@@ -668,120 +511,3 @@ SeriesRegistry.registerSeriesType('timeline', TimelineSeries);
  * */
 
 export default TimelineSeries;
-
-/* *
- *
- *  API Declarations
- *
- * */
-
-/**
- * Callback JavaScript function to format the data label as a string. Note that
- * if a `format` is defined, the format takes precedence and the formatter is
- * ignored.
- *
- * @callback Highcharts.TimelineDataLabelsFormatterCallbackFunction
- *
- * @param {Highcharts.PointLabelObject|Highcharts.TimelineDataLabelsFormatterContextObject} this
- *        Data label context to format
- *
- * @return {number|string|null|undefined}
- *         Formatted data label text
- */
-
-/**
- * @interface Highcharts.TimelineDataLabelsFormatterContextObject
- * @extends Highcharts.PointLabelObject
- *//**
- * @name Highcharts.TimelineDataLabelsFormatterContextObject#key
- * @type {string|undefined}
- *//**
- * @name Highcharts.TimelineDataLabelsFormatterContextObject#point
- * @type {Highcharts.Point}
- *//**
- * @name Highcharts.TimelineDataLabelsFormatterContextObject#series
- * @type {Highcharts.Series}
- */
-
-''; // dettach doclets above
-
-/* *
- *
- *  API Options
- *
- * */
-
-/**
- * The `timeline` series. If the [type](#series.timeline.type) option is
- * not specified, it is inherited from [chart.type](#chart.type).
- *
- * @extends   series,plotOptions.timeline
- * @excluding animationLimit, boostThreshold, connectEnds, connectNulls,
- *            cropThreshold, dashStyle, dataParser, dataURL, findNearestPointBy,
- *            getExtremesFromAll, negativeColor, pointInterval,
- *            pointIntervalUnit, pointPlacement, pointStart, softThreshold,
- *            stacking, stack, step, threshold, turboThreshold, zoneAxis, zones,
- *            dataSorting, boostBlending
- * @product   highcharts
- * @requires  modules/timeline
- * @apioption series.timeline
- */
-
-/**
- * An array of data points for the series. For the `timeline` series type,
- * points can be given with three general parameters, `name`, `label`,
- * and `description`:
- *
- * Example:
- *
- * ```js
- * series: [{
- *    type: 'timeline',
- *    data: [{
- *        name: 'Jan 2018',
- *        label: 'Some event label',
- *        description: 'Description to show in tooltip'
- *    }]
- * }]
- * ```
- * If all points additionally have the `x` values, and xAxis type is set to
- * `datetime`, then events are laid out on a true time axis, where their
- * placement reflects the actual time between them.
- *
- * @sample {highcharts} highcharts/series-timeline/alternate-labels
- *         Alternate labels
- * @sample {highcharts} highcharts/series-timeline/datetime-axis
- *         Real time intervals
- *
- * @type      {Array<*>}
- * @extends   series.line.data
- * @excluding marker, y
- * @product   highcharts
- * @apioption series.timeline.data
- */
-
-/**
- * The name of event.
- *
- * @type      {string}
- * @product   highcharts
- * @apioption series.timeline.data.name
- */
-
-/**
- * The label of event.
- *
- * @type      {string}
- * @product   highcharts
- * @apioption series.timeline.data.label
- */
-
-/**
- * The description of event. This description will be shown in tooltip.
- *
- * @type      {string}
- * @product   highcharts
- * @apioption series.timeline.data.description
- */
-
-''; // adds doclets above to transpiled file

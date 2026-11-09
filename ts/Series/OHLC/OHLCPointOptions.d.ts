@@ -1,10 +1,12 @@
 /* *
  *
- *  (c) 2010-2021 Torstein Honsi
+ *  (c) 2010-2026 Highsoft AS
+ *  Author: Torstein Hønsi
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -15,7 +17,7 @@
  * */
 
 import type ColorType from '../../Core/Color/ColorType';
-import HLCPointOptions from '../HLC/HLCPointOptions';
+import type HLCPointOptions from '../HLC/HLCPointOptions';
 
 /* *
  *
@@ -24,7 +26,23 @@ import HLCPointOptions from '../HLC/HLCPointOptions';
  * */
 
 export interface OHLCPointOptions extends HLCPointOptions {
+
+    /**
+     * The closing value of each data point.
+     *
+     * @product highstock
+     */
+    close?: number
+
+    /**
+     * The opening value of each data point.
+     *
+     * @product highstock
+     */
+    open?: number;
+
     upColor?: ColorType;
+
 }
 
 export default OHLCPointOptions;

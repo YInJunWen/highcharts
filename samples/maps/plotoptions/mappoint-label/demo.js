@@ -27,6 +27,7 @@
                     shape: 'callout',
                     backgroundColor: 'rgba(0, 0, 0, 0.7)',
                     borderRadius: 5,
+                    padding: 5,
                     style: {
                         color: '#FFFFFF'
                     }
@@ -37,7 +38,8 @@
                     lineWidth: 1
                 },
                 tooltip: {
-                    pointFormat: '{point.name} [{point.lon:.2f}, {point.lat:.2f}]'
+                    pointFormat: '{point.name} [{point.lon:.2f}, ' +
+                        '{point.lat:.2f}]'
                 }
             }
         },

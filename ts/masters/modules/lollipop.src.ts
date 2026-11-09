@@ -1,11 +1,18 @@
+// SPDX-License-Identifier: LicenseRef-Highcharts
 /**
  * @license Highcharts JS v@product.version@ (@product.date@)
  * @module highcharts/modules/lollipop
  * @requires highcharts
+ * @requires highcharts/highcharts-more
+ * @requires highcharts/modules/dumbbell
  *
- * (c) 2009-2021 Sebastian Bochan, Rafal Sebestjanski
+ * (c) 2009-2026 Highsoft AS
+ * Author: Sebastian Bochan, Rafał Sebestjański
  *
- * License: www.highcharts.com/license
+ * A commercial license may be required depending on use,
+ * see www.highcharts.com/license
  */
 'use strict';
+import Highcharts from '../../Core/Globals.js';
 import '../../Series/Lollipop/LollipopSeries.js';
+export default Highcharts;

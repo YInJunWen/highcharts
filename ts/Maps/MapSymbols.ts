@@ -1,10 +1,12 @@
 /* *
  *
- *  (c) 2010-2021 Torstein Honsi
+ *  (c) 2010-2026 Highsoft AS
+ *  Author: Torstein Hønsi
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -17,10 +19,17 @@
  * */
 
 import type SVGPath from '../Core/Renderer/SVG/SVGPath';
+import type SVGRenderer from '../Core/Renderer/SVG/SVGRenderer';
 import type SymbolOptions from '../Core/Renderer/SVG/SymbolOptions';
+import type { SymbolTypeRegistry } from '../Core/Renderer/SVG/SymbolType';
 
-import SVGRenderer from '../Core/Renderer/SVG/SVGRenderer.js';
-const { prototype: { symbols } } = SVGRenderer;
+/* *
+ *
+ *  Variables
+ *
+ * */
+
+let symbols: SymbolTypeRegistry;
 
 /* *
  *
@@ -28,8 +37,7 @@ const { prototype: { symbols } } = SVGRenderer;
  *
  * */
 
-/* eslint-disable require-jsdoc, valid-jsdoc */
-
+/** @internal */
 function bottomButton(
     x: number,
     y: number,
@@ -37,66 +45,24 @@ function bottomButton(
     h: number,
     options?: SymbolOptions
 ): SVGPath {
-    const r = (options && options.r) || 0;
-    return selectiveRoundedRect(x - 1, y - 1, w, h, 0, 0, r, r);
+    if (options) {
+        const r = options?.r || 0;
+        options.brBoxY = y - r;
+        options.brBoxHeight = h + r;
+    }
+    return symbols.roundedRect(x, y, w, h, options);
 }
 
-/**
- * Create symbols for the zoom buttons
- * @private
- */
-function selectiveRoundedRect(
-    x: number,
-    y: number,
-    w: number,
-    h: number,
-    rTopLeft: number,
-    rTopRight: number,
-    rBottomRight: number,
-    rBottomLeft: number
-): SVGPath {
-    return [
-        ['M', x + rTopLeft, y],
-        // top side
-        ['L', x + w - rTopRight, y],
-        // top right corner
-        [
-            'C',
-            x + w - rTopRight / 2,
-            y,
-            x + w,
-            y + rTopRight / 2,
-            x + w,
-            y + rTopRight
-        ],
-        // right side
-        ['L', x + w, y + h - rBottomRight],
-        // bottom right corner
-        [
-            'C', x + w, y + h - rBottomRight / 2,
-            x + w - rBottomRight / 2, y + h,
-            x + w - rBottomRight, y + h
-        ],
-        // bottom side
-        ['L', x + rBottomLeft, y + h],
-        // bottom left corner
-        [
-            'C',
-            x + rBottomLeft / 2,
-            y + h,
-            x,
-            y + h - rBottomLeft / 2,
-            x,
-            y + h - rBottomLeft
-        ],
-        // left side
-        ['L', x, y + rTopLeft],
-        // top left corner
-        ['C', x, y + rTopLeft / 2, x + rTopLeft / 2, y, x + rTopLeft, y],
-        ['Z']
-    ];
+/** @internal */
+function compose(
+    SVGRendererClass: typeof SVGRenderer
+): void {
+    symbols = SVGRendererClass.prototype.symbols;
+    symbols.bottombutton = bottomButton;
+    symbols.topbutton = topButton;
 }
 
+/** @internal */
 function topButton(
     x: number,
     y: number,
@@ -104,8 +70,11 @@ function topButton(
     h: number,
     options?: SymbolOptions
 ): SVGPath {
-    const r = (options && options.r) || 0;
-    return selectiveRoundedRect(x - 1, y - 1, w, h, r, r, 0, 0);
+    if (options) {
+        const r = options?.r || 0;
+        options.brBoxHeight = h + r;
+    }
+    return symbols.roundedRect(x, y, w, h, options);
 }
 
 /* *
@@ -114,17 +83,20 @@ function topButton(
  *
  * */
 
+/** @internal */
 declare module '../Core/Renderer/SVG/SymbolType' {
     interface SymbolTypeRegistry {
-        /** @requires Map/MapSymbols */
+        /**
+         * @requires Map/MapSymbols
+         */
         bottombutton: typeof bottomButton;
-        /** @requires Map/MapSymbols */
+
+        /**
+         * @requires Map/MapSymbols
+         */
         topbutton: typeof topButton;
     }
 }
-
-symbols.bottombutton = bottomButton;
-symbols.topbutton = topButton;
 
 /* *
  *
@@ -132,4 +104,10 @@ symbols.topbutton = topButton;
  *
  * */
 
-export default symbols;
+/** @internal */
+const MapSymbols = {
+    compose
+};
+
+/** @internal */
+export default MapSymbols;

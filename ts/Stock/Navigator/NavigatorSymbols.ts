@@ -1,10 +1,12 @@
 /* *
  *
- *  (c) 2010-2021 Torstein Honsi
+ *  (c) 2010-2026 Highsoft AS
+ *  Author: Torstein Hønsi
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -20,6 +22,10 @@ import type SVGPath from '../../Core/Renderer/SVG/SVGPath';
 import type SymbolOptions from '../../Core/Renderer/SVG/SymbolOptions';
 import type { SymbolTypeRegistry } from '../../Core/Renderer/SVG/SymbolType';
 
+import { borderRadiusObject } from '../../Extensions/BorderRadius.js';
+import rect from '../../Core/Renderer/SVG/Symbols.js';
+import { relativeLength } from '../../Shared/Utilities.js';
+
 /* *
  *
  *  Constants
@@ -28,7 +34,7 @@ import type { SymbolTypeRegistry } from '../../Core/Renderer/SVG/SymbolType';
 
 /**
  * Draw one of the handles on the side of the zoomed range in the navigator.
- * @private
+ * @internal
  */
 function navigatorHandle(
     _x: number,
@@ -38,20 +44,19 @@ function navigatorHandle(
     options: SymbolOptions = {}
 ): SVGPath {
     const halfWidth = options.width ? options.width / 2 : width,
-        markerPosition = Math.round(halfWidth / 3) + 0.5;
+        markerPosition = 1.5,
+        r = relativeLength(
+            borderRadiusObject(options.borderRadius).radius,
+            Math.min(halfWidth * 2, height)
+        );
 
     height = options.height || height;
-
     return [
-        ['M', -halfWidth - 1, 0.5],
-        ['L', halfWidth, 0.5],
-        ['L', halfWidth, height + 0.5],
-        ['L', -halfWidth - 1, height + 0.5],
-        ['L', -halfWidth - 1, 0.5],
-        ['M', -markerPosition, 4],
-        ['L', -markerPosition, height - 3],
-        ['M', markerPosition - 1, 4],
-        ['L', markerPosition - 1, height - 3]
+        ['M', -markerPosition, height / 2 - 3.5],
+        ['L', -markerPosition, height / 2 + 4.5],
+        ['M', markerPosition - 1, height / 2 - 3.5],
+        ['L', markerPosition - 1, height / 2 + 4.5],
+        ...rect.rect(-halfWidth - 1, 0.5, halfWidth * 2 + 1, height, { r })
     ];
 }
 
@@ -61,8 +66,10 @@ function navigatorHandle(
  *
  * */
 
+/** @internal */
 const NavigatorSymbols: Partial<SymbolTypeRegistry> = {
     'navigator-handle': navigatorHandle
 };
 
+/** @internal */
 export default NavigatorSymbols;

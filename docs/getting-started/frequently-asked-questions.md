@@ -1,15 +1,22 @@
+---
+description: >-
+  Find answers to common integration questions about external resources,
+  server data, Stock features, exporting, performance, character encoding, and
+  irregular time data, with examples and links to more detailed guides.
+---
+
 Frequently asked questions
 ===
 
 *   [Does Highcharts refer to files outside our domain?](#does-highcharts-refer-to-files-outside-our-domain)
-*   [My charts are not showing in Internet Explorer 7 or 8](#my-charts-are-not-showing-in-internet-explorer-7-or-8)
 *   [Can I use Highcharts with a ... server?](#can-i-use-highcharts-with-a-server)
-*   [Can I use features from Highcharts Stock in Highcharts?](#can-i-use-features-from-highstock-in-highcharts)
+*   [Can I use features from Highcharts Stock in Highcharts?](#can-i-use-features-from-highcharts-stock-in-highcharts)
 *   [Can I add a data table to the exported chart?](#can-i-add-a-data-table-to-the-exported-chart)
 *   [How can I get the best performance out of Highcharts?](#how-can-i-get-the-best-performance-out-of-highcharts)
 *   [Can I export multiple charts to the same image or PDF?](#can-i-export-multiple-charts-to-the-same-image-or-pdf)
 *   [My non-English characters don't display right in my charts](#my-non-english-characters-don39t-display-right-in-my-charts)
 *   [Can I generate charts on the server without using a browser?](#can-i-generate-charts-on-the-server-without-using-a-browser)
+*   [Why do charts show a white screen in iOS WKWebView?](#why-do-charts-show-a-white-screen-in-ios-wkwebview)
 *   [How do I define irregular time data?](#how-do-i-define-irregular-time-data)
 *   [How do I add data from a MySQL database?](#how-do-i-add-data-from-a-mysql-database)
 *   [Your map of my country does not include a disputed area](#your-map-of-my-country-does-not-include-a-disputed-area)
@@ -23,34 +30,7 @@ For basic usage, Highcharts doesn't refer to any files other than highcharts.js/
 
 *   The exporting module. Since not all browsers are able to convert the chart to an image format, this operation is by default done on our web service, https://export.highcharts.com. The generated SVG is sent from your browser to the export server, and an image is sent back. If you're concerned about your data content being passed over the internet, you should consider our alternative solutions. The simplest alternative is to use our [module for client-side export](https://highcharts.com/docs/export-module/client-side-export). Check out the features and compatibility table if it meets your requirements. If you have access to a node server, you can also [set up your own export server](https://highcharts.com/docs/export-module/setting-up-the-server). 
 *   Certain features, including client side exporting, may require third-party dependencies. Some of these are loaded on demand from our servers, but in these cases the loading location is configurable. Details on all external dependencies, including licensing and security details, can be found in the [optional dependencies](https://highcharts.com/docs/getting-started/optional-dependencies) documentation article.
-
-* * *
-
-My charts are not showing in Internet Explorer 7 or 8
------------------------------------------------------
-
-The most common reason why a chart works in modern browsers but fails in IE6, 7 and 8, is stray commas in the configuration options. Stray commas are commas after the last item of an object or an array in JavaScript. These will pass silently in modern browsers, but cause a JavaScript error in legacy IE.
-
-```js
-var chart = new Highcharts.Chart({
-    chart: {
-        renderTo: 'container'
-    },
-    xAxis: {
-        type: 'datetime'
-    },
-    series: [{
-        data: [29.9, 71.5, 106.4, 129.2, 144.0, 176.0, 135.6, 148.5,
-                216.4, 194.1, 95.6, 54.4],
-        pointStart: Date.UTC(2012, 0, 1),
-        pointInterval: 24 * 3600 * 1000,
-    }]
-});
-```
-
-[Try it live](https://jsfiddle.net/highcharts/DXnPa/).
-
-Another case where legacy IE fails to show charts, is when the security setting "ActiveX controls and plug-ins" => "Binary and script behavious" is disabled. This happens very rarely on user computers, but we have seen it from time to time on company networks. In this case, IE fails to draw any of the vector graphics, only the the text is shown. 
+* Stock Tools icons. By default the icons are loaded dynamically from https://code.highcharts.com. To change where icons should be loaded from see the [iconsURL](https://api.highcharts.com/highstock/navigation.iconsURL) option.
 
 * * *
 
@@ -59,9 +39,9 @@ Can I use Highcharts with a ... server?
 
 Highcharts runs entirely on the client, and works with any web server that can deliver HTML and JavaScript content. Whether your server is PHP, Perl, ASP, ASP.NET, Node.js or whatever, Highcharts is completely ignorant of it. The HTML/JavaScript files may also be loaded from the file system, which is the case in app platforms where Highcharts is loaded in a web component inside the app.
 
-The best practice in integrating Highcharts may differ from system to system. You should follow the common practice for handing JavaScript on your specific system. Some prefer to serve a clean JSON or JavaScript file with the Highcharts setup, others to write the JavaScript setup directly to the web page. Data can be loaded in form of JSON or CSV files (see Working with data in the left menu), or printed inline in the chart setup. When working with a databased powered backend, it may be cleaner to have your server system serve JSON or CSV files.
+The best practice in integrating Highcharts may differ from system to system. You should follow the common practice for handing JavaScript on your specific system. Some prefer to serve a clean JSON or JavaScript file with the Highcharts setup, others to write the JavaScript setup directly to the web page. Data can be loaded in form of JSON or CSV files (see Working with data in the left menu), or printed inline in the chart setup. When working with a database powered backend, it may be cleaner to have your server system serve JSON or CSV files.
 
-For a live connection to the server, you may set up the web page to load new data over XHR or set up direct communicatations using WebSockets. With the new data arriving in the browser, the chart can be kept updated through various dynamic endpoints like `Series.addPoint()`, `Point.update()`, `Chart.addSeries()`, `Chart.update()` etc.
+For a live connection to the server, you may set up the web page to load new data over XHR or set up direct communications using WebSockets. With the new data arriving in the browser, the chart can be kept updated through various dynamic endpoints like `Series.addPoint()`, `Point.update()`, `Chart.addSeries()`, `Chart.update()` etc.
 
 Before you start to set up a complex backend, you may want to check out [highcharts.com/download](https://highcharts.com/download) to see if there is a wrapper for your specific system.
 
@@ -96,10 +76,12 @@ How can I get the best performance out of Highcharts?
 
 When working with series with a high number of data points, there are a few things to consider.
 
-1.  First of all, consider using the [Boost module](https://www.highcharts.com/blog/tutorials/highcharts-high-performance-boost-module/).
+1.  First of all, consider using the [Boost module](https://www.highcharts.com/blog/tutorials/highcharts-high-performance-boost-module/). Boost only works for the series types listed in the [Boost module docs](https://www.highcharts.com/docs/advanced-chart-features/boost-module). Note that in Highcharts Stock, boost does not kick in while data grouping is enabled, which is the default in `Highcharts.stockChart`. Disabling data grouping does not make other series types, such as `candlestick` or `ohlc`, boostable.
 2.  Otherwise, for line plots, it is recommended that you disable point markers, as these will add a performance overhead. See [https://highcharts.com/demo/line-time-series](https://highcharts.com/demo/line-time-series).
 3.  Disabling shadows increases performance, as three shadow elements are created for each shape that includes a shadow.
-4.  For large column series, it is recommended that you disable the initial animation, [plotOptions.column.animation](https://api.highcharts.com/highcharts#plotOptions.column.animation), at least for VML based browsers. The best way to distinguish between fast SVG browsers and slower VML browsers is to use the Highcharts.svg boolean property.
+4.  If you have a Stock licence, use the [Data Grouping module](https://www.highcharts.com/docs/stock/data-grouping). It is enabled by default in Highcharts Stock (`Highcharts.stockChart`) for most series types, such as `line`, `column` and `candlestick`, but not for others, such as `scatter` or `flags`. See [series types grouped by default](https://www.highcharts.com/docs/stock/data-grouping#series-types-grouped-by-default). This module packs multiple consecutive values into the same point, and results in considerably fewer points to render. This greatly reduces the initial loading time. The following chart compares the loading times of the same data set with and without data grouping.
+
+<iframe style="width: 100%; height: 470px" src="https://www.highcharts.com/samples/embed/highcharts/blog/dg-performance-comparison" frameborder="0"></iframe>
 
 * * *
 
@@ -137,10 +119,38 @@ Yes. See our article, [Render charts on the server](https://highcharts.com/docs/
 
 * * *
 
+Why do charts show a white screen in iOS WKWebView?
+---------------------------------------------------
+
+This issue is usually related to how resources are loaded in a native iOS
+integration.
+
+For native iOS apps, the historical Highcharts iOS wrapper is
+community-supported:
+[highcharts/highcharts-ios](https://github.com/highcharts/highcharts-ios)
+
+For the issue reported on iOS 26.4 (white screen), see:
+[highcharts/highcharts-ios#465](https://github.com/highcharts/highcharts-ios/issues/465)
+
+The reported working setup is:
+
+1. Keep Highcharts JavaScript resources in the main app bundle.
+2. Use the main bundle as `baseURL` in `WKWebView`:
+   `Bundle.main.bundleURL` (Swift) or
+   `[[NSBundle mainBundle] bundleURL]` (Objective-C).
+3. Keep relative script paths in HTML, for example:
+   `<script src="js/highcharts.js"></script>`.
+
+If `WKWebView` loads HTML with `loadHTMLString:baseURL:` and `baseURL` points
+to an embedded framework bundle, JavaScript resources may fail to load on iOS
+26.4, which can result in a white screen.
+
+* * *
+
 How do I define irregular time data?
 ------------------------------------
 
-To add data points with irregular intervals, instead of defining pointStart and pointInterval for the series, define an X value (date) for each point. See [https://jsfiddle.net/highcharts/Jx5n2/](https://jsfiddle.net/highcharts/Jx5n2/).
+To add data points with irregular intervals, instead of defining `pointStart` and `pointInterval` for the series, define an X value (date) for each point. See [demo of irregular time](https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/spline-irregular-time).
 
 If you want the line to be broken for missing dates, insert null values instead.
 

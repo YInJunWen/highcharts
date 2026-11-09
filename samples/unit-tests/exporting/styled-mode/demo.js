@@ -27,7 +27,7 @@ QUnit.test(
             ]
         });
 
-        var svg = chart.getSVG(),
+        var svg = chart.exporting.getSVG(),
             urls = svg.match(/url\(.*?\;?\)/g),
             matched = urls.filter(function (url) {
                 return url.match(/\&quot;/);
@@ -36,7 +36,8 @@ QUnit.test(
         assert.strictEqual(
             matched.length,
             0,
-            "Exported chart CSS 'url' values does not have any unnecessary '&quot;' strings."
+            'Exported chart CSS \'url\' values does not have any unnecessary ' +
+            '\'&quot;\' strings.'
         );
 
         assert.notStrictEqual(

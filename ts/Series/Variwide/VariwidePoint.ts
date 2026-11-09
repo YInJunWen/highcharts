@@ -2,11 +2,13 @@
  *
  *  Highcharts variwide module
  *
- *  (c) 2010-2021 Torstein Honsi
+ *  (c) 2010-2026 Highsoft AS
+ *  Author: Torstein Hønsi
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -21,16 +23,16 @@
 import type VariwidePointOptions from './VariwidePointOptions';
 import type VariwideSeries from './VariwideSeries';
 
-import SeriesRegistry from '../../Core/Series/SeriesRegistry.js';
-const {
-    column: {
-        prototype: {
-            pointClass: ColumnPoint
-        }
-    }
-} = SeriesRegistry.seriesTypes;
-import U from '../../Core/Utilities.js';
-const { isNumber } = U;
+import ColumnSeries from '../Column/ColumnSeries.js';
+import { isNumber } from '../../Shared/Utilities.js';
+
+/* *
+ *
+ *  Constants
+ *
+ * */
+
+const ColumnPoint = ColumnSeries.prototype.pointClass;
 
 /* *
  *
@@ -38,8 +40,9 @@ const { isNumber } = U;
  *
  * */
 
-declare module '../../Core/Series/PointLike' {
-    interface PointLike {
+/** @internal */
+declare module '../../Core/Series/PointBase' {
+    interface PointBase {
         crosshairWidth?: VariwidePoint['crosshairWidth'];
     }
 }
@@ -53,13 +56,15 @@ class VariwidePoint extends ColumnPoint {
 
     /* *
      *
-     *  Properites
+     *  Properties
      *
      * */
 
-    public crosshairWidth: number = void 0 as any;
-    public options: VariwidePointOptions = void 0 as any;
-    public series: VariwideSeries = void 0 as any;
+    /** @internal */
+    public crosshairWidth!: number;
+    public options!: VariwidePointOptions;
+    /** @internal */
+    public series!: VariwideSeries;
 
     /* *
      *
@@ -67,6 +72,7 @@ class VariwidePoint extends ColumnPoint {
      *
      * */
 
+    /** @internal */
     public isValid(): boolean {
         return isNumber(this.y) && isNumber(this.z);
     }

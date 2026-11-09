@@ -1,0 +1,135 @@
+/* *
+ *
+ *  (c) 2010-2026 Highsoft AS
+ *
+ *  Authors: Magdalena Gut, Piotr Madej
+ *
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
+ *
+ *
+ * */
+
+'use strict';
+
+/* *
+ *
+ *  Imports
+ *
+ * */
+
+import GeoHeatmapPointOptions from '../GeoHeatmap/GeoHeatmapPointOptions.js';
+import GeoHeatmapSeries from '../GeoHeatmap/GeoHeatmapSeries.js';
+import { PointShortOptions } from '../../Core/Series/PointOptions.js';
+import MapSeries from '../Map/MapSeries.js';
+import { isNumber } from '../../Shared/Utilities.js';
+
+/* *
+ *
+ *  Constants
+ *
+ * */
+
+const MapPoint = MapSeries.prototype.pointClass;
+
+/* *
+ *
+ *  Declarations
+ *
+ * */
+
+/** @internal */
+declare module '../../Core/Series/KDPointSearchObjectBase' {
+    interface KDPointSearchObjectBase {
+        lat?: number;
+        lon?: number;
+    }
+}
+
+/** @internal */
+declare module '../../Core/Series/PointBase' {
+    interface PointBase {
+        lat?: number;
+        lon?: number;
+    }
+}
+
+/* *
+ *
+ *  Class
+ *
+ * */
+
+class GeoHeatmapPoint extends MapPoint {
+
+    /* *
+     *
+     *  Properties
+     *
+     * */
+
+    /** @internal */
+    public lat!: number;
+
+    /** @internal */
+    public lon!: number;
+
+    public options!: GeoHeatmapPointOptions;
+
+    /** @internal */
+    public series!: GeoHeatmapSeries;
+
+    /* *
+     *
+     *  Functions
+     *
+     * */
+
+
+    /**
+     * @internal
+     */
+    public applyOptions(
+        options: (GeoHeatmapPointOptions | PointShortOptions),
+        x?: number
+    ): GeoHeatmapPoint {
+        const point = super.applyOptions.call(
+                this, options, x
+            ) as GeoHeatmapPoint,
+            { lat, lon } = point.options;
+
+
+        if (isNumber(lon) && isNumber(lat)) {
+            const { colsize = 1, rowsize = 1 } = this.series.options,
+                x1 = lon - colsize / 2,
+                y1 = lat - rowsize / 2;
+
+            point.geometry = point.options.geometry = {
+                type: 'Polygon',
+                // A rectangle centered in lon/lat
+                coordinates: [
+                    [
+                        [x1, y1],
+                        [x1 + colsize, y1],
+                        [x1 + colsize, y1 + rowsize],
+                        [x1, y1 + rowsize],
+                        [x1, y1]
+                    ]
+                ]
+            };
+        }
+
+        return point;
+
+
+    }
+}
+
+/* *
+ *
+ *  Default Export
+ *
+ * */
+
+export default GeoHeatmapPoint;

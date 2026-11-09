@@ -1,8 +1,9 @@
 /* *
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -14,6 +15,7 @@
  *
  * */
 
+import type { IndicatorLinkedSeriesBase } from '../IndicatorBase';
 import type IndicatorValuesObject from '../IndicatorValuesObject';
 import type LineSeries from '../../../Series/Line/LineSeries';
 import type {
@@ -22,15 +24,9 @@ import type {
 } from './RSIOptions';
 import type RSIPoint from './RSIPoint';
 
+import SMAIndicator from '../SMA/SMAIndicator.js';
 import SeriesRegistry from '../../../Core/Series/SeriesRegistry.js';
-const {
-    sma: SMAIndicator
-} = SeriesRegistry.seriesTypes;
-import U from '../../../Core/Utilities.js';
-const {
-    isNumber,
-    merge
-} = U;
+import { isNumber, merge } from '../../../Shared/Utilities.js';
 
 /* *
  *
@@ -39,6 +35,7 @@ const {
  * */
 
 // Utils:
+/** @internal */
 function toFixed(a: number, n: number): number {
     return parseFloat(a.toFixed(n));
 }
@@ -52,7 +49,6 @@ function toFixed(a: number, n: number): number {
 /**
  * The RSI series type.
  *
- * @private
  * @class
  * @name Highcharts.seriesTypes.rsi
  *
@@ -71,15 +67,16 @@ class RSIIndicator extends SMAIndicator {
      * requires the `linkedTo` option to be set and should be loaded after
      * the `stock/indicators/indicators.js` file.
      *
-     * @sample stock/indicators/rsi
+     * @sample {highstock} stock/indicators/rsi
      *         RSI indicator
      *
      * @extends      plotOptions.sma
      * @since        6.0.0
      * @product      highstock
-     * @requires     stock/indicators/indicators
-     * @requires     stock/indicators/rsi
+     * @requires     indicators/indicators
+     * @requires     indicators/rsi
      * @optionparent plotOptions.rsi
+     * @internal
      */
     public static defaultOptions: RSIOptions = merge(SMAIndicator.defaultOptions, {
         params: {
@@ -94,9 +91,9 @@ class RSIIndicator extends SMAIndicator {
      *
      * */
 
-    public data: Array<RSIPoint> = void 0 as any;
-    public points: Array<RSIPoint> = void 0 as any;
-    public options: RSIOptions = void 0 as any;
+    public data!: Array<RSIPoint>;
+    public points!: Array<RSIPoint>;
+    public options!: RSIOptions;
 
     /* *
      *
@@ -104,24 +101,25 @@ class RSIIndicator extends SMAIndicator {
      *
      * */
 
+    /** @internal */
     public getValues<TLinkedSeries extends LineSeries>(
-        series: TLinkedSeries,
+        series: TLinkedSeries&IndicatorLinkedSeriesBase,
         params: RSIParamsOptions
     ): (IndicatorValuesObject<TLinkedSeries>|undefined) {
-        let period = (params.period as any),
+        const period = (params.period as any),
             xVal: Array<number> = (series.xData as any),
             yVal: Array<number> | Array<Array<number>> = (series.yData as any),
             yValLen: number = yVal ? yVal.length : 0,
             decimals: number = (params.decimals as any),
             // RSI starts calculations from the second point
             // Cause we need to calculate change between two points
-            range = 1,
             RSI: Array<Array<number>> = [],
             xData: Array<number> = [],
-            yData: Array<number> = [],
+            yData: Array<number> = [];
+        let gain: number = 0,
+            loss: number = 0,
             index = (params.index as number),
-            gain = 0,
-            loss = 0,
+            range: number = 1,
             RSIPoint: number,
             change: number,
             avgGain: number,
@@ -129,14 +127,14 @@ class RSIIndicator extends SMAIndicator {
             i: number,
             values: Array<number>;
 
-        if ((xVal.length < period)) {
+        if (xVal.length < period) {
             return;
         }
 
         if (isNumber(yVal[0])) {
             values = yVal as Array<number>;
         } else {
-            // in case of the situation, where the series type has data length
+            // In case of the situation, where the series type has data length
             // longer then 4 (HLC, range), this ensures that we are not trying
             // to reach the index out of bounds
             index = Math.min(index, yVal[0].length - 1);
@@ -257,10 +255,9 @@ export default RSIIndicator;
  * @extends   series,plotOptions.rsi
  * @since     6.0.0
  * @product   highstock
- * @excluding dataParser, dataURL
- * @requires  stock/indicators/indicators
- * @requires  stock/indicators/rsi
+ * @requires  indicators/indicators
+ * @requires  indicators/rsi
  * @apioption series.rsi
  */
 
-''; // to include the above in the js output
+''; // To include the above in the js output

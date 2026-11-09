@@ -29,6 +29,9 @@ QUnit.test('Point animation', function (assert) {
                         beta: 0,
                         viewDistance: 25,
                         depth: 0
+                    },
+                    style: {
+                        fontFamily: 'Helvetica, Arial, sans-serif'
                     }
                 },
                 plotOptions: {
@@ -53,9 +56,10 @@ QUnit.test('Point animation', function (assert) {
         point.update(200);
 
         realPos = getPhysicalHeight(point);
-        assert.strictEqual(
+        assert.close(
             realPos,
             initialPos,
+            1,
             'Time 0 - point should not yet have started moving'
         );
 

@@ -1,12 +1,11 @@
 /* *
  *
- *  Copyright (c) 2019-2021 Highsoft AS
+ *  (c) 2019-2026 Highsoft AS
  *
  *  Boost module: stripped-down renderer for higher performance
  *
  *  License: highcharts.com/license
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -25,15 +24,16 @@ import type {
     BoostTargetObject
 } from './BoostTargetObject';
 import type Chart from '../../Core/Chart/Chart';
+import type Pointer from '../../Core/Pointer';
 import type Series from '../../Core/Series/Series';
 import type SeriesOptions from '../../Core/Series/SeriesOptions';
+import type SVGElement from '../../Core/Renderer/SVG/SVGElement';
+import type { TypedArray } from '../../Shared/Types';
 
 import BoostableMap from './BoostableMap.js';
-import U from '../../Core/Utilities.js';
-const {
-    addEvent,
-    pick
-} = U;
+import H from '../../Core/Globals.js';
+const { composed } = H;
+import { addEvent, pushUnique } from '../../Shared/Utilities.js';
 
 /* *
  *
@@ -41,19 +41,24 @@ const {
  *
  * */
 
+/** @internal */
 interface BoostChartAdditions extends BoostTargetAdditions {
+    cssVars?: Record<string, string>;
     forceChartBoost?: boolean;
     markerGroup?: Series['markerGroup'];
+    lineWidthFilter?: SVGElement;
 }
 
+/** @internal */
 export declare class BoostChartComposition extends Chart {
     boosted?: boolean;
     boost: BoostChartAdditions;
     series: Array<BoostSeriesComposition>;
 }
 
-declare module '../../Core/Chart/ChartLike'{
-    interface ChartLike extends BoostTargetObject {
+/** @internal */
+declare module '../../Core/Chart/ChartBase'{
+    interface ChartBase extends BoostTargetObject {
         boosted?: boolean;
         boost?: BoostChartAdditions;
     }
@@ -61,29 +66,17 @@ declare module '../../Core/Chart/ChartLike'{
 
 /* *
  *
- *  Constants
- *
- * */
-
-const composedClasses: Array<Function> = [];
-
-/* *
- *
  *  Functions
  *
  * */
 
-/**
- * @private
- */
+/** @internal */
 function compose<T extends typeof Chart>(
     ChartClass: T,
     wglMode?: boolean
 ): T {
 
-    if (wglMode && composedClasses.indexOf(ChartClass) === -1) {
-        composedClasses.push(ChartClass);
-
+    if (wglMode && pushUnique(composed, 'Boost.Chart')) {
         ChartClass.prototype.callbacks.push(onChartCallback);
     }
 
@@ -95,23 +88,60 @@ function compose<T extends typeof Chart>(
  * For the chart, we need to consider the maximum extent of its Y axes,
  * in case of Highcharts Stock panes and navigator.
  *
- * @private
+ * @internal
  * @function Highcharts.Chart#getBoostClipRect
  */
 function getBoostClipRect(
     chart: Chart,
     target: BoostTargetObject
 ): BBoxObject {
-    const clipBox = {
+    const navigator = chart.navigator;
+    let clipBox = {
         x: chart.plotLeft,
         y: chart.plotTop,
         width: chart.plotWidth,
         height: chart.plotHeight
     };
 
+    if (navigator && chart.inverted) { // #17820, #20936
+        clipBox.width += navigator.top + navigator.height;
+
+        if (!navigator.opposite) {
+            clipBox.x = navigator.left;
+        }
+
+    } else if (navigator && !chart.inverted) {
+        clipBox.height = navigator.top + navigator.height - chart.plotTop;
+    }
+
+    // Clipping of individual series (#11906, #19039).
+    if ((target as Series).is) {
+        const { xAxis, yAxis } = target as Series;
+        clipBox = chart.getClipBox(target as Series);
+        if (chart.inverted) {
+            const lateral = clipBox.width;
+            clipBox.width = clipBox.height;
+            clipBox.height = lateral;
+            clipBox.x = yAxis.pos;
+            clipBox.y = xAxis.pos;
+        } else {
+            clipBox.x = xAxis.pos;
+            clipBox.y = yAxis.pos;
+        }
+    }
+
+
     if (target === chart) {
         const verticalAxes =
             chart.inverted ? chart.xAxis : chart.yAxis; // #14444
+
+        // Use chart.clipBox dimensions to match what createAndAttachRenderer
+        // compares against. Fractional clipOffset shrinks chart.clipBox below
+        // plotWidth/Height, breaking that check. #22949
+        if (!chart.inverted && !navigator && chart.clipBox) {
+            clipBox.width = chart.clipBox.width;
+            clipBox.height = chart.clipBox.height;
+        }
 
         if (verticalAxes.length <= 1) {
             clipBox.y = Math.min(verticalAxes[0].pos, clipBox.y);
@@ -120,8 +150,6 @@ function getBoostClipRect(
                 chart.plotTop +
                 verticalAxes[0].len
             );
-        } else {
-            clipBox.height = chart.plotHeight;
         }
     }
 
@@ -131,13 +159,11 @@ function getBoostClipRect(
 /**
  * Returns true if the chart is in series boost mode.
  *
- * @function Highcharts.Chart#isChartSeriesBoosting
- *
+ * @internal
  * @param {Highcharts.Chart} chart
- *        the chart to check
- *
+ * Chart to check.
  * @return {boolean}
- *         true if the chart is in series boost mode
+ * `true` if the chart is in series boost mode.
  */
 function isChartSeriesBoosting(
     chart: Chart
@@ -145,7 +171,7 @@ function isChartSeriesBoosting(
     const allSeries = chart.series,
         boost = chart.boost = chart.boost || {},
         boostOptions = chart.options.boost || {},
-        threshold = pick(boostOptions.seriesThreshold, 50);
+        threshold = (boostOptions.seriesThreshold ?? 50);
 
     if (allSeries.length >= threshold) {
         return true;
@@ -161,8 +187,8 @@ function isChartSeriesBoosting(
         allowBoostForce = true;
         for (const axis of chart.xAxis) {
             if (
-                pick(axis.min, -Infinity) > pick(axis.dataMin, -Infinity) ||
-                pick(axis.max, Infinity) < pick(axis.dataMax, Infinity)
+                (axis.min ?? -Infinity) > (axis.dataMin ?? -Infinity) ||
+                (axis.max ?? Infinity) < (axis.dataMax ?? Infinity)
             ) {
                 allowBoostForce = false;
                 break;
@@ -180,6 +206,7 @@ function isChartSeriesBoosting(
     // If there are more than five series currently boosting,
     // we should boost the whole chart to avoid running out of webgl contexts.
     let canBoostCount = 0,
+        eligibleCount = 0,
         needBoostCount = 0,
         seriesOptions: SeriesOptions;
 
@@ -204,14 +231,16 @@ function isChartSeriesBoosting(
             continue;
         }
 
+        ++eligibleCount;
+
         if (BoostableMap[series.type]) {
             ++canBoostCount;
         }
 
         if (patientMax(
-            series.processedXData,
-            seriesOptions.data as any,
-            // series.xData,
+            series.getColumn('x', true),
+            seriesOptions.data || [],
+            /// series.xData,
             series.points
         ) >= (seriesOptions.boostThreshold || Number.MAX_VALUE)) {
             ++needBoostCount;
@@ -220,8 +249,20 @@ function isChartSeriesBoosting(
 
     boost.forceChartBoost = allowBoostForce && (
         (
+            // Even when the series that need a boost are less than or equal
+            // to 5, force a chart boost when all series are to be boosted.
+            // See #18815
             canBoostCount === allSeries.length &&
-            needBoostCount > 0
+            needBoostCount === canBoostCount
+        ) ||
+        // Preserve chart-level boost when it was already active (markerGroup
+        // exists) and all remaining visible eligible series still need boost,
+        // so that hiding a series does not drop out of chart-boost mode
+        // and break the shared halo (#23338).
+        (
+            !!boost.markerGroup &&
+            canBoostCount === eligibleCount &&
+            needBoostCount === canBoostCount
         ) ||
         needBoostCount > 5
     );
@@ -230,8 +271,8 @@ function isChartSeriesBoosting(
 }
 
 /**
- * Take care of the canvas blitting
- * @private
+ * Take care of the canvas blitting.
+ * @internal
  */
 function onChartCallback(
     chart: Chart
@@ -239,7 +280,7 @@ function onChartCallback(
 
     /**
      * Convert chart-level canvas to image.
-     * @private
+     * @internal
      */
     function canvasToSVG(): void {
         if (
@@ -253,7 +294,7 @@ function onChartCallback(
 
     /**
      * Clear chart-level canvas.
-     * @private
+     * @internal
      */
     function preRender(): void {
 
@@ -263,8 +304,8 @@ function onChartCallback(
         chart.boosted = false;
 
         // Clear the canvas
-        if (chart.boost.clear) {
-            chart.boost.clear();
+        if (!chart.axes.some((axis): boolean|undefined => axis.isPanning)) {
+            chart.boost.clear?.();
         }
 
         if (
@@ -276,7 +317,7 @@ function onChartCallback(
             chart.boost.wgl.allocateBuffer(chart);
         }
 
-        // see #6518 + #6739
+        // See #6518 + #6739
         if (
             chart.boost.markerGroup &&
             chart.xAxis &&
@@ -292,60 +333,68 @@ function onChartCallback(
     }
 
     addEvent(chart, 'predraw', preRender);
-    addEvent(chart, 'render', canvasToSVG);
-
-    // addEvent(chart, 'zoom', function () {
-    //     chart.boostForceChartBoost =
-    //         shouldForceChartSeriesBoosting(chart);
-    // });
+    // Use the load event rather than redraw, otherwise user load events will
+    // fire too early (#18755)
+    addEvent(chart, 'load', canvasToSVG, { order: -1 });
+    addEvent(chart, 'redraw', canvasToSVG);
 
     let prevX = -1;
     let prevY = -1;
 
-    addEvent(chart.pointer, 'afterGetHoverData', (): void => {
-        const series = chart.hoverSeries;
+    addEvent(
+        chart.pointer,
+        'afterGetHoverData',
+        (e: Pointer.EventArgsObject): void => {
+            const series = e.hoverPoint?.series;
 
-        chart.boost = chart.boost || {};
+            chart.boost = chart.boost || {};
 
-        if (chart.boost.markerGroup && series) {
-            const xAxis = chart.inverted ? series.yAxis : series.xAxis;
-            const yAxis = chart.inverted ? series.xAxis : series.yAxis;
+            if (chart.boost.markerGroup && series) {
+                const xAxis = chart.inverted ? series.yAxis : series.xAxis;
+                const yAxis = chart.inverted ? series.xAxis : series.yAxis;
 
-            if (
-                (xAxis && xAxis.pos !== prevX) ||
-                (yAxis && yAxis.pos !== prevY)
-            ) {
-                // #10464: Keep the marker group position in sync with the
-                // position of the hovered series axes since there is only
-                // one shared marker group when boosting.
-                chart.boost.markerGroup.translate(xAxis.pos, yAxis.pos);
+                if (
+                    (xAxis && xAxis.pos !== prevX) ||
+                    (yAxis && yAxis.pos !== prevY)
+                ) {
+                    // #21176: If the axis is changed, hide teh halo without
+                    // animation  to prevent flickering of halos sharing the
+                    // same marker group
+                    chart.series.forEach((s): void => {
+                        s.halo?.hide();
+                    });
 
-                prevX = xAxis.pos;
-                prevY = yAxis.pos;
+                    // #10464: Keep the marker group position in sync with the
+                    // position of the hovered series axes since there is only
+                    // one shared marker group when boosting.
+                    chart.boost.markerGroup.translate(xAxis.pos, yAxis.pos);
+
+                    prevX = xAxis.pos;
+                    prevY = yAxis.pos;
+                }
             }
         }
-    });
+    );
 }
 
 /**
  * Tolerant max() function.
  *
- * @private
+ * @internal
  * @param {...Array<Array<unknown>>} args
  * Max arguments
  * @return {number}
  * Max value
  */
-function patientMax(...args: Array<Array<unknown>>): number {
+function patientMax(...args: Array<Array<unknown>|TypedArray>): number {
     let r = -Number.MAX_VALUE;
 
-    args.forEach(function (t: Array<unknown>): (boolean|undefined) {
+    args.forEach((t): boolean|undefined => {
         if (
             typeof t !== 'undefined' &&
             t !== null &&
             typeof t.length !== 'undefined'
         ) {
-            // r = r < t.length ? t.length : r;
             if (t.length > 0) {
                 r = t.length;
                 return true;
@@ -362,10 +411,12 @@ function patientMax(...args: Array<Array<unknown>>): number {
  *
  * */
 
+/** @internal */
 const BoostChart = {
     compose,
     getBoostClipRect,
     isChartSeriesBoosting
 };
 
+/** @internal */
 export default BoostChart;

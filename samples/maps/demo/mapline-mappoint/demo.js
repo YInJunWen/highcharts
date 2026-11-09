@@ -27,18 +27,15 @@
     // Skip or move some labels to avoid collision
     states.forEach(state => {
         // Disable data labels
-        if (state.properties.code_hasc === 'AU.CT' || state.properties.code_hasc === 'AU.JB') {
+        if (
+            state.properties.code_hasc ===
+            'AU.CT' || state.properties.code_hasc === 'AU.JB'
+        ) {
             state.dataLabels = {
                 enabled: false
             };
         }
-        if (state.properties.code_hasc === 'AU.TS') {
-            state.dataLabels = {
-                style: {
-                    color: '#333333'
-                }
-            };
-        }
+
         // Move center for data label
         if (state.properties.code_hasc === 'AU.SA') {
             state.middleY = 0.3;
@@ -64,7 +61,10 @@
             point: {
                 valueDescriptionFormat: '{xDescription}.'
             },
-            description: 'Map of Australia, showing examples of multiple geometry types in Highcharts Maps: Map areas (used for regions), map lines (used for rivers), and map points (used for cities).'
+            description: 'Map of Australia, showing examples of multiple ' +
+                'geometry types in Highcharts Maps: Map areas (used for ' +
+                'regions), map lines (used for rivers), and map points (used ' +
+                'for cities).'
         },
 
         mapNavigation: {
@@ -77,12 +77,10 @@
         series: [{
             name: 'States and territories',
             data: states,
-            color: Highcharts.color(Highcharts.getOptions().colors[2])
-                .setOpacity(0.75)
-                .get(),
+            color: '#8b8a',
             states: {
                 hover: {
-                    color: Highcharts.getOptions().colors[4]
+                    color: 'var(--highcharts-color-4)'
                 }
             },
             dataLabels: {
@@ -93,7 +91,8 @@
                     textTransform: 'uppercase',
                     fontWeight: 'normal',
                     textOutline: 'none',
-                    color: '#888'
+                    color: 'var(--highcharts-neutral-color-100, black)',
+                    opacity: 0.5
                 }
             },
             tooltip: {
@@ -108,7 +107,7 @@
                     lineWidth: 3
                 }
             },
-            color: Highcharts.getOptions().colors[0],
+            color: '#2caffe',
             tooltip: {
                 pointFormat: '{point.properties.NAME}'
             }
@@ -124,10 +123,7 @@
                 align: 'left',
                 verticalAlign: 'middle'
             },
-            animation: false,
-            tooltip: {
-                pointFormat: '{point.name}'
-            }
+            animation: false
         }]
     });
 

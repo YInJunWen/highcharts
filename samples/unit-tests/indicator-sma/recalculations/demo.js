@@ -40,7 +40,11 @@ QUnit.test('Test algorithm on data updates.', function (assert) {
                     type: 'sma',
                     linkedTo: 'main'
                 }
-            ]
+            ],
+            scrollbar: {
+                buttonsEnabled: true,
+                height: 14
+            }
         }),
         pointsValue = [],
         secondChart,
@@ -72,7 +76,11 @@ QUnit.test('Test algorithm on data updates.', function (assert) {
         }
     });
 
-    assert.deepEqual(chart.series[1].yData, [13, 14, 15], 'Correct values');
+    assert.deepEqual(
+        chart.series[1].yData || chart.series[1].getColumn('y'),
+        [13, 14, 15],
+        'Correct values'
+    );
 
     assert.strictEqual(
         chart.series[1].graph.attr('stroke'),
@@ -83,7 +91,7 @@ QUnit.test('Test algorithm on data updates.', function (assert) {
     chart.series[0].points[6].remove();
 
     assert.deepEqual(
-        chart.series[1].yData,
+        chart.series[1].yData || chart.series[1].getColumn('y'),
         [13, 14],
         'Correct values after point.remove()'
     );
@@ -93,7 +101,8 @@ QUnit.test('Test algorithm on data updates.', function (assert) {
     assert.strictEqual(
         chart.series[1].points[chart.series[1].points.length - 1].x,
         chart.series[0].points[chart.series[0].points.length - 1].x,
-        'Correct last point position after addPoint() with shift parameter (#8572)'
+        'Correct last point position after addPoint() with shift parameter ' +
+        '(#8572)'
     );
 
     secondSeries = chart.addSeries({
@@ -192,6 +201,22 @@ QUnit.test('Test algorithm on data updates.', function (assert) {
         xAxis: {
             minRange: 1
         },
+        scrollbar: {
+            buttonsEnabled: true,
+            height: 14
+        },
+        rangeSelector: {
+            buttons: [{
+                type: 'hour',
+                count: 1,
+                text: '1h',
+                dataGrouping: {
+                    units: [
+                        ['hour', [1]]
+                    ]
+                }
+            }]
+        },
         series: [
             {
                 id: 'aapl',
@@ -242,7 +267,7 @@ QUnit.test('Test algorithm on data updates.', function (assert) {
 
     assert.deepEqual(
         pointsValue,
-        secondChart.series[1].processedYData,
+        secondChart.series[1].getColumn('y', true),
         'Correct points after setData() (#9493)'
     );
 
@@ -266,12 +291,8 @@ QUnit.test('Test algorithm on data updates.', function (assert) {
         ]
     });
 
-    secondChart.series[1].points.forEach(function (point) {
-        pointsValue.push(point.y);
-    });
-
     assert.deepEqual(
-        pointsValue,
+        secondChart.series[1].getColumn('y', true),
         [
             212.074,
             212.23000000000002,
@@ -280,23 +301,52 @@ QUnit.test('Test algorithm on data updates.', function (assert) {
             216.27200000000002,
             216.19800000000004
         ],
-        'Correct points after update with cropped data - simulated draggable points (#9822)'
+        'Correct points after update with cropped data - simulated draggable ' +
+        'points (#9822)'
     );
 
     secondChart.series[0].addPoint(212.92, true, true);
 
     assert.strictEqual(
         secondChart.series[1].points[0].x,
-        secondChart.series[1].processedXData[0],
-        'Correct first point position after addPoint() with shift parameter and cropped data (#8572)'
+        secondChart.series[1].getColumn('x', true)[0],
+        'Correct first point position after addPoint() with shift parameter ' +
+            'and cropped data (#8572)'
     );
 
     assert.strictEqual(
         secondChart.series[1].points[secondChart.series[1].points.length - 1].x,
-        secondChart.series[1].processedXData[
-            secondChart.series[1].processedXData.length - 1
+        secondChart.series[1].getColumn('x', true)[
+            secondChart.series[1].getColumn('x', true).length - 1
         ],
-        'Correct last point position after addPoint() with shift parameter and cropped data (#8572)'
+        'Correct last point position after addPoint() with shift parameter ' +
+        'and cropped data (#8572)'
+    );
+
+    const lineSeriesPoints = secondChart.series[2].points;
+
+    secondChart.addSeries({
+        id: 'volume',
+        data: [
+            [lineSeriesPoints[0].x, 1500],
+            [lineSeriesPoints[1].x, 2000]
+        ]
+    });
+
+    secondChart.addSeries({
+        linkedTo: 'aapl',
+        type: 'obv',
+        params: {
+            volumeSeriesID: 'volume'
+        },
+        yAxis: 0
+    });
+
+    secondChart.rangeSelector.clickButton(0);
+
+    assert.ok(
+        true,
+        'No volumeSeriesID error when cliked rangeSelector button, #18643'
     );
 });
 
@@ -305,16 +355,20 @@ QUnit.test('Order of series and indicators, #15892.', function (assert) {
         navigator: {
             enabled: false
         },
-        series: [{
-            id: 'main',
-            data: [13, 14, 15, 13, 14, 15, 13, 14, 15]
+        scrollbar: {
+            buttonsEnabled: true,
+            height: 14
         },
-        {
+        series: [{
             type: 'sma',
+            id: 'sma',
             linkedTo: 'main',
             params: {
                 period: 4
             }
+        }, {
+            id: 'main',
+            data: [13, 14, 15, 13, 14, 15, 13, 14, 15]
         }]
     });
 
@@ -325,8 +379,143 @@ QUnit.test('Order of series and indicators, #15892.', function (assert) {
         both should be initialized.`
     );
     assert.ok(
-        chart.series[0].processedXData.length,
+        chart.series[0].getColumn('x', true).length,
         `When an indicator is declared before the main series,
         indicator data should be procesed.`
     );
+
+    chart.addSeries({
+        type: 'sma',
+        linkedTo: 'sma',
+        params: {
+            period: 4
+        }
+    });
+
+    chart.series[1].addPoint(16);
+
+    assert.strictEqual(
+        chart.series[2].points.length,
+        chart.series[0].points.length -
+            chart.series[2].options.params.period + 1,
+        `Indicator linked to another indicator should be recalculated after
+        adding a point to the main series #17190.`
+    );
+
+    chart.series[1].addPoint(5);
+    chart.series[1].addPoint(10);
+
+    assert.strictEqual(
+        chart.series[2].points.length,
+        6,
+        `After adding two points to the main series, indicator linked to another
+        indicator should also update its data #18689.`
+    );
 });
+
+QUnit.test(
+    'addPoint/removePoint vs setData on linked SMA (#22081)',
+    function (assert) {
+        const pointStart = 1000,
+            period = 5,
+            chart = Highcharts.stockChart('container', {
+                series: [{
+                    id: 'main',
+                    pointStart: pointStart,
+                    data: [
+                        10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
+                        20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30
+                    ]
+                }, {
+                    type: 'sma',
+                    id: 'sma',
+                    linkedTo: 'main',
+                    params: {
+                        period: period
+                    },
+                    dataGrouping: {
+                        enabled: false
+                    }
+                }]
+            }),
+            main = chart.get('main');
+
+        function assertSmaSynced(label) {
+            const sma = chart.get('sma'),
+                modifiedRows = sma.dataTable.getModified().rowCount,
+                expectedLength = main.dataTable.rowCount - period + 1;
+
+            assert.strictEqual(
+                sma.points.length,
+                expectedLength,
+                label + ': SMA point count should match main series'
+            );
+            assert.strictEqual(
+                sma.points.length,
+                modifiedRows,
+                label +
+                    ': points length should match getModified() row count'
+            );
+            assert.deepEqual(
+                sma.points.map(function (point) {
+                    return point.y;
+                }),
+                sma.getColumn('y', true),
+                label + ': rendered points should match y column data'
+            );
+        }
+
+        assertSmaSynced('initial');
+
+        main.addPoint(31);
+        assertSmaSynced('after addPoint(end)');
+
+        main.removePoint(main.data.length - 1);
+        assertSmaSynced('after removePoint(last)');
+
+        main.removePoint(0);
+        assertSmaSynced('after removePoint(first)');
+
+        main.addPoint(50, true, true);
+        assertSmaSynced('after addPoint(shift)');
+
+        main.setData([
+            100, 101, 102, 103, 104, 105, 106, 107, 108, 109,
+            110, 111, 112, 113, 114, 115, 116, 117, 118, 119
+        ]);
+        assertSmaSynced('after full setData replace');
+
+        main.setData([10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]);
+        main.setData([
+            [5000, 10], [5001, 11], [5002, 12], [5003, 13], [5004, 14],
+            [5005, 15], [5006, 16], [5007, 17], [5008, 18], [5009, 19],
+            [5010, 20], [5011, 21]
+        ]);
+        assertSmaSynced(
+            'after setData with unrelated x values (+1 length, not append)'
+        );
+
+        // Length +1/-1 with matching edge x looks like addPoint, but an
+        // overlapping y changed - must not take the incremental path.
+        main.setData([10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]);
+        const smaBefore = chart.get('sma').points.map(point => point.y);
+        const mutateIndex = 5;
+        const mutatedData = main.points.map(point => [point.x, point.y]);
+        mutatedData[mutateIndex][1] = 100;
+        mutatedData.push([
+            mutatedData[mutatedData.length - 1][0] + 1,
+            21
+        ]);
+        main.setData(mutatedData);
+        assertSmaSynced(
+            'after setData (+1 length) with mutated overlapping y'
+        );
+
+        const smaIndex = mutateIndex - period + 1;
+        assert.notStrictEqual(
+            chart.get('sma').points[smaIndex].y,
+            smaBefore[smaIndex],
+            'SMA window covering the mutated y should be recalculated'
+        );
+    }
+);

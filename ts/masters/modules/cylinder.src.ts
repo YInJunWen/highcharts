@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: LicenseRef-Highcharts
 /**
  * @license Highcharts JS v@product.version@ (@product.date@)
  * @module highcharts/modules/cylinder
@@ -6,9 +7,15 @@
  *
  * Highcharts cylinder module
  *
- * (c) 2010-2021 Kacper Madej
+ * (c) 2010-2026 Highsoft AS
+ * Author: Kacper Madej
  *
- * License: www.highcharts.com/license
+ * A commercial license may be required depending on use,
+ * see www.highcharts.com/license
  */
 'use strict';
-import '../../Series/Cylinder/CylinderSeries.js';
+import Highcharts from '../../Core/Globals.js';
+import SVGRenderer from '../../Core/Renderer/SVG/SVGRenderer.js';
+import CylinderSeries from '../../Series/Cylinder/CylinderSeries.js';
+CylinderSeries.compose(SVGRenderer);
+export default Highcharts;

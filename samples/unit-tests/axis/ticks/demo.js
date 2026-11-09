@@ -89,7 +89,7 @@ QUnit.test(
                 series: [
                     {
                         type: 'column',
-                        //pointRange: 1,
+                        // pointRange: 1,
                         data: [
                             [7, 7],
                             [10, 8]
@@ -336,6 +336,20 @@ QUnit.test('Ticks for a single point.', function (assert) {
     );
 
     chart.yAxis[0].update({
+        tickPositioner: (min, max, axis) => (
+            (min && max && axis) ?
+                [16, 32, 48] :
+                []
+        )
+    });
+
+    assert.strictEqual(
+        chart.yAxis[0].min,
+        16,
+        'Arrow-function tickPositioner should work.'
+    );
+
+    chart.yAxis[0].update({
         tickPositioner: function () {}
     });
 
@@ -511,11 +525,11 @@ QUnit.test('The tickPositions option', function (assert) {
     chart.xAxis[0].update({
         tickPositions: undefined
     });
-    
+
     assert.deepEqual(
         chart.xAxis[0].tickPositions,
         [8, 9, 10, 11, 12, 13, 14],
-        'After setting tickPostions to undefined they should be' + 
+        'After setting tickPostions to undefined they should be' +
             'cleared. (#10525)'
     );
 });
@@ -710,10 +724,47 @@ QUnit.test('Monthly ticks (#3500)', function (assert) {
     }
 
     assert.deepEqual(
-        expectedTicksText,
         ticksText,
+        expectedTicksText,
         'Monthly X axis ticks is not correct'
     );
+
+    chart.update({
+        chart: {
+            width: 1200,
+            marginRight: 0
+        }
+    });
+
+    const ticksWithoutFlags = chart.xAxis[0].tickPositions.slice();
+
+    chart.addSeries({
+        type: 'flags',
+        data: []
+    });
+
+    assert.deepEqual(
+        chart.xAxis[0].tickPositions,
+        ticksWithoutFlags,
+        'Empty flags series should not change monthly tick positions (#23555).'
+    );
+
+    chart.series[1].update({
+        visible: false,
+        data: [{
+            x: Date.UTC(2014, 2, 15),
+            title: 'A',
+            text: 'A'
+        }]
+    });
+
+    assert.deepEqual(
+        chart.xAxis[0].tickPositions,
+        ticksWithoutFlags,
+        'Hidden flags with data should not change monthly tick positions ' +
+        '(#23555).'
+    );
+
     // Reset
     Highcharts.setOptions(resetTo);
 });
@@ -901,7 +952,8 @@ QUnit.test('No ticks on short axis (#3195)', function (assert) {
 });
 
 QUnit.test(
-    'The ticks should be visible when specified tick amount and chart height <200px',
+    'The ticks should be visible when specified tick amount and chart height ' +
+    '<200px',
     function (assert) {
         var chart = Highcharts.chart('container', {
             chart: {
@@ -963,7 +1015,8 @@ QUnit.test('Ticks and setSize', assert => {
                 pos150,
                 (pos100 + pos200) / 2,
                 1,
-                'The new tick should appear centered between the two existing ' +
+                'The new tick should appear centered between the two ' +
+                'existing ' +
                     'ticks (#13507)'
             );
             done();
@@ -976,7 +1029,8 @@ QUnit.test('Ticks and setSize', assert => {
             assert.strictEqual(
                 chart.xAxis[0].ticks[0].label.attr('opacity'),
                 1,
-                'The label should remain visible after the update sequence (#12137)'
+                'The label should remain visible after the update sequence ' +
+                '(#12137)'
             );
             done();
         }, 2);
@@ -988,9 +1042,125 @@ QUnit.test('Ticks and setSize', assert => {
 });
 
 QUnit.test(
-    'The tick interval after updating series visibility should stay the same (#13369)',
+    'Expected space for ticks, calculation of chart plot height (#19896).',
     function (assert) {
-        var chart = Highcharts.chart('container', {
+        const optionsToCheck = [{
+            xAxis: {
+                labels: {
+                    reserveSpace: false
+                }
+            }
+        }, {
+            yAxis: {
+                crossing: 0
+            }
+        }, {
+            xAxis: {
+                labels: {
+                    distance: 15
+                }
+            }
+        }, {
+            xAxis: {
+                tickLength: 20
+            }
+        }, {
+            xAxis: {
+                offset: 20
+            }
+        }, {
+            xAxis: {
+                offset: -20
+            }
+        }, {
+            xAxis: {
+                labels: {
+                    style: {
+                        fontSize: 11
+                    }
+                }
+            }
+        }, {
+            chart: {
+                styledMode: true
+            },
+            xAxis: {
+                className: 'test-classname'
+            }
+        }];
+
+        // Used only for test description.
+        const toDotNot = (input, parentKey) => Object.keys(input || {})
+            .reduce((acc, key) => {
+                const value = input[key],
+                    outputKey = parentKey ? `${parentKey}.${key}` : `${key}`;
+                return ({ ...acc, [outputKey]: value });
+            }, {});
+
+        optionsToCheck.forEach(options => {
+            let expectedPlotHeight = 0;
+            const chart = Highcharts.chart('container', Highcharts.merge({
+                chart: {
+                    height: 370
+                },
+                yAxis: {
+                    min: 0,
+                    max: 75,
+                    events: {
+                        afterSetScale: function () {
+                            if (expectedPlotHeight === 0) {
+                                expectedPlotHeight = this.chart.plotHeight;
+                            }
+                        }
+                    }
+                },
+                series: [{
+                    data: [
+                        [-25, 75],
+                        [0, 0],
+                        [25, 75]
+                    ]
+                }]
+            }, options));
+
+            const ticksBeforeUpdate = chart.yAxis[0].tickPositions;
+
+            chart.series[0].update({});
+
+            assert.deepEqual(
+                chart.yAxis[0].tickPositions,
+                ticksBeforeUpdate,
+                `Ticks with ${JSON.stringify(toDotNot(options))} should stay
+                the same after updating series (#19604).`
+            );
+
+            // Chrome is not that reliable
+            let precision = 2;
+
+            // A strange case of shifting, only when the font-family contains
+            // the `-apple-system` font, and only with FirefoxHeadless (and
+            // ChromeHeadless on Windows). Not reproducible with regular Firefox
+            // or Chrome.
+            if (
+                options.chart?.styledMode &&
+                (
+                    navigator.userAgent.indexOf('Firefox') !== -1 ||
+                    window.navigator.platform.indexOf('Win') >= 0
+                )
+            ) {
+                precision = 9;
+            }
+
+            assert.close(
+                chart.plotHeight,
+                expectedPlotHeight,
+                precision,
+                `Plot height with ${JSON.stringify(toDotNot(options))} should
+                stay the same after updating series (#19604).`
+            );
+        });
+
+        const chart = Highcharts.chart('container', {
             xAxis: {
                 type: 'datetime'
             },
@@ -1036,7 +1206,8 @@ QUnit.test(
         assert.deepEqual(
             initialTickInterval,
             chart.xAxis[0].tickPositions,
-            'Using the scatter and line series the tick interval should stay the same.'
+            `Using the scatter and line series the tick interval should stay
+            the same after updating series visibility (#13369).`
         );
 
         chart.addSeries({
@@ -1057,13 +1228,15 @@ QUnit.test(
         assert.deepEqual(
             chart.xAxis[0].tickPositions,
             [1580515200000, 1580688000000],
-            'After adding columns series the tick interval should change to make a place for columns.'
+            `After adding columns series the tick interval should change to make
+            a place for columns.`
         );
     }
 );
 
 QUnit.test(
-    'In trimTicks, Min and max must be checked when start/endOntick are false (#14417).',
+    'In trimTicks, Min and max must be checked when start/endOntick are ' +
+    'false (#14417).',
     function (assert) {
         var chart = Highcharts.chart('container', {
             xAxis: {
@@ -1117,3 +1290,62 @@ QUnit.test(
         );
     }
 );
+
+QUnit.test('Tick and label overflow (#16307)', assert => {
+    const chart = Highcharts.chart('container', {
+        chart: {
+            width: 600,
+            marginRight: 50
+        },
+        xAxis: {
+            categories: [
+                'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep',
+                'Oct', 'Nov', 'Dec'
+            ],
+            tickLength: 10,
+            tickWidth: 1
+        },
+        series: [{
+            data: [
+                29.9, 71.5, 106.4, 129.2, 144.0,
+                176.0, 135.6, 148.5, 216.4, 194.1, 95.6, 54.4
+            ]
+        }],
+        plotOptions: {
+            series: {
+                pointPlacement: 'on'
+            }
+        }
+    });
+
+    assert.strictEqual(
+        chart.xAxis[0].ticks['11'].mark.opacity,
+        0,
+        'The last tick mark should not be visible (#20166)'
+    );
+
+    assert.strictEqual(
+        chart.xAxis[0].ticks['11'].label.opacity,
+        1,
+        '... but the last tick label should be visible (#20375)'
+    );
+
+    chart.redraw();
+    assert.strictEqual(
+        chart.xAxis[0].ticks['11'].mark.opacity,
+        0,
+        'After redraw, the last tick mark should still not be visible'
+    );
+
+    chart.update({
+        xAxis: {
+            tickWidth: 3
+        }
+    });
+    assert.strictEqual(
+        chart.xAxis[0].ticks['11'].mark.attr('stroke-width'),
+        3,
+        'After update, the last tick mark should have a stroke width of 3'
+    );
+
+});

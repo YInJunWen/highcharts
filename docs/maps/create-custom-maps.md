@@ -1,3 +1,10 @@
+---
+description: >-
+  Draw regions in Inkscape, add fills and identifiers, handle islands,
+  enclaves, and separators, then convert SVG into map data with Highcharts’
+  online converter. The article shows how to load that data into a chart.
+---
+
 Creating custom maps
 ===
 
@@ -47,7 +54,7 @@ Highcharts Maps can be used for more than geographic data, and more than the fea
 
 ![map-from-svg-10.png](map-from-svg-10.png)
 
-15. Go to this [link](https://jsfiddle.net/highcharts/7pfgqrbe/), where you can find an empty boilerplate for Highcharts Maps. Add a series configuration object and paste your data. It should now look like this [demo](https://jsfiddle.net/highcharts/hw4z12kc/).
+15. Go to this [link](https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/maps/general/boilerplate/), where you can find an empty boilerplate for Highcharts Maps. Add a series configuration object and paste your data. It should now look like this [demo](https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/maps/series/data-path/).
 
 ```js
 // Initiate the chart

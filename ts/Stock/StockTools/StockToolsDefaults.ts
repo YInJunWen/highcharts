@@ -2,11 +2,13 @@
  *
  *  GUI generator for Stock tools
  *
- *  (c) 2009-2021 Sebastian Bochan
+ *  (c) 2009-2026 Highsoft AS
+ *  Author: Sebastian Bochan
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -357,7 +359,7 @@ const lang: LangOptions = {
                  */
                 zigzag: ['Zig Zag'],
 
-                // Oscilators
+                // Oscillators
                 /**
                  *  Absolute price indicator alias.
                  *
@@ -611,6 +613,8 @@ const lang: LangOptions = {
  * @sample stock/demo/stock-tools-custom-gui Stock Tools customized GUI
  *
  * @since        7.0.0
+ *
+ * @requires modules/stock-tools
  * @optionparent stockTools
  */
 const stockTools: StockToolsOptions = {
@@ -626,7 +630,7 @@ const stockTools: StockToolsOptions = {
          * Since 7.1.3 use [iconsURL](#navigation.iconsURL) for popup and
          * stock tools.
          *
-         * @deprecated
+         * @deprecated 7.1.3
          * @apioption stockTools.gui.iconsURL
          *
          */
@@ -697,6 +701,7 @@ const stockTools: StockToolsOptions = {
          */
         definitions: {
             separator: {
+                elementType: 'span',
                 /**
                  * A predefined background symbol for the button.
                  */
@@ -707,7 +712,7 @@ const stockTools: StockToolsOptions = {
                  * A collection of strings pointing to config options for
                  * the items.
                  *
-                 * @type {Array}
+                 * @type {Array<string>}
                  * @default [
                  *   'label',
                  *   'circle',
@@ -764,7 +769,7 @@ const stockTools: StockToolsOptions = {
                  * A collection of strings pointing to config options for
                  * the items.
                  *
-                 * @type {Array}
+                 * @type {Array<string>}
                  * @default [
                  *   'flagCirclepin',
                  *   'flagDiamondpin',
@@ -819,7 +824,7 @@ const stockTools: StockToolsOptions = {
                  * A collection of strings pointing to config options for
                  * the items.
                  *
-                 * @type {Array}
+                 * @type {Array<string>}
                  * @default [
                  *   'segment',
                  *   'arrowSegment',
@@ -911,7 +916,7 @@ const stockTools: StockToolsOptions = {
                  * A collection of strings pointing to config options for
                  * the items.
                  *
-                 * @type {Array}
+                 * @type {Array<string>}
                  * @default [
                  *   'elliott3',
                  *   'elliott5',
@@ -964,7 +969,7 @@ const stockTools: StockToolsOptions = {
                  * A collection of strings pointing to config options for
                  * the items.
                  *
-                 * @type {Array}
+                 * @type {Array<string>}
                  * @default [
                  *   'verticalCounter',
                  *   'verticalLabel',
@@ -1006,7 +1011,7 @@ const stockTools: StockToolsOptions = {
                  * A collection of strings pointing to config options for
                  * the items.
                  *
-                 * @type {Array}
+                 * @type {Array<string>}
                  * @default [
                  *   'fibonacci',
                  *   'fibonacciTimeZones',
@@ -1056,7 +1061,7 @@ const stockTools: StockToolsOptions = {
                 },
                 timeCycles: {
                     /**
-                     * A predefined backgroud symbol for the button.
+                     * A predefined background symbol for the button.
                      *
                      * @type {string}
                      */
@@ -1068,7 +1073,7 @@ const stockTools: StockToolsOptions = {
                  * A collection of strings pointing to config options for
                  * the items.
                  *
-                 * @type {Array}
+                 * @type {Array<string>}
                  * @default [
                  *   'measureXY',
                  *   'measureX',
@@ -1134,7 +1139,7 @@ const stockTools: StockToolsOptions = {
                  * A collection of strings pointing to config options for
                  * the items.
                  *
-                 * @type {Array}
+                 * @type {Array<string>}
                  * @default [
                  *   'zoomX',
                  *   'zoomY',
@@ -1176,7 +1181,7 @@ const stockTools: StockToolsOptions = {
                  * A collection of strings pointing to config options for
                  * the items.
                  *
-                 * @type {Array}
+                 * @type {Array<string>}
                  * @default [
                  *   'typeOHLC',
                  *   'typeLine',
@@ -1257,7 +1262,13 @@ const stockTools: StockToolsOptions = {
                  */
                 symbol: 'save-chart.svg'
             }
-        }
+        },
+        /**
+         * Whether the stock tools toolbar is visible.
+         *
+         * @since 11.4.4
+         */
+        visible: true
     }
 };
 
@@ -1267,9 +1278,11 @@ const stockTools: StockToolsOptions = {
  *
  * */
 
+/** @internal */
 const StockToolsDefaults = {
     lang,
     stockTools
 };
 
+/** @internal */
 export default StockToolsDefaults;

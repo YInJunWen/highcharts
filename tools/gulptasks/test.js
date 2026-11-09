@@ -2,6 +2,8 @@
  * Copyright (C) Highsoft AS
  */
 
+/* eslint-disable node/no-unsupported-features/es-syntax */
+
 const gulp = require('gulp');
 const path = require('path');
 
@@ -21,8 +23,6 @@ const CONFIGURATION_FILE = path.join(
 
 const JS_DIRECTORY = path.join(BASE, 'js');
 
-const KARMA_CONFIG_FILE = path.join(BASE, 'test', 'karma-conf.js');
-
 const TESTS_DIRECTORY = path.join(BASE, 'samples', 'unit-tests');
 
 /* *
@@ -30,6 +30,38 @@ const TESTS_DIRECTORY = path.join(BASE, 'samples', 'unit-tests');
  *  Functions
  *
  * */
+
+/**
+ * Reject legacy runner flags that Playwright does not receive.
+ *
+ * @param {Object} argv Command-line arguments.
+ * @return {void}
+ */
+function rejectRetiredFlags(argv) {
+    const retiredVisualFlag = ['reference', 'visualcompare']
+        .find(flag => flag in argv);
+
+    if (retiredVisualFlag) {
+        throw new Error(
+            `--${retiredVisualFlag} is no longer supported by gulp test. ` +
+            'Use `npm run test:pw:visual` for visual tests. ' +
+            'Set VISUAL_TEST_REFERENCE=1 when generating references.'
+        );
+    }
+
+    const retiredFlag = [
+        'browsers', 'browsercount', 'splitbrowsers', 'debug', 'tests',
+        'testsAbsolutePath', 'ts', 'dots', 'timeout'
+    ].find(flag => flag in argv);
+
+    if (retiredFlag) {
+        throw new Error(
+            `--${retiredFlag} is no longer supported by gulp test. ` +
+            'Use `npx playwright test` for browser selection, test filtering ' +
+            'and other Playwright options.'
+        );
+    }
+}
 
 /**
  * Check that each demo.details has the correct js_wrap setting required for it
@@ -41,7 +73,7 @@ function checkJSWrap() {
 
     const fs = require('fs');
     const glob = require('glob');
-    const logLib = require('./lib/log');
+    const LogLib = require('../libs/log');
     const yaml = require('js-yaml');
 
     let errors = 0;
@@ -50,18 +82,18 @@ function checkJSWrap() {
         process.cwd() + '/samples/+(highcharts|stock|maps|gantt)/**/demo.html'
     ).forEach(f => {
 
-        const detailsFile = f.replace(/\.html$/, '.details');
+        const detailsFile = f.replace(/\.html$/u, '.details');
 
         try {
             const details = yaml.safeLoad(
                 fs.readFileSync(detailsFile, 'utf-8')
             );
             if (details.js_wrap !== 'b') {
-                logLib.failure('js_wrap not found:', detailsFile);
+                LogLib.failure('js_wrap not found:', detailsFile);
                 errors++;
             }
-        } catch (e) {
-            logLib.failure('File not found:', detailsFile);
+        } catch {
+            LogLib.failure('File not found:', detailsFile);
             errors++;
         }
     });
@@ -71,7 +103,46 @@ function checkJSWrap() {
     }
 }
 
+function checkSamplesConsistency() {
+    const FSLib = require('../libs/fs.js');
+    const { existsSync } = require('node:fs');
+    const glob = require('glob');
+    const LogLib = require('../libs/log');
+
+    let errors = 0;
+
+    // Avoid double-commit of demo.js and demo.ts
+    glob.sync(
+        FSLib.path(process.cwd() + '/samples/*/demo/*', true)
+    ).forEach(p => {
+        if (existsSync(FSLib.path(p + '/demo.ts'))) {
+            const gitignore = FSLib.path(p + '/.gitignore');
+            if (!existsSync(gitignore)) {
+                LogLib.failure(
+                    'Should have a .gitignore file when demo.ts exists',
+                    p
+                );
+                errors++;
+            } else {
+                const content = FSLib.getFile(gitignore);
+                if (!content.includes('demo.js')) {
+                    LogLib.failure(
+                        'Should list demo.js in .gitignore file when demo.ts exists',
+                        p
+                    );
+                    errors++;
+                }
+            }
+        }
+    });
+
+    if (errors) {
+        throw new Error('Samples validation failed');
+    }
+}
+
 /**
+ * Checks if demos (public ones for the website) have valid configuration
  * @return {void}
  */
 function checkDemosConsistency() {
@@ -93,53 +164,72 @@ function checkDemosConsistency() {
     });
 
     const glob = require('glob');
-    const logLib = require('./lib/log');
+    const FSLib = require('../libs/fs.js');
+    const LogLib = require('../libs/log');
     const yaml = require('js-yaml');
+    const assert = require('node:assert');
+    const { existsSync } = require('node:fs');
 
     let errors = 0;
 
+
     glob.sync(
-        process.cwd() + '/samples/+(highcharts|stock|maps|gantt)/demo/*/demo.details'
-    ).forEach(detailsFile => {
-
-        try {
-            const details = yaml.load(
-                fs.readFileSync(detailsFile, 'utf-8')
+        FSLib.path(process.cwd() + '/samples/*/demo/*', true)
+    ).forEach(p => {
+        if (existsSync(FSLib.path(p + '/demo.html'))) {
+            assert(
+                existsSync(FSLib.path(p + '/demo.details')),
+                `Missing demo.details file at ${p}`
             );
+        }
+    });
 
-            if (typeof details !== 'object') {
-                throw new Error('Malformed details file');
-            }
+    glob.sync(
+        FSLib.path(process.cwd() + '/samples/*/*/*/demo.details', true)
+    ).forEach(detailsFile => {
+        detailsFile = FSLib.path(detailsFile, true);
 
-            const { name, categories: demoCategories, tags: demoTags } = details;
-            if (!name || /High.*demo/.test(name)) {
-                logLib.failure('no name set, or default name used:', detailsFile);
-                errors++;
-            }
+        if (/\/samples\/(\w+)\/demo\//u.test(detailsFile)) {
+            try {
+                const details = yaml.safeLoad(
+                    fs.readFileSync(detailsFile, 'utf-8')
+                );
 
-            if (!demoCategories || !demoCategories.length) {
-                logLib.failure('no categories found:', detailsFile);
-                errors++;
-            } else {
-                if (!demoCategories.every(category => categories.includes(typeof category === 'object' ? Object.keys(category)[0] : category))) {
-                    logLib.failure('one or more categories are missing from demo-config:', detailsFile);
+                if (typeof details !== 'object') {
+                    throw new Error('Malformed details file');
+                }
+
+                const { name, categories: demoCategories, tags: demoTags } = details;
+                if (!name || /High.*demo/u.test(name)) {
+                    LogLib.failure('no name set, or default name used:', detailsFile);
                     errors++;
                 }
-            }
 
-            if (!demoTags || !demoTags.length) {
-                logLib.failure('no tags found:', detailsFile);
-                errors++;
-            } else {
-                if (!demoTags.every(tag => tag === 'unlisted' || tags.includes(tag))) {
-                    logLib.failure('one or more tags are missing from demo-config:', detailsFile);
+                if (!demoCategories || !demoCategories.length) {
+                    LogLib.failure('no categories found:', detailsFile);
                     errors++;
+                } else {
+                    if (!demoCategories.every(category => categories.includes(typeof category === 'object' ? Object.keys(category)[0] : category))) {
+                        LogLib.failure('one or more categories are missing from demo-config:', detailsFile);
+                        errors++;
+                    }
                 }
+
+                if (!demoTags || !demoTags.length) {
+                    LogLib.failure('no tags found:', detailsFile);
+                    errors++;
+                } else {
+                    if (!demoTags.some(tag => tag === 'unlisted' || tags.includes(tag))) {
+                        LogLib.failure('demo.details should include at least one tag from demo-config.js ', detailsFile);
+                        errors++;
+                    }
+                }
+
+            } catch {
+                LogLib.failure('File not found:', detailsFile);
+                errors++;
             }
 
-        } catch (e) {
-            logLib.failure('File not found:', detailsFile);
-            errors++;
         }
     });
 
@@ -149,20 +239,31 @@ function checkDemosConsistency() {
 }
 
 /**
+ * Checks if documentation is added to sidebar file
  * @async
- * @return {void}
+ * @return {Promise<void>}
  */
 function checkDocsConsistency() {
     const FS = require('fs');
-    const LogLib = require('./lib/log');
+    const LogLib = require('../libs/log');
 
     const sidebar = require('../../docs/sidebars.js');
     const { unlisted } = require('../../docs/doc-config.js');
     const sidebarDocs = [];
 
-    Object
-        .keys(sidebar.docs)
-        .forEach(key => sidebarDocs.push(...Object.values(sidebar.docs[key])));
+    // Recursive function to collect doc paths from sidebar
+    function collectDocs(item) {
+        if (Array.isArray(item)) {
+            item.forEach(collectDocs);
+        } else if (typeof item === 'string') {
+            sidebarDocs.push(item);
+        } else if (typeof item === 'object') {
+            Object.values(item).forEach(collectDocs);
+        }
+    }
+
+    // Start collecting docs from sidebar.docs
+    collectDocs(sidebar.docs);
 
     const dirs = FS.readdirSync('docs/');
     const foundDocs = [];
@@ -180,6 +281,7 @@ function checkDocsConsistency() {
     } catch (error) {
         throw new Error(error);
     }
+
     const docsNotAdded = foundDocs.filter(file => {
         if (unlisted.includes(file)) {
             return false;
@@ -192,97 +294,10 @@ function checkDocsConsistency() {
         docsNotAdded.forEach(file => LogLib.warn(`   '${file}'`));
         throw new Error('Docs not added to sidebar');
     }
+
+    // Check links and references to samples
+
 }
-
-/**
- * @return {void}
- */
-function saveRun() {
-
-    const FS = require('fs');
-    const FSLib = require('./lib/fs');
-    const StringLib = require('./lib/string');
-
-    const latestCodeHash = FSLib.getDirectoryHash(
-        CODE_DIRECTORY, true, StringLib.removeComments
-    );
-    const latestJsHash = FSLib.getDirectoryHash(
-        JS_DIRECTORY, true, StringLib.removeComments
-    );
-    const latestTestsHash = FSLib.getDirectoryHash(
-        TESTS_DIRECTORY, true, StringLib.removeComments
-    );
-
-    const configuration = {
-        latestCodeHash,
-        latestJsHash,
-        latestTestsHash
-    };
-
-    FS.writeFileSync(CONFIGURATION_FILE, JSON.stringify(configuration));
-}
-
-/**
- * @return {boolean}
- *         True if outdated
- */
-function shouldRun() {
-
-    const fs = require('fs');
-    const fsLib = require('./lib/fs');
-    const logLib = require('./lib/log');
-    const stringLib = require('./lib/string');
-
-    let configuration = {
-        latestCodeHash: '',
-        latestJsHash: '',
-        latestTestsHash: ''
-    };
-
-    if (fs.existsSync(CONFIGURATION_FILE)) {
-        configuration = JSON.parse(
-            fs.readFileSync(CONFIGURATION_FILE).toString()
-        );
-    }
-
-    const latestCodeHash = fsLib.getDirectoryHash(
-        CODE_DIRECTORY, true, stringLib.removeComments
-    );
-    const latestJsHash = fsLib.getDirectoryHash(
-        JS_DIRECTORY, true, stringLib.removeComments
-    );
-    const latestTestsHash = fsLib.getDirectoryHash(
-        TESTS_DIRECTORY, true, stringLib.removeComments
-    );
-
-    if (latestCodeHash === configuration.latestCodeHash &&
-        latestJsHash !== configuration.latestJsHash
-    ) {
-
-        logLib.failure(
-            '✖ The files have not been built' +
-            ' since the last source code changes.' +
-            ' Run `npx gulp` and try again.'
-        );
-
-        throw new Error('Code out of sync');
-    }
-
-    if (latestCodeHash === configuration.latestCodeHash &&
-        latestTestsHash === configuration.latestTestsHash
-    ) {
-
-        logLib.success(
-            '✓ Source code and unit tests not have been modified' +
-            ' since the last successful test run.'
-        );
-
-        return false;
-    }
-
-    return true;
-}
-
 
 /* *
  *
@@ -293,142 +308,155 @@ function shouldRun() {
 /**
  * Run the test suite.
  *
+ * @param {Function} gulpback
+ * Internal async function by Gulp.js.
+ *
  * @return {Promise<void>}
  *         Promise to keep
  */
-function test() {
+async function test(gulpback) {
+    const argv = require('yargs').argv;
+    const logLib = require('../libs/log');
+    const PluginError = require('plugin-error');
 
-    const LogLib = require('./lib/log');
-    const Yargs = require('yargs');
+    const { shouldRun, saveRun, HELP_TEXT_COMMON } = require('./lib/test');
 
-    return new Promise((resolve, reject) => {
+    rejectRetiredFlags(argv);
 
-        const argv = Yargs.argv;
+    if (argv.help || argv.helpme) {
+        logLib.message(
+            `HIGHCHARTS PLAYWRIGHT TEST RUNNER
 
-        if (argv.help) {
-            LogLib.message(`
-HIGHCHARTS TEST RUNNER
+Available arguments for 'gulp test':` +
+            HELP_TEXT_COMMON
+        );
+        return;
+    }
 
-Available arguments for 'gulp test':
+    checkDocsConsistency();
+    checkSamplesConsistency();
+    checkDemosConsistency();
+    checkJSWrap();
 
---browsers
-    Comma separated list of browsers to test. Available browsers are
-    'ChromeHeadless, Chrome, Firefox, Safari, Edge, IE' depending on what is
-    installed on the local system. Defaults to ChromeHeadless.
+    const forceRun = !!argv.force;
 
-    In addition, virtual browsers from Browserstack are supported. They are
-    prefixed by the operating system. Available BrowserStack browsers are
-    'Mac.Chrome, Mac.Firefox, Mac.Safari, Win.Chrome, Win.Edge, Win.Firefox,
-    Win.IE'.
-
-    For debugging in Visual Studio Code, use 'ChromeHeadless.Debugging'.
-
-    A shorthand option, '--browsers all', runs all BrowserStack machines.
-
---browsercount
-    Number of browserinstances to spread/shard the tests across. Default value is 2.
-    Will default use ChromeHeadless browser. For other browsers specify
-    argument --splitbrowsers (same usage as above --browsers argument).
-
---debug
-    Skips rebuilding and prints some debugging info.
-
---force
-    Forces all tests without cached results.
-
---speak
-    Says if tests failed or succeeded.
-
---tests
-    Comma separated list of tests to run. Defaults to '*.*' that runs all tests
-    in the 'samples/' directory.
-    Example: 'gulp test --tests unit-tests/chart/*' runs all tests in the chart
-    directory.
-
---testsAbsolutePath
-    Comma separated list of tests to run. By default runs all tests
-    in the 'samples/' directory.
-    Example:
-    'gulp test --testsAbsolutePath /User/{userName}/{path}/{to}/highcharts/samples/unit-tests/3d/axis/demo.js'
-    runs all tests in the file.
-
---visualcompare
-    Performs a visual comparison of the output and creates a reference.svg and candidate.svg
-    when doing so. A JSON file with the results is produced in the location
-    specified by config.imageCapture.resultsOutputPath.
-
---ts
-    Compile TypeScript-based tests.
-
---dots
-    Use the less verbose 'dots' reporter
-
---timeout
-    Set a different disconnect timeout from default config
-
-`);
-            return;
+    // Extract --project parameter from command line arguments
+    // This is passed directly to Playwright, not parsed by yargs
+    // Supports both --project value and --project=value formats
+    let projectParam = null;
+    for (let i = 0; i < process.argv.length; i++) {
+        const arg = process.argv[i];
+        if (arg === '--project' && i + 1 < process.argv.length) {
+            projectParam = process.argv[i + 1];
+            break;
+        } else if (arg.startsWith('--project=')) {
+            projectParam = arg.split('=')[1];
+            break;
         }
-        checkDocsConsistency();
-        checkDemosConsistency();
-        checkJSWrap();
+    }
 
-        const forceRun = !!(argv.browsers || argv.browsercount || argv.force || argv.tests || argv.testsAbsolutePath);
+    // Use different config file for different projects to avoid cache conflicts
+    const configFile = projectParam ?
+        CONFIGURATION_FILE.replace('.json', `_${projectParam}.json`) :
+        CONFIGURATION_FILE;
 
-        if (forceRun || shouldRun()) {
+    const runConfig = {
+        configFile,
+        codeDirectory: CODE_DIRECTORY,
+        jsDirectory: JS_DIRECTORY,
+        testsDirectory: TESTS_DIRECTORY,
+        project: projectParam
+    };
 
-            LogLib.message('Run `gulp test --help` for available options');
+    const { getProductTests, getProducts } = require('./lib/test');
+    const productTests = getProductTests();
 
-            const KarmaServer = require('karma').Server;
-            const PluginError = require('plugin-error');
-            const {
-                reporters: defaultReporters,
-                browserDisconnectTimeout: defaultTimeout
-            } = require(KARMA_CONFIG_FILE);
+    // If false, there are no modified products. If undefined, run all tests.
+    if (productTests === false) {
+        logLib.message('No tests to run, exiting early');
+        return;
+    }
 
-            new KarmaServer(
-                {
-                    configFile: KARMA_CONFIG_FILE,
-                    reporters: argv.dots ? ['dots'] : defaultReporters,
-                    browserDisconnectTimeout: typeof argv.timeout === 'number' ? argv.timeout : defaultTimeout,
-                    singleRun: true,
-                    client: {
-                        cliArgs: argv
-                    }
-                },
-                err => {
+    const shouldRunTests = forceRun ||
+        (await shouldRun(runConfig).catch(error => {
+            logLib.failure(error.message);
 
-                    if (err !== 0) {
+            logLib.failure(
+                '✖ The files have not been built' +
+                ' since the last source code changes.' +
+                ' Run `npx gulp` and try again.' +
+                ' If this error occures contantly ' +
+                ' without a reason, then remove ' +
+                '`node_modules/_gulptasks_*.json` files.'
+            );
 
-                        if (argv.speak) {
-                            LogLib.say('Tests failed!');
-                        }
+            return false;
+        }));
 
-                        reject(new PluginError('karma', {
-                            message: 'Tests failed'
-                        }));
+    if (shouldRunTests) {
 
-                        return;
-                    }
+        logLib.message('Run `gulp test --help` for available options');
 
-                    try {
-                        saveRun();
-                    } catch (catchedError) {
-                        LogLib.warn(catchedError);
-                    }
+        // Unit tests use Playwright
+        const processLib = require('../libs/process');
 
-                    if (argv.speak) {
-                        LogLib.say('Tests succeeded!');
-                    }
+        // Conditionally build required code
+        await gulp.task('scripts')(gulpback);
 
-                    resolve();
+        // Determine which Playwright projects to run
+        const products = argv.modified ? getProducts() : (argv.product ? [argv.product] : null);
+        const prods = products?.length ? products : ['Core'];
+        const hasGrid = prods.includes('Grid');
+
+        const hasDashboards = prods.includes('Dashboards');
+        const hasHC = prods.some(p => ['Core', 'Stock', 'Maps', 'Gantt', 'Accessibility'].includes(p));
+
+        const gridLiteProj = ['grid-lite', 'grid-shared'];
+        const gridProProj = ['grid-pro'];
+        const dashProj = ['setup-dashboards', 'dashboards'];
+        const hcProj = ['setup-highcharts', 'highcharts', 'qunit'];
+        const a11yProj = ['setup-highcharts', 'qunit'];
+
+        const commands = [];
+        if (hasGrid) {
+            commands.push({ projects: gridLiteProj, grep: '' });
+            commands.push({ projects: gridProProj, grep: '' });
+        }
+        if (hasDashboards) {
+            commands.push({ projects: dashProj, grep: '' });
+        }
+        if (hasHC) {
+            const hcGrep = Array.isArray(productTests) && productTests.length > 0 ?
+                `--grep "unit-tests/(${productTests.join('|')})"` :
+                '';
+            commands.push({ projects: hcProj, grep: hcGrep });
+        }
+        if ((hasGrid || hasDashboards) && !hasHC) {
+            commands.push({ projects: a11yProj, grep: '--grep "unit-tests/(accessibility)"' });
+        }
+        if (commands.length === 0) {
+            commands.push({ projects: hcProj, grep: '' });
+        }
+
+        for (const { projects, grep } of commands) {
+            const cmd = `npx playwright test ${projects.map(p => `--project=${p}`).join(' ')} ${grep}`.trim();
+            logLib.message(`Running: ${cmd}`);
+            try {
+                await processLib.exec(cmd);
+            } catch {
+                if (argv.speak) {
+                    logLib.say('Tests failed!');
                 }
-            ).start();
-        } else {
-
-            resolve();
+                throw new PluginError('playwright', { message: 'Tests failed' });
+            }
         }
-    });
+
+        if (argv.speak) {
+            logLib.say('Tests succeeded!');
+        }
+
+        saveRun(runConfig);
+    }
 }
 
-gulp.task('test', gulp.series('scripts', test));
+gulp.task('test', gulp.series('test-docs', test));

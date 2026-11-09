@@ -1,10 +1,12 @@
 /* *
  *
- *  (c) 2009-2021 Torstein Honsi
+ *  (c) 2009-2026 Highsoft AS
+ *  Author: Torstein Hønsi
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -27,7 +29,7 @@ import type { LabelIntersectBoxObject } from './SeriesLabelOptions';
 /**
  * Counter-clockwise, part of the fast line intersection logic.
  *
- * @private
+ * @internal
  * @function ccw
  */
 function ccw(
@@ -46,7 +48,7 @@ function ccw(
 /**
  * Detect if two lines intersect.
  *
- * @private
+ * @internal
  * @function intersectLine
  */
 function intersectLine(
@@ -66,7 +68,7 @@ function intersectLine(
 /**
  * Detect if a box intersects with a line.
  *
- * @private
+ * @internal
  * @function boxIntersectLine
  */
 function boxIntersectLine(
@@ -80,16 +82,14 @@ function boxIntersectLine(
     y2: number
 ): boolean {
     return (
-        intersectLine(x, y, x + w, y, x1, y1, x2, y2) || // top of label
-        intersectLine(x + w, y, x + w, y + h, x1, y1, x2, y2) || // right
-        intersectLine(x, y + h, x + w, y + h, x1, y1, x2, y2) || // bottom
-        intersectLine(x, y, x, y + h, x1, y1, x2, y2) // left of label
+        intersectLine(x, y, x + w, y, x1, y1, x2, y2) || // Top of label
+        intersectLine(x + w, y, x + w, y + h, x1, y1, x2, y2) || // Right
+        intersectLine(x, y + h, x + w, y + h, x1, y1, x2, y2) || // Bottom
+        intersectLine(x, y, x, y + h, x1, y1, x2, y2) // Left of label
     );
 }
 
-/**
- * @private
- */
+/** @internal */
 function intersectRect(
     r1: LabelIntersectBoxObject,
     r2: LabelIntersectBoxObject
@@ -106,9 +106,11 @@ function intersectRect(
  *
  * */
 
+/** @internal */
 const SeriesLabelUtilities = {
     boxIntersectLine,
     intersectRect
 };
 
+/** @internal */
 export default SeriesLabelUtilities;

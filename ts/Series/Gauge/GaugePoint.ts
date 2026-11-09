@@ -1,10 +1,12 @@
 /* *
  *
- *  (c) 2010-2021 Torstein Honsi
+ *  (c) 2010-2026 Highsoft AS
+ *  Author: Torstein Hønsi
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -22,14 +24,7 @@ import type SVGAttributes from '../../Core/Renderer/SVG/SVGAttributes';
 import type SVGElement from '../../Core/Renderer/SVG/SVGElement';
 import type { StatesOptionsKey } from '../../Core/Series/StatesOptions';
 
-import SeriesRegistry from '../../Core/Series/SeriesRegistry.js';
-const {
-    series: {
-        prototype: {
-            pointClass: Point
-        }
-    }
-} = SeriesRegistry;
+import Point from '../../Core/Series/Point.js';
 
 /* *
  *
@@ -45,10 +40,13 @@ class GaugePoint extends Point {
      *
      * */
 
+    /** @internal */
     public dial?: SVGElement;
-    public options: GaugePointOptions = void 0 as any;
-    public series: GaugeSeries = void 0 as any;
-    public shapeArgs: SVGAttributes = void 0 as any;
+    public options!: GaugePointOptions;
+    /** @internal */
+    public series!: GaugeSeries;
+    /** @internal */
+    public shapeArgs!: SVGAttributes;
 
 
     /* *
@@ -57,17 +55,15 @@ class GaugePoint extends Point {
      *
      * */
 
-    /* eslint-disable valid-jsdoc */
 
     /**
      * Don't do any hover colors or anything
-     * @private
+     * @internal
      */
     public setState(state?: StatesOptionsKey): void {
         this.state = state;
     }
 
-    /* eslint-enable valid-jsdoc */
 }
 
 /* *

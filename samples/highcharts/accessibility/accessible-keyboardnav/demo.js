@@ -3,12 +3,15 @@ Highcharts.chart('container', {
         text: 'Navigate chart with keyboard'
     },
 
+    exporting: {
+        showTable: true
+    },
+
     tooltip: {
         enabled: false
     },
 
     legend: {
-        useHTML: true,
         layout: 'proximate',
         align: 'right'
     },

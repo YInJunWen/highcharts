@@ -1,0 +1,10 @@
+---
+name: Treegraph box layout
+authors:
+  - Paweł Lysy, Torstein Hønsi
+js_wrap: b
+tags:
+  - Highcharts demo
+categories:
+  - Trees and networks
+...

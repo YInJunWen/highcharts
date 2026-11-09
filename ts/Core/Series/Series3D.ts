@@ -1,12 +1,14 @@
 /* *
  *
- *  (c) 2010-2021 Torstein Honsi
+ *  (c) 2010-2026 Highsoft AS
+ *  Author: Torstein Hønsi
  *
  *  Extension to the Series object in 3D charts.
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -18,20 +20,20 @@
  *
  * */
 
-import type Point from './Point';
 import type Position3DObject from '../Renderer/Position3DObject';
 import type ZAxis from '../Axis/ZAxis';
-import Math3D from '../Math3D.js';
-const { perspective } = Math3D;
+
+import H from '../Globals.js';
+const { composed } = H;
+import { perspective } from '../Math3D.js';
 import Series from '../Series/Series.js';
-import U from '../Utilities.js';
-const {
+import {
     addEvent,
     extend,
+    isNumber,
     merge,
-    pick,
-    isNumber
-} = U;
+    pushUnique
+} from '../../Shared/Utilities.js';
 
 /* *
  *
@@ -39,15 +41,17 @@ const {
  *
  * */
 
-declare module './PointLike' {
-    interface PointLike {
+/** @internal */
+declare module './PointBase' {
+    interface PointBase {
         plotZ?: number;
         z?: number;
     }
 }
 
-declare module './SeriesLike' {
-    interface SeriesLike {
+/** @internal */
+declare module './SeriesBase' {
+    interface SeriesBase {
         zAxis?: ZAxis;
         rawPointsX?: Array<number>;
         zPadding?: number;
@@ -62,6 +66,7 @@ declare module './SeriesLike' {
  *
  * */
 
+/** @internal */
 class Series3D extends Series {
 
     /* *
@@ -74,46 +79,57 @@ class Series3D extends Series {
 
     /* *
      *
+     *  Static Functions
+     *
+     * */
+
+    public static compose(
+        SeriesClass: typeof Series
+    ): void {
+
+        if (pushUnique(composed, 'Core.Series3D')) {
+            addEvent(SeriesClass, 'afterTranslate', function (): void {
+                if (this.chart.is3d()) {
+                    this.translate3dPoints();
+                }
+            });
+
+            extend(SeriesClass.prototype, {
+                translate3dPoints: Series3D.prototype.translate3dPoints
+            });
+        }
+
+    }
+
+    /* *
+     *
      *  Functions
      *
      * */
 
-    /* eslint-disable valid-jsdoc */
-
-    public translate(): void {
-        super.translate.apply(this, arguments);
-        if (this.chart.is3d()) {
-            this.translate3dPoints();
-        }
-    }
-
     /**
      * Translate the plotX, plotY properties and add plotZ.
-     * @private
+     * @internal
      */
     public translate3dPoints(): void {
-        let series = this,
+        const series = this,
             seriesOptions = series.options,
             chart = series.chart,
-            zAxis: ZAxis = pick(series.zAxis, (chart.options.zAxis as any)[0]),
+            zAxis: ZAxis = (series.zAxis ?? (chart.options.zAxis as any)[0]),
             rawPoints = [] as Array<Position3DObject>,
-            rawPoint: Point,
-            projectedPoints: Array<Position3DObject>,
-            projectedPoint: Position3DObject,
-            zValue: (number|null|undefined),
-            i: number,
             rawPointsX: Array<number> = [],
             stack = seriesOptions.stacking ?
                 (isNumber(seriesOptions.stack) ? seriesOptions.stack : 0) :
                 series.index || 0;
 
+        let projectedPoint: Position3DObject,
+            zValue: (number|null|undefined);
+
         series.zPadding = stack *
             (seriesOptions.depth || 0 + (seriesOptions.groupZPadding || 1));
 
-        for (i = 0; i < series.data.length; i++) {
-            rawPoint = series.data[i];
-
-            if (zAxis && zAxis.translate) {
+        series.points.forEach((rawPoint): void => {
+            if (zAxis?.translate) {
                 zValue = zAxis.logarithmic && zAxis.val2lin ?
                     zAxis.val2lin(rawPoint.z as any) :
                     rawPoint.z; // #4562
@@ -137,44 +153,22 @@ class Series3D extends Series {
             });
 
             rawPointsX.push(rawPoint.plotX || 0);
-        }
+        });
 
         series.rawPointsX = rawPointsX;
 
-        projectedPoints = perspective(rawPoints, chart, true);
+        const projectedPoints = perspective(rawPoints, chart, true);
 
-        for (i = 0; i < series.data.length; i++) {
-            rawPoint = series.data[i];
+        series.points.forEach((rawPoint, i): void => {
             projectedPoint = projectedPoints[i];
 
             rawPoint.plotX = projectedPoint.x;
             rawPoint.plotY = projectedPoint.y;
             rawPoint.plotZ = projectedPoint.z;
-        }
+        });
     }
 
-    /* eslint-enable valid-jsdoc */
 }
-
-/* *
- *
- *  Compatibility
- *
- * */
-
-/* eslint-disable no-invalid-this */
-
-addEvent(Series, 'afterTranslate', function (): void {
-    if (this.chart.is3d()) {
-        this.translate3dPoints();
-    }
-});
-
-/* eslint-enable no-invalid-this */
-
-extend(Series.prototype, {
-    translate3dPoints: Series3D.prototype.translate3dPoints
-});
 
 /* *
  *
@@ -182,4 +176,5 @@ extend(Series.prototype, {
  *
  * */
 
+/** @internal */
 export default Series3D;

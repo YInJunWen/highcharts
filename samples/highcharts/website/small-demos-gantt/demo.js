@@ -5,6 +5,11 @@ const pArray = params.split('&');
 let chartStr = '';
 let chartToShow = 'inverted';
 
+const colors = [
+    '#8087E8', '#A3EDBA', '#F19E53', '#6699A1',
+    '#E1D369', '#87B4E7', '#DA6D85', '#BBBAC5'
+];
+
 
 pArray.forEach(function (element) {
     if (element.indexOf('charts=') !== -1) {
@@ -29,6 +34,7 @@ function inverted() {
         title: {
             text: ''
         },
+        colors: colors,
         scrollbar: {
             enabled: false
         },
@@ -45,7 +51,8 @@ function inverted() {
         lang: {
             accessibility: {
                 axis: {
-                    xAxisDescriptionPlural: 'The chart has a two-part X axis showing time in both week numbers and days.'
+                    xAxisDescriptionPlural: 'The chart has a two-part X axis ' +
+                        'showing time in both week numbers and days.'
                 }
             }
         },
@@ -59,8 +66,8 @@ function inverted() {
         xAxis: [{
             opposite: false,
             visible: true,
-            min: Date.UTC(2018, 10, 25),
-            max: Date.UTC(2018, 11, 24),
+            min: '2018-11-25',
+            max: '2018-12-24',
             labels: {
                 allowOverlap: true,
                 enabled: false
@@ -69,17 +76,7 @@ function inverted() {
                 week: {
                     list: ['🗓 W%W', '🗓 W%W']
                 }
-            },
-            grid: {
-                borderColor: '#707073',
-                borderWidth: 0,
-                cellHeight: 10
-            },
-            gridLineColor: '#2f2b38',
-            gridLineWidth: 0,
-            gridLineDashStyle: 'dot',
-            maxPadding: 0,
-            minPadding: 0
+            }
         }],
         yAxis: {
             offset: -40,
@@ -93,8 +90,7 @@ function inverted() {
                 align: 'center',
                 x: -22,
                 style: {
-                    fontSize: '14px',
-                    color: '#000'
+                    fontSize: '14px'
                 },
                 padding: 0
             },
@@ -125,46 +121,46 @@ function inverted() {
         series: [{
             name: 'Project 1',
             data: [{
-                start: Date.UTC(2018, 11, 1),
-                end: Date.UTC(2018, 11, 8),
+                start: '2018-12-01',
+                end: '2018-12-08',
                 // completed: 0.65,
                 name: 'Done',
                 id: 'Prep'
             },
             {
-                start: Date.UTC(2018, 11, 9),
-                end: Date.UTC(2018, 11, 16),
+                start: '2018-12-09',
+                end: '2018-12-16',
                 name: 'Done',
                 id: 'Design'
             },
             {
-                start: Date.UTC(2018, 11, 1),
-                end: Date.UTC(2018, 11, 8),
+                start: '2018-12-01',
+                end: '2018-12-08',
                 // completed: 0.5,
                 name: 'Doing',
                 id: 'Dev'
             }, {
-                start: Date.UTC(2018, 11, 9),
-                end: Date.UTC(2018, 11, 16),
+                start: '2018-12-09',
+                end: '2018-12-16',
                 // completed: 0.5,
                 name: 'Doing',
                 id: 'Content'
             }, {
-                start: Date.UTC(2018, 11, 1),
-                end: Date.UTC(2018, 11, 8),
+                start: '2018-12-01',
+                end: '2018-12-08',
                 // completed: 0.15,
                 name: 'Do',
                 id: 'QA'
             }, {
-                start: Date.UTC(2018, 11, 9),
-                end: Date.UTC(2018, 11, 16),
+                start: '2018-12-09',
+                end: '2018-12-16',
                 // completed: 0.3,
                 name: 'Do',
                 id: 'Launch'
             },
             {
-                start: Date.UTC(2018, 11, 17),
-                end: Date.UTC(2018, 11, 23),
+                start: '2018-12-17',
+                end: '2018-12-23',
                 // completed: 0.3,
                 name: 'Do',
                 id: 'Promo'
@@ -225,7 +221,7 @@ function inverted() {
 
 
 function subtasks() {
-    var today = new Date(),
+    const today = new Date(),
         day = 1000 * 60 * 60 * 24;
 
     // Set to 00:00:00:000 today
@@ -240,12 +236,12 @@ function subtasks() {
         chart: {
             scrollablePlotArea: {
                 minHeight: 800
-            },
-            backgroundColor: '#2F2B38'
+            }
         },
         credits: {
             enabled: false
         },
+        colors: colors,
         title: {
             text: ''
         },
@@ -256,7 +252,7 @@ function subtasks() {
             plotBands: [{
                 from: today.getTime() + (0 * day),
                 to: today.getTime() + (14 * day),
-                color: '#46465C'
+                color: 'var(--highcharts-background-color)'
             }],
             dateTimeLabelFormats: {
                 day: {
@@ -266,16 +262,13 @@ function subtasks() {
                     list: ['Week %W', 'W%W']
                 }
             },
-            gridLineColor: '#2F2B38',
+            gridLineColor: 'var(--highcharts-neutral-color-10)',
             gridLineWidth: 1,
             grid: {
                 borderWidth: 0
             },
             labels: {
-                allowOverlap: true,
-                style: {
-                    color: '#fff'
-                }
+                allowOverlap: true
             }
         },
         accessibility: {
@@ -286,12 +279,14 @@ function subtasks() {
             },
             point: {
                 descriptionFormatter: function (point) {
-                    var dependency = point.dependency &&
+                    const dependency = point.dependency &&
                         point.series.chart.get(point.dependency).name,
-                        dependsOn = dependency ? ' Depends on ' + dependency + '.' : '';
+                        dependsOn = dependency ?
+                            ' Depends on ' + dependency + '.' : '';
 
                     return Highcharts.format(
-                        '{point.yCategory}. Start {point.x:%Y-%m-%d}, end {point.x2:%Y-%m-%d}.{dependsOn}',
+                        '{point.yCategory}. Start {point.x:%Y-%m-%d}, end ' +
+                        '{point.x2:%Y-%m-%d}.{dependsOn}',
                         { point, dependsOn }
                     );
                 }
@@ -316,13 +311,12 @@ function subtasks() {
                 },
                 symbol: {
                     // y: 0,
-                    fillColor: '#fff',
                     padding: 5
                 },
                 style: {
-                    color: '#fff',
                     fontSize: '12px',
-                    padding: 0
+                    padding: 0,
+                    color: 'var(--highcharts-neutral-color-100)'
                 }
             }
 
@@ -330,7 +324,8 @@ function subtasks() {
         lang: {
             accessibility: {
                 axis: {
-                    xAxisDescriptionPlural: 'The chart has a two-part X axis showing time in both week numbers and days.'
+                    xAxisDescriptionPlural: 'The chart has a two-part X axis ' +
+                        'showing time in both week numbers and days.'
                 }
             }
         },
@@ -340,8 +335,7 @@ function subtasks() {
                 borderWidth: 0,
                 connectors: {
                     lineWidth: 2
-                },
-                borderRadius: 0
+                }
             }
         },
         series: [{
@@ -352,7 +346,7 @@ function subtasks() {
                 id: '1',
                 start: today.getTime(),
                 end: today.getTime() + (3 * day),
-                color: Highcharts.getOptions().colors[0]
+                color: colors[0]
             }, {
                 name: '1a ',
                 id: '1a',
@@ -360,12 +354,12 @@ function subtasks() {
                 start: today.getTime(),
                 end: today.getTime() + (2 * day),
                 color: 'transparent',
-                borderColor: Highcharts.getOptions().colors[0],
-                borderWidth: 1,
+                borderColor: colors[0],
+                borderWidth: 2,
                 connectors: {
                     dashStyle: 'dot',
                     lineWidth: 1,
-                    lineColor: Highcharts.getOptions().colors[0]
+                    lineColor: colors[0]
                 }
             },
             {
@@ -376,12 +370,12 @@ function subtasks() {
                 start: today.getTime() + (2 * day),
                 end: today.getTime() + (3 * day),
                 color: 'transparent',
-                borderColor: Highcharts.getOptions().colors[0],
-                borderWidth: 1,
+                borderColor: colors[0],
+                borderWidth: 2,
                 connectors: {
                     dashStyle: 'dot',
                     lineWidth: 1,
-                    lineColor: Highcharts.getOptions().colors[0]
+                    lineColor: colors[0]
                 }
             },
             {
@@ -391,14 +385,14 @@ function subtasks() {
                 dependency: '1',
                 start: today.getTime() + (3.5 * day),
                 end: today.getTime() + (7 * day),
-                color: Highcharts.getOptions().colors[1]
+                color: colors[1]
             }, {
                 name: '2a',
                 id: '2a',
                 parent: '2',
                 start: today.getTime() + (3.5 * day),
                 end: today.getTime() + (5 * day),
-                color: Highcharts.getOptions().colors[1]
+                color: colors[1]
             },
             {
                 name: '2a-1',
@@ -407,12 +401,12 @@ function subtasks() {
                 start: today.getTime() + (3.5 * day),
                 end: today.getTime() + (4 * day),
                 color: 'transparent',
-                borderColor: Highcharts.getOptions().colors[1],
-                borderWidth: 1,
+                borderColor: colors[1],
+                borderWidth: 2,
                 connectors: {
                     dashStyle: 'dot',
                     lineWidth: 1,
-                    lineColor: Highcharts.getOptions().colors[1]
+                    lineColor: colors[1]
                 }
             },
             {
@@ -423,12 +417,12 @@ function subtasks() {
                 start: today.getTime() + (4 * day),
                 end: today.getTime() + (4.5 * day),
                 color: 'transparent',
-                borderColor: Highcharts.getOptions().colors[1],
-                borderWidth: 1,
+                borderColor: colors[1],
+                borderWidth: 2,
                 connectors: {
                     dashStyle: 'dot',
                     lineWidth: 1,
-                    lineColor: Highcharts.getOptions().colors[1]
+                    lineColor: colors[1]
                 }
             },
             {
@@ -439,12 +433,12 @@ function subtasks() {
                 start: today.getTime() + (4.5 * day),
                 end: today.getTime() + (5 * day),
                 color: 'transparent',
-                borderColor: Highcharts.getOptions().colors[1],
-                borderWidth: 1,
+                borderColor: colors[1],
+                borderWidth: 2,
                 connectors: {
                     dashStyle: 'dot',
                     lineWidth: 1,
-                    lineColor: Highcharts.getOptions().colors[1]
+                    lineColor: colors[1]
 
                 }
             },
@@ -455,14 +449,14 @@ function subtasks() {
                 parent: '2',
                 start: today.getTime() + (5 * day),
                 end: today.getTime() + (7 * day),
-                color: Highcharts.getOptions().colors[1]
+                color: colors[1]
             }, {
                 name: '2c',
                 id: '2c',
                 parent: '2',
                 start: today.getTime() + (5 * day),
                 end: today.getTime() + (7 * day),
-                color: Highcharts.getOptions().colors[1]
+                color: colors[1]
             },
             {
                 name: 'Task 3',
@@ -471,7 +465,7 @@ function subtasks() {
                 collapsed: false,
                 start: today.getTime() + (7.5 * day),
                 end: today.getTime() + (12 * day),
-                color: Highcharts.getOptions().colors[2]
+                color: colors[2]
             }, {
                 name: '3a',
                 id: '3a',
@@ -479,12 +473,12 @@ function subtasks() {
                 start: today.getTime() + (7.5 * day),
                 end: today.getTime() + (10 * day),
                 color: 'transparent',
-                borderColor: Highcharts.getOptions().colors[2],
-                borderWidth: 1,
+                borderColor: colors[2],
+                borderWidth: 2,
                 connectors: {
                     dashStyle: 'dot',
                     lineWidth: 1,
-                    lineColor: Highcharts.getOptions().colors[2]
+                    lineColor: colors[2]
                 }
             }, {
                 name: '3b',
@@ -494,12 +488,12 @@ function subtasks() {
                 start: today.getTime() + (10 * day),
                 end: today.getTime() + (12 * day),
                 color: 'transparent',
-                borderColor: Highcharts.getOptions().colors[2],
-                borderWidth: 1,
+                borderColor: colors[2],
+                borderWidth: 2,
                 connectors: {
                     dashStyle: 'dot',
                     lineWidth: 1,
-                    lineColor: Highcharts.getOptions().colors[2]
+                    lineColor: colors[2]
                 }
             }
             ]
@@ -549,6 +543,7 @@ function nav() {
         title: {
             text: ''
         },
+        colors: colors,
         credits: {
             enabled: false
         },
@@ -564,8 +559,8 @@ function nav() {
         xAxis: {
             visible: true,
             zIndex: 10,
-            min: Date.UTC(2017, 11, 1),
-            max: Date.UTC(2018, 2, 4),
+            min: '2017-12-01',
+            max: '2018-03-04',
             grid: {
                 enabled: true,
                 cellHeight: 20,
@@ -590,7 +585,6 @@ function nav() {
                 type: 'gantt',
                 color: 'white',
                 borderColor: 'white',
-                borderRadius: 0,
                 pointWidth: 10,
                 accessibility: {
                     enabled: false
@@ -619,13 +613,16 @@ function nav() {
         accessibility: {
             point: {
                 descriptionFormatter: function (point) {
-                    var completedValue = point.completed ?
+                    const completedValue = point.completed ?
                             point.completed.amount || point.completed : null,
                         completed = completedValue ?
-                            ' Task ' + Math.round(completedValue * 1000) / 10 + '% completed.' :
+                            ' Task ' + Math.round(
+                                completedValue * 1000
+                            ) / 10 + '% completed.' :
                             '';
                     return Highcharts.format(
-                        '{point.yCategory}.{completed} Start {point.x:%Y-%m-%d}, end {point.x2:%Y-%m-%d}.',
+                        '{point.yCategory}.{completed} Start ' +
+                        '{point.x:%Y-%m-%d}, end {point.x2:%Y-%m-%d}.',
                         { point, completed }
                     );
                 }
@@ -639,8 +636,10 @@ function nav() {
         lang: {
             accessibility: {
                 axis: {
-                    xAxisDescriptionPlural: 'The chart has a two-part X axis showing time in both week numbers and days.',
-                    yAxisDescriptionPlural: 'The chart has one Y axis showing task categories.'
+                    xAxisDescriptionPlural: 'The chart has a two-part X axis ' +
+                        'showing time in both week numbers and days.',
+                    yAxisDescriptionPlural: 'The chart has one Y axis ' +
+                        'showing task categories.'
                 }
             }
         },
@@ -648,9 +647,8 @@ function nav() {
             series: {
                 groupPadding: 0.3,
                 pointPadding: 0.3,
-                pointWidth: 30,
+                pointWidth: 25,
                 borderWidth: 0,
-                borderRadius: 0,
                 dataLabels: {
                     enabled: false,
                     color: 'white',
@@ -664,36 +662,36 @@ function nav() {
         series: [{
             name: 'Project 1',
             data: [{
-                start: Date.UTC(2017, 11, 1),
-                end: Date.UTC(2018, 1, 2),
+                start: '2017-12-01',
+                end: '2018-02-02',
                 completed: 0.85,
                 name: 'Prototyping',
-                borderColor: Highcharts.getOptions().colors[3]
+                borderColor: colors[3]
             }, {
-                start: Date.UTC(2018, 1, 2),
-                end: Date.UTC(2018, 11, 5),
+                start: '2018-02-02',
+                end: '2018-12-05',
                 completed: 0.5,
                 name: 'Development'
             }, {
-                start: Date.UTC(2018, 11, 8),
-                end: Date.UTC(2018, 11, 9),
+                start: '2018-12-08',
+                end: '2018-12-09',
                 completed: 0.15,
                 name: 'Testing'
             }, {
-                start: Date.UTC(2018, 11, 9),
-                end: Date.UTC(2018, 11, 19),
+                start: '2018-12-09',
+                end: '2018-12-19',
                 completed: {
                     amount: 0.3,
-                    fill: '#fa0'
+                    fill: colors[2]
                 },
                 name: 'Development'
             }, {
-                start: Date.UTC(2018, 11, 10),
-                end: Date.UTC(2018, 11, 23),
+                start: '2018-12-10',
+                end: '2018-12-23',
                 name: 'Testing'
             }, {
-                start: Date.UTC(2018, 11, 25, 8),
-                end: Date.UTC(2018, 11, 25, 16),
+                start: '2018-12-25 08:00',
+                end: '2018-12-25 16:00',
                 name: 'Release'
             }]
         }],
@@ -738,8 +736,8 @@ function drag() {
     http://api.highcharts.com/gantt.
 */
 
-    var today = new Date(),
-        day = 1000 * 60 * 60 * 24;
+    let today = new Date();
+    const day = 1000 * 60 * 60 * 24;
 
     // Set to 00:00:00:000 today
     today.setUTCHours(0);
@@ -762,6 +760,7 @@ function drag() {
                 }
             }
         },
+        colors: colors,
         title: {
             floating: false
         },
@@ -771,7 +770,8 @@ function drag() {
         lang: {
             accessibility: {
                 axis: {
-                    xAxisDescriptionPlural: 'The chart has a two-part X axis showing time in both week numbers and days.'
+                    xAxisDescriptionPlural: 'The chart has a two-part X axis ' +
+                        'showing time in both week numbers and days.'
                 }
             }
         },
@@ -780,8 +780,10 @@ function drag() {
                 descriptionFormatter: function (point) {
                     return Highcharts.format(
                         point.milestone ?
-                            '{point.name}, milestone for {point.yCategory} at {point.x:%Y-%m-%d}.' :
-                            '{point.name}, assigned to {point.yCategory} from {point.x:%Y-%m-%d} to {point.x2:%Y-%m-%d}.',
+                            '{point.name}, milestone for {point.yCategory} ' +
+                            'at {point.x:%Y-%m-%d}.' :
+                            '{point.name}, assigned to {point.yCategory} ' +
+                            'from {point.x:%Y-%m-%d} to {point.x2:%Y-%m-%d}.',
                         { point }
                     );
                 }
@@ -809,33 +811,21 @@ function drag() {
                 states: {
                     select:
                     {
-                        borderColor: Highcharts.getOptions().colors[6],
-                        color: Highcharts.getOptions().colors[6],
+                        borderColor: colors[2],
+                        color: colors[2],
                         enabled: true
                     },
                     hover:
                     {
-                        borderColor: Highcharts.getOptions().colors[6],
-                        color: Highcharts.getOptions().colors[6],
+                        borderColor: colors[2],
+                        color: colors[2],
                         enabled: true
                     }
                 },
                 borderColor: 'transparent',
                 pointPadding: 0.2,
                 dataLabels: {
-                    enabled: true,
-                    formatter: function () {
-                        // nothing
-                    },
-                    style: {
-                        cursor: 'default',
-                        pointerEvents: 'none',
-                        color: '#fff',
-                        textOutline: 'none',
-                        fontSize: '18px',
-                        padding: 0
-                    },
-                    y: -5
+                    enabled: false
                 },
                 allowPointSelect: true
             }
@@ -858,7 +848,8 @@ function drag() {
                 rotation: 270,
                 indentation: 0,
                 padding: 0,
-                format: '<p style="background-color:transparent;border: 0px solid #e6e6e6;padding:10px 8px 8px;">{text}</p>'
+                format: '<p style="background-color:transparent;border: 0px ' +
+                    'solid #e6e6e6;padding:10px 8px 8px;">{text}</p>'
             },
             grid: {
                 enabled: false
@@ -866,18 +857,6 @@ function drag() {
         },
         xAxis: {
             offset: -20,
-            currentDateIndicator: {
-                enabled: true,
-                label: {
-                    style: {
-                        color: '#FEEAC3',
-                        fontSize: '10px',
-                        fontWeight: 'bold'
-                    }
-                },
-                color: '#FEEAC3'
-
-            },
             dateTimeLabelFormats: {
                 day: {
                     list: ['%e']
@@ -892,14 +871,16 @@ function drag() {
             // minPadding: 0,
             // margin: 0,
             // padding: 0,
-            gridLineColor: '#BBBAC5',
+            gridLineColor: 'var(--highcharts-neutral-color-20)',
             gridLineWidth: 1,
             gridLineDashStyle: 'dot',
             labels: {
                 useHTML: true,
                 allowOverlap: true,
                 padding: 0,
-                format: '<p style="font-size:10px;background-color:transparent;color:transparent;padding:20px 8px 8px;">{value: %E}</p>'
+                format: '<p style="font-size:10px;background-color:' +
+                    'transparent;color:transparent;padding:20px 8px 8px;">' +
+                    '{value: %E}</p>'
             }
         },
         tooltip: {
@@ -913,7 +894,7 @@ function drag() {
                 end: today + day * 4.5,
                 name: '1',
                 id: 'prototype',
-                borderColor: '#E1D369',
+                borderColor: colors[0],
                 borderWidth: 2,
                 y: 0,
                 zIndex: 1
@@ -925,29 +906,28 @@ function drag() {
                 id: 'proto_done',
                 zIndex: 100,
                 y: 0,
-                borderColor: Highcharts.getOptions().colors[4],
+                borderColor: colors[0],
                 borderWidth: 2,
                 color: 'black',
                 connectors: {
-                    lineColor: '#E1D369',
+                    lineColor: colors[0],
                     marker: {
-                        color: Highcharts.getOptions().colors[0]
+                        color: colors[0]
                     }
                 }
             }, {
                 start: today + day * 5.5,
                 end: today + day * 6,
-                borderColor: '#E1D369',
+                borderColor: colors[0],
                 borderWidth: 2,
                 name: '2',
-                borderRadius: 20,
                 dependency: 'proto_done',
                 zIndex: 1,
                 y: 0,
                 connectors: {
-                    lineColor: '#E1D369',
+                    lineColor: colors[0],
                     marker: {
-                        color: Highcharts.getOptions().colors[0]
+                        color: colors[0]
                     }
                 }
             },

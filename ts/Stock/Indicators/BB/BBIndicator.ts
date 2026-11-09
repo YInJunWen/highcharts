@@ -1,8 +1,10 @@
-/**
+/* *
  *
- *  License: www.highcharts.com/license
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
+ *
  *
  * */
 
@@ -19,20 +21,14 @@ import type {
     BBParamsOptions
 } from './BBOptions';
 import type BBPoint from './BBPoint';
+import type { IndicatorLinkedSeriesBase } from '../IndicatorBase';
 import type IndicatorValuesObject from '../IndicatorValuesObject';
 import type LineSeries from '../../../Series/Line/LineSeries';
 
 import MultipleLinesComposition from '../MultipleLinesComposition.js';
+import SMAIndicator from '../SMA/SMAIndicator.js';
 import SeriesRegistry from '../../../Core/Series/SeriesRegistry.js';
-const {
-    sma: SMAIndicator
-} = SeriesRegistry.seriesTypes;
-import U from '../../../Core/Utilities.js';
-const {
-    extend,
-    isArray,
-    merge
-} = U;
+import { extend, isArray, merge } from '../../../Shared/Utilities.js';
 
 /* *
  *
@@ -41,20 +37,18 @@ const {
  * */
 
 // Utils:
-/**
- * @private
- */
+/** @internal */
 function getStandardDeviation(
     arr: Array<Array<number>>,
     index: number,
     isOHLC: boolean,
     mean: number
 ): number {
-    let variance = 0,
-        arrLen = arr.length,
+    const arrLen = arr.length;
+    let i = 0,
         std = 0,
-        i = 0,
-        value: number;
+        value: number,
+        variance = 0;
 
     for (; i < arrLen; i++) {
         value = ((isOHLC ? arr[i][index] : arr[i]) as any) - mean;
@@ -75,7 +69,6 @@ function getStandardDeviation(
 /**
  * Bollinger Bands series type.
  *
- * @private
  * @class
  * @name Highcharts.seriesTypes.bb
  *
@@ -93,15 +86,16 @@ class BBIndicator extends SMAIndicator {
      * Bollinger bands (BB). This series requires the `linkedTo` option to be
      * set and should be loaded after the `stock/indicators/indicators.js` file.
      *
-     * @sample stock/indicators/bollinger-bands
+     * @sample {highstock} stock/indicators/bollinger-bands
      *         Bollinger bands
      *
      * @extends      plotOptions.sma
      * @since        6.0.0
      * @product      highstock
-     * @requires     stock/indicators/indicators
-     * @requires     stock/indicators/bollinger-bands
+     * @requires     indicators/indicators
+     * @requires     indicators/bollinger-bands
      * @optionparent plotOptions.bb
+     * @internal
      */
     public static defaultOptions: BBOptions = merge(SMAIndicator.defaultOptions, {
 
@@ -188,11 +182,11 @@ class BBIndicator extends SMAIndicator {
      *
      * */
 
-    public data: Array<BBPoint> = void 0 as any;
+    public data!: Array<BBPoint>;
 
-    public options: BBOptions = void 0 as any;
+    public options!: BBOptions;
 
-    public points: Array<BBPoint> = void 0 as any;
+    public points!: Array<BBPoint>;
 
     /* *
      *
@@ -200,6 +194,7 @@ class BBIndicator extends SMAIndicator {
      *
      * */
 
+    /** @internal */
     public init(this: BBIndicator): void {
         SeriesRegistry.seriesTypes.sma.prototype.init.apply(this, arguments);
 
@@ -218,28 +213,28 @@ class BBIndicator extends SMAIndicator {
         }, this.options);
     }
 
+    /** @internal */
     public getValues<TLinkedSeries extends LineSeries>(
-        series: TLinkedSeries,
+        series: TLinkedSeries&IndicatorLinkedSeriesBase,
         params: BBParamsOptions
     ): (IndicatorValuesObject<TLinkedSeries>|undefined) {
-        let period: number = (params.period as any),
+        const period: number = (params.period as any),
             standardDeviation: number = (params.standardDeviation as any),
+            xData: Array<number> = [],
+            yData: Array<Array<number>> = [],
             xVal: Array<number> = (series.xData as any),
             yVal: Array<Array<number>> = (series.yData as any),
             yValLen: number = yVal ? yVal.length : 0,
             // 0- date, 1-middle line, 2-top line, 3-bottom line
-            BB: Array<Array<number>> = [],
-            // middle line, top line and bottom line
-            ML: number,
+            BB: Array<Array<number>> = [];
+            // Middle line, top line and bottom line
+        let ML: number,
             TL: number,
             BL: number,
             date: number,
-            xData: Array<number> = [],
-            yData: Array<Array<number>> = [],
             slicedX: (Array<number>|undefined),
             slicedY: Array<Array<number>>,
             stdDev: number,
-            isOHLC: boolean,
             point: (
                 IndicatorValuesObject<TLinkedSeries>|
                 undefined
@@ -250,7 +245,7 @@ class BBIndicator extends SMAIndicator {
             return;
         }
 
-        isOHLC = isArray(yVal[0]);
+        const isOHLC = isArray(yVal[0]);
 
         for (i = period; i <= yValLen; i++) {
             slicedX = xVal.slice(i - period, i);
@@ -295,6 +290,7 @@ class BBIndicator extends SMAIndicator {
  *
  * */
 
+/** @internal */
 interface BBIndicator extends MultipleLinesComposition.IndicatorComposition {
     linesApiNames: Array<string>;
     nameComponents: Array<string>;
@@ -344,11 +340,10 @@ export default BBIndicator;
  *
  * @extends   series,plotOptions.bb
  * @since     6.0.0
- * @excluding dataParser, dataURL
  * @product   highstock
- * @requires  stock/indicators/indicators
- * @requires  stock/indicators/bollinger-bands
+ * @requires  indicators/indicators
+ * @requires  indicators/bollinger-bands
  * @apioption series.bb
  */
 
-''; // to include the above in the js output
+''; // To include the above in the js output

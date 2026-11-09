@@ -1,12 +1,14 @@
 /* *
  *
- *  (c) 2010-2021 Torstein Honsi
+ *  (c) 2010-2026 Highsoft AS
+ *  Author: Torstein Hønsi
  *
  *  3D pie series
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -20,16 +22,8 @@
 
 import type Pie3DSeries from './Pie3DSeries';
 import type SVGPath from '../../Core/Renderer/SVG/SVGPath';
-import SeriesRegistry from '../../Core/Series/SeriesRegistry.js';
-const {
-    seriesTypes: {
-        pie: {
-            prototype: {
-                pointClass: PiePoint
-            }
-        }
-    }
-} = SeriesRegistry;
+
+import PieSeries from '../Pie/PieSeries.js';
 
 /* *
  *
@@ -37,7 +31,7 @@ const {
  *
  * */
 
-const superHaloPath = PiePoint.prototype.haloPath;
+const PiePoint = PieSeries.prototype.pointClass;
 
 /* *
  *
@@ -53,7 +47,8 @@ class Pie3DPoint extends PiePoint {
      *
      * */
 
-    public series: Pie3DSeries = void 0 as any;
+    /** @internal */
+    public series!: Pie3DSeries;
 
     /* *
      *
@@ -61,17 +56,13 @@ class Pie3DPoint extends PiePoint {
      *
      * */
 
-    /* eslint-disable valid-jsdoc */
-
     /**
-     * @private
+     * @internal
      */
     public haloPath(): SVGPath {
-        return this.series.chart.is3d() ?
-            [] : superHaloPath.apply(this, arguments);
+        return this.series?.chart.is3d() ?
+            [] : super.haloPath.apply(this, arguments);
     }
-
-    /* eslint-enable valid-jsdoc */
 
 }
 

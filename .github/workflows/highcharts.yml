@@ -1,0 +1,40 @@
+name: Highcharts
+
+on:
+  push:
+    branches: [ 'master' ]
+  pull_request:
+    branches: [ 'master' ]
+    paths:
+      - 'package.json'
+      - 'package-lock.json'
+      - 'css/**'
+      - '!css/dashboards*'
+      - '!css/grid*'
+      - 'samples/**'
+      - '!samples/dashboards/**'
+      - '!samples/grid-lite/**'
+      - '!samples/grid-pro/**'
+      - 'test/**'
+      - 'tests/highcharts/**'
+      - 'tests/qunit/**'
+      - 'ts/**'
+      - '!ts/Dashboards/**'
+      - '!ts/Grid/**'
+      - '!ts/masters-dashboards/**'
+      - '.github/workflows/**'
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read # to fetch code (actions/checkout)
+
+jobs:
+  test_headless:
+    name: Headless tests
+    uses: ./.github/workflows/highcharts-headless.yml

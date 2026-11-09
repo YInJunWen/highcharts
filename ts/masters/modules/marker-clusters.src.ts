@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: LicenseRef-Highcharts
 /**
  * @license Highcharts JS v@product.version@ (@product.date@)
  * @module highcharts/modules/marker-clusters
@@ -5,9 +6,17 @@
  *
  * Marker clusters module for Highcharts
  *
- * (c) 2010-2021 Wojciech Chmiel
+ * (c) 2010-2026 Highsoft AS
+ * Author: Wojciech Chmiel
  *
- * License: www.highcharts.com/license
+ * A commercial license may be required depending on use,
+ * see www.highcharts.com/license
  */
 'use strict';
-import '../../Extensions/MarkerClusters.js';
+import Highcharts from '../../Core/Globals.js';
+import MarkerClusters from '../../Extensions/MarkerClusters/MarkerClusters.js';
+import MarkerClusterSymbols from '../../Extensions/MarkerClusters/MarkerClusterSymbols.js';
+const G: AnyRecord = Highcharts;
+MarkerClusters.compose(G.Axis, G.Chart, G.defaultOptions, G.Series);
+MarkerClusterSymbols.compose(G.SVGRenderer);
+export default Highcharts;

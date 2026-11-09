@@ -2,11 +2,13 @@
  *
  *  Networkgraph series
  *
- *  (c) 2010-2021 Paweł Fus
+ *  (c) 2010-2026 Highsoft AS
+ *  Author: Paweł Fus
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -24,7 +26,8 @@ import type NetworkgraphChart from './NetworkgraphChart';
 import type NetworkgraphSeriesOptions from './NetworkgraphSeriesOptions';
 import type { StatesOptionsKey } from '../../Core/Series/StatesOptions';
 import type SVGAttributes from '../../Core/Renderer/SVG/SVGAttributes';
-import type SVGElement from '../../Core/Renderer/SVG/SVGElement';
+
+import SVGElement from '../../Core/Renderer/SVG/SVGElement.js';
 
 import DragNodesComposition from '../DragNodesComposition.js';
 import GraphLayout from '../GraphLayoutComposition.js';
@@ -34,26 +37,25 @@ import NetworkgraphPoint from './NetworkgraphPoint.js';
 import NetworkgraphSeriesDefaults from './NetworkgraphSeriesDefaults.js';
 import NodesComposition from '../NodesComposition.js';
 import ReingoldFruchtermanLayout from './ReingoldFruchtermanLayout.js';
+import ColumnSeries from '../Column/ColumnSeries.js';
+import LineSeries from '../Line/LineSeries.js';
+import Series from '../../Core/Series/Series.js';
 import SeriesRegistry from '../../Core/Series/SeriesRegistry.js';
+
+import D from '../SimulationSeriesUtilities.js';
 const {
-    series: Series,
-    seriesTypes: {
-        column: {
-            prototype: columnProto
-        },
-        line: {
-            prototype: lineProto
-        }
-    }
-} = SeriesRegistry;
-import U from '../../Core/Utilities.js';
-const {
+    initDataLabels,
+    initDataLabelsDefer
+} = D;
+
+import { composeTextPath } from '../../Extensions/TextPath.js';
+import {
     addEvent,
     defined,
     extend,
-    merge,
-    pick
-} = U;
+    merge
+} from '../../Shared/Utilities.js';
+composeTextPath(SVGElement);
 
 /* *
  *
@@ -61,8 +63,8 @@ const {
  *
  * */
 
-declare module '../../Core/Series/SeriesLike' {
-    interface SeriesLike {
+declare module '../../Core/Series/SeriesBase' {
+    interface SeriesBase {
         layout?: ReingoldFruchtermanLayout;
     }
 }
@@ -99,6 +101,7 @@ class NetworkgraphSeries extends Series {
      *
      * */
 
+    /** @internal */
     public static compose(
         ChartClass: typeof Chart
     ): void {
@@ -112,13 +115,17 @@ class NetworkgraphSeries extends Series {
      *
      * */
 
-    public data: Array<NetworkgraphPoint> = void 0 as any;
+    public data!: Array<NetworkgraphPoint>;
 
-    public nodes: Array<NetworkgraphPoint> = void 0 as any;
+    /** @internal */
+    public nodes!: Array<NetworkgraphPoint>;
 
-    public options: NetworkgraphSeriesOptions = void 0 as any;
+    public options!: NetworkgraphSeriesOptions;
 
-    public points: Array<NetworkgraphPoint> = void 0 as any;
+    public points!: Array<NetworkgraphPoint>;
+
+    /** @internal */
+    public deferDataLabels: boolean = true;
 
     /* *
      *
@@ -138,11 +145,12 @@ class NetworkgraphSeries extends Series {
      * @private
      */
     public deferLayout(): void {
-        let layoutOptions = this.options.layoutAlgorithm,
+        const layoutOptions = this.options.layoutAlgorithm,
+            chartOptions = this.chart.options.chart;
+
+        let layout: ReingoldFruchtermanLayout,
             graphLayoutsStorage = this.chart.graphLayoutsStorage,
-            graphLayoutsLookup = this.chart.graphLayoutsLookup,
-            chartOptions = this.chart.options.chart,
-            layout: ReingoldFruchtermanLayout;
+            graphLayoutsLookup = this.chart.graphLayoutsLookup;
 
         if (!this.visible) {
             return;
@@ -187,32 +195,46 @@ class NetworkgraphSeries extends Series {
         if (this.layout) {
             this.layout.removeElementFromCollection(
                 this,
-                this.layout.series
+                this.layout.series as Array<this>
             );
         }
         NodesComposition.destroy.call(this);
     }
 
     /**
-     * Networkgraph has two separate collecions of nodes and lines, render
+     * Networkgraph has two separate collections of nodes and lines, render
      * dataLabels for both sets:
      * @private
      */
     public drawDataLabels(): void {
-        const textPath = (this.options.dataLabels as any).textPath;
+        // We defer drawing the dataLabels
+        // until dataLabels.animation.defer time passes
+        if (this.deferDataLabels) {
+            return;
+        }
+
+        const dlOptions = this.options.dataLabels;
+
+        let textPath;
+        if (dlOptions?.textPath) {
+            textPath = dlOptions.textPath;
+        }
 
         // Render node labels:
-        Series.prototype.drawDataLabels.apply(this, arguments as any);
+        Series.prototype.drawDataLabels.call(this, this.nodes);
 
         // Render link labels:
-        this.points = this.data;
-        (this.options.dataLabels as any).textPath =
-            (this.options.dataLabels as any).linkTextPath;
-        Series.prototype.drawDataLabels.apply(this, arguments as any);
+        if (dlOptions?.linkTextPath) {
+            // If linkTextPath is set, render link labels with linkTextPath
+            dlOptions.textPath = dlOptions.linkTextPath;
+        }
 
-        // Restore nodes
-        this.points = this.nodes;
-        (this.options.dataLabels as any).textPath = textPath;
+        Series.prototype.drawDataLabels.call(this, this.data);
+
+        // Go back to textPath for nodes
+        if (dlOptions?.textPath) {
+            dlOptions.textPath = textPath;
+        }
     }
 
     /**
@@ -226,11 +248,12 @@ class NetworkgraphSeries extends Series {
 
         NodesComposition.generatePoints.apply(this, arguments as any);
 
-        // In networkgraph, it's fine to define stanalone nodes, create
+        // In networkgraph, it's fine to define standalone nodes, create
         // them:
         if (this.options.nodes) {
             this.options.nodes.forEach(
                 function (
+                    this: NetworkgraphSeries,
                     nodeOptions: NodesComposition.PointCompositionOptions
                 ): void {
                     if (!this.nodeLookup[nodeOptions.id as any]) {
@@ -246,11 +269,12 @@ class NetworkgraphSeries extends Series {
             node = this.nodes[i];
 
             node.degree = node.getDegree();
-            node.radius = pick(
-                node.marker && node.marker.radius,
-                this.options.marker && this.options.marker.radius,
+            node.radius = (
+                (node.marker && node.marker.radius) ??
+                (this.options.marker && this.options.marker.radius) ??
                 0
             );
+            node.key = node.name;
 
             // If node exists, but it's not available in nodeLookup,
             // then it's leftover from previous runs (e.g. setData)
@@ -278,7 +302,7 @@ class NetworkgraphSeries extends Series {
 
     /**
      * Set index for each node. Required for proper `node.update()`.
-     * Note that links are indexated out of the box in `generatePoints()`.
+     * Note that links are indexed out of the box in `generatePoints()`.
      *
      * @private
      */
@@ -300,8 +324,8 @@ class NetworkgraphSeries extends Series {
         chart: NetworkgraphChart,
         options: Partial<NetworkgraphSeriesOptions>
     ): NetworkgraphSeries {
-
         super.init(chart, options);
+        initDataLabelsDefer.call(this);
 
         addEvent(this, 'updatedData', (): void => {
             if (this.layout) {
@@ -315,6 +339,14 @@ class NetworkgraphSeries extends Series {
                     node.resolveColor();
                 }
             });
+        });
+
+        // If the dataLabels.animation.defer time is longer than
+        // the time it takes for the layout to become stable then
+        // drawDataLabels would never be called (that's why we force it here)
+        addEvent(this, 'afterSimulation', function (): void {
+            this.deferDataLabels = false;
+            this.drawDataLabels();
         });
 
         return this;
@@ -333,7 +365,7 @@ class NetworkgraphSeries extends Series {
         const attribs =
             Series.prototype.markerAttribs.call(this, point, state);
 
-        // series.render() is called before initial positions are set:
+        // Series.render() is called before initial positions are set:
         if (!defined(point.plotY)) {
             attribs.y = 0;
         }
@@ -352,28 +384,28 @@ class NetworkgraphSeries extends Series {
         state?: StatesOptionsKey
     ): SVGAttributes {
         // By default, only `selected` state is passed on
-        let pointState = state || point && point.state || 'normal',
-            attribs = Series.prototype.pointAttribs.call(
-                this,
-                point,
-                pointState
-            ),
-            stateOptions = (this.options.states as any)[pointState];
+        const pointState = state || point && point.state || 'normal',
+            stateOptions = this.options.states?.[pointState];
+
+        let attribs = Series.prototype.pointAttribs.call(
+            this,
+            point,
+            pointState
+        );
 
         if (point && !point.isNode) {
             attribs = point.getLinkAttributes();
-            // For link, get prefixed names:
+            // For link, get nested names:
             if (stateOptions) {
                 attribs = {
-                    // TO DO: API?
-                    stroke: stateOptions.linkColor || attribs.stroke,
-                    dashstyle: (
-                        stateOptions.linkDashStyle || attribs.dashstyle
-                    ),
-                    opacity: pick(
-                        stateOptions.linkOpacity, attribs.opacity
-                    ),
-                    'stroke-width': stateOptions.linkColor ||
+                    stroke: stateOptions.link?.color || attribs.stroke,
+                    dashstyle: stateOptions.link?.dashStyle ||
+                        attribs.dashstyle,
+                    // Deprecated linkOpacity, but keep for backwards compat.
+                    opacity: (stateOptions as any).linkOpacity ??
+                        stateOptions.link?.opacity ??
+                        attribs.opacity,
+                    'stroke-width': stateOptions.link?.width ||
                         attribs['stroke-width']
                 };
             }
@@ -395,7 +427,7 @@ class NetworkgraphSeries extends Series {
 
         // Render markers:
         series.points = series.nodes;
-        lineProto.render.call(this);
+        LineSeries.prototype.render.call(this);
         series.points = points;
 
         points.forEach(function (
@@ -411,7 +443,8 @@ class NetworkgraphSeries extends Series {
             series.redrawHalo(hoverPoint);
         }
 
-        if (series.chart.hasRendered &&
+        if (
+            series.chart.hasRendered &&
             !(series.options.dataLabels as any).allowOverlap
         ) {
             series.nodes.concat(series.points).forEach(function (node): void {
@@ -447,13 +480,11 @@ class NetworkgraphSeries extends Series {
     }
 
     /**
-     * Run pre-translation and register nodes&links to the deffered layout.
+     * Run pre-translation and register nodes&links to the deferred layout.
      * @private
      */
     public translate(): void {
-        if (!this.processedXData) {
-            this.processData();
-        }
+
         this.generatePoints();
 
         this.deferLayout();
@@ -528,9 +559,10 @@ extend(NetworkgraphSeries.prototype, {
     pointArrayMap: ['from', 'to'],
     requireSorting: false,
     trackerGroups: ['group', 'markerGroup', 'dataLabelsGroup'],
+    initDataLabels: initDataLabels,
     buildKDTree: noop,
     createNode: NodesComposition.createNode,
-    drawTracker: columnProto.drawTracker,
+    drawTracker: ColumnSeries.prototype.drawTracker,
     onMouseDown: DragNodesComposition.onMouseDown,
     onMouseMove: DragNodesComposition.onMouseMove,
     onMouseUp: DragNodesComposition.onMouseUp,
@@ -565,40 +597,16 @@ export default NetworkgraphSeries;
  * */
 
 /**
- * Formatter callback function.
+ * Callback that fires after the end of Networkgraph series simulation
+ * when the layout is stable.
  *
- * @callback Highcharts.SeriesNetworkgraphDataLabelsFormatterCallbackFunction
+ * @callback Highcharts.NetworkgraphAfterSimulationCallbackFunction
  *
- * @param {Highcharts.SeriesNetworkgraphDataLabelsFormatterContextObject|Highcharts.PointLabelObject} this
- *        Data label context to format
+ * @param {Highcharts.Series} this
+ *        The series where the event occurred.
  *
- * @return {string}
- *         Formatted data label text
+ * @param {global.Event} event
+ *        The event that occurred.
  */
 
-/**
- * Context for the formatter function.
- *
- * @interface Highcharts.SeriesNetworkgraphDataLabelsFormatterContextObject
- * @extends Highcharts.PointLabelObject
- * @since 7.0.0
- *//**
- * The color of the node.
- * @name Highcharts.SeriesNetworkgraphDataLabelsFormatterContextObject#color
- * @type {Highcharts.ColorString}
- * @since 7.0.0
- *//**
- * The point (node) object. The node name, if defined, is available through
- * `this.point.name`. Arrays: `this.point.linksFrom` and `this.point.linksTo`
- * contains all nodes connected to this point.
- * @name Highcharts.SeriesNetworkgraphDataLabelsFormatterContextObject#point
- * @type {Highcharts.Point}
- * @since 7.0.0
- *//**
- * The ID of the node.
- * @name Highcharts.SeriesNetworkgraphDataLabelsFormatterContextObject#key
- * @type {string}
- * @since 7.0.0
- */
-
-''; // detach doclets above
+''; // Detach doclets above

@@ -2,7 +2,11 @@ QUnit.test('Color object', function (assert) {
     var color = Highcharts.color;
 
     assert.strictEqual(color('#FF0000').get(), 'rgb(255,0,0)', 'Hex, no new');
-    assert.strictEqual(new color('#FF0000').get(), 'rgb(255,0,0)', 'Hex, new');
+    assert.strictEqual(
+        new Highcharts.Color('#FF0000').get(),
+        'rgb(255,0,0)',
+        'Hex, new'
+    );
     assert.strictEqual(color('#FF0000').get('rgb'), 'rgb(255,0,0)', 'Get RGB');
     assert.strictEqual(color('rgb(255, 0, 0)').get(), 'rgb(255,0,0)', 'RGB');
     assert.strictEqual(color('rgb(255,0,0)').get(), 'rgb(255,0,0)', 'RGB');
@@ -23,5 +27,17 @@ QUnit.test('Color object', function (assert) {
         color('#FF0000').setOpacity(0.2).get(),
         'rgba(255,0,0,0.2)',
         'Set opacity'
+    );
+
+    assert.strictEqual(
+        color('#f003').get('rgba'),
+        'rgba(255,0,0,0.2)',
+        '4-digit hex color'
+    );
+
+    assert.strictEqual(
+        color('#ff000033').get('rgba'),
+        'rgba(255,0,0,0.2)',
+        '8-digit hex color'
     );
 });

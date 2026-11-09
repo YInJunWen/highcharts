@@ -1,47 +1,325 @@
-// Get the turnover. Read the table from the HTML, sort by the joined/left
-// events and keep track of the number of employees.
-function getTurnover() {
-    let employees = 0;
-    return [].reduce.call(
-        document.getElementById('turnover').querySelectorAll('tr'),
-        (turnover, tr) => {
-            const dateJoined = Date.parse(tr.children[1].textContent);
-            if (!isNaN(dateJoined)) {
-                turnover.push({
-                    x: dateJoined,
-                    name: `${tr.children[0].textContent} joined`,
-                    accumulate: 1,
-                    image: tr.children[3].textContent || null
-                });
-            }
+// Create a custom symbol for the event labels
+Highcharts.SVGRenderer.prototype.symbols.eventLabel = (
+    x,
+    y,
+    width,
+    height,
+    options
+) => {
+    const r = 3,
+        d = Highcharts.SVGRenderer.prototype.symbols
+            .callout(x, y, width, height, options),
+        { anchorX, anchorY } = options;
 
-            const dateLeft = Date.parse(tr.children[2].textContent);
-            if (!isNaN(dateLeft)) {
-                turnover.push({
-                    x: dateLeft,
-                    name: `${tr.children[0].textContent} left`,
-                    accumulate: -1,
-                    image: null
-                });
-            }
+    // Border radius
+    options.r = r;
 
-            return turnover;
-        },
-        [])
-        .sort((a, b) => a.x - b.x)
-        .map(event => Object.assign(
-            event, {
-                y: (employees += event.accumulate)
-            }
-        ));
-}
+    // Replace the chevron with a riser and a circle at the anchor point
+    if (
+        typeof anchorY === 'number' &&
+        anchorY - height > 8 &&
+        d.length === 13
+    ) {
+        d[5][1] = anchorX + 1;
+        d[6] = ['L', anchorX + 1, anchorY - r + 1];
+        d.splice(7, 0, ['A', 3, 3, 1, 1, 1, anchorX - 1, anchorY - r + 1]);
+        d[8][1] = anchorX - 1;
+    }
+
+    return d;
+};
+
+const employees = [
+    { x: '2009-11-01', y: 1 },
+    { x: '2010-11-20', y: 2 },
+    { x: '2011-04-01', y: 3 },
+    { x: '2011-08-01', y: 4 },
+    { x: '2011-08-05', y: 5 },
+    { x: '2012-06-01', y: 6 },
+    { x: '2012-09-10', y: 5 },
+    { x: '2012-09-15', y: 6 },
+    { x: '2013-08-01', y: 7 },
+    { x: '2013-08-20', y: 8 },
+    { x: '2013-10-01', y: 9 },
+    { x: '2014-08-08', y: 10 },
+    { x: '2014-11-01', y: 11 },
+    { x: '2015-02-01', y: 12 },
+    { x: '2015-05-01', y: 13 },
+    { x: '2015-08-01', y: 15 },
+    { x: '2016-01-01', y: 16 },
+    { x: '2016-02-01', y: 18 },
+    { x: '2016-05-01', y: 17 },
+    { x: '2016-07-01', y: 16 },
+    { x: '2016-08-01', y: 19 },
+    { x: '2016-09-01', y: 20 },
+    { x: '2017-01-01', y: 21 },
+    { x: '2017-03-01', y: 20 },
+    { x: '2017-08-01', y: 19 },
+    { x: '2017-09-01', y: 21 },
+    { x: '2017-11-01', y: 20 },
+    { x: '2018-01-01', y: 23 },
+    { x: '2018-08-01', y: 26 },
+    { x: '2019-02-01', y: 27 },
+    { x: '2019-03-01', y: 28 },
+    { x: '2019-06-01', y: 29 },
+    { x: '2019-08-01', y: 31 },
+    { x: '2020-01-01', y: 29 },
+    { x: '2020-02-01', y: 28 },
+    { x: '2020-06-01', y: 27 },
+    { x: '2020-07-01', y: 26 },
+    { x: '2020-09-01', y: 28 },
+    { x: '2020-10-01', y: 29 },
+    { x: '2020-11-01', y: 30 },
+    { x: '2021-01-01', y: 31 },
+    { x: '2021-02-01', y: 32 },
+    { x: '2021-03-01', y: 33 },
+    { x: '2021-04-01', y: 34 },
+    { x: '2021-06-01', y: 33 },
+    { x: '2021-07-01', y: 34 },
+    { x: '2021-09-01', y: 33 },
+    { x: '2021-10-01', y: 32 },
+    { x: '2021-11-01', y: 33 },
+    { x: '2021-12-01', y: 34 },
+    { x: '2022-02-01', y: 35 },
+    { x: '2022-03-01', y: 34 },
+    { x: '2022-05-01', y: 36 },
+    { x: '2022-06-01', y: 37 },
+    { x: '2022-07-01', y: 36 },
+    { x: '2022-08-01', y: 39 },
+    { x: '2022-09-01', y: 38 },
+    { x: '2022-11-01', y: 39 },
+    { x: '2022-12-01', y: 39 },
+    { x: '2023-01-01', y: 39 },
+    { x: '2023-02-01', y: 39 },
+    { x: '2023-03-01', y: 40 },
+    { x: '2023-04-01', y: 41 },
+    { x: '2023-05-01', y: 41 },
+    { x: '2023-06-01', y: 40 },
+    { x: '2023-07-01', y: 38 },
+    { x: '2023-08-01', y: 38 },
+    { x: '2023-09-01', y: 39 },
+    { x: '2023-10-01', y: 39 },
+    { x: '2023-11-01', y: 39 },
+    { x: '2023-12-01', y: 39 },
+    { x: '2024-01-01', y: 40 },
+    { x: '2024-02-01', y: 41 },
+    { x: '2024-03-01', y: 41 },
+    { x: '2024-04-01', y: 41 },
+    { x: '2024-05-01', y: 41 },
+    { x: '2024-06-01', y: 42 },
+    { x: '2024-07-01', y: 46 },
+    { x: '2024-08-01', y: 48 },
+    { x: '2024-09-01', y: 48 },
+    { x: '2024-10-01', y: 48 },
+    { x: '2024-11-01', y: 48 },
+    { x: '2024-12-01', y: 48 },
+    { x: '2025-01-01', y: 48 },
+    { x: '2025-02-01', y: 48 },
+    { x: '2025-03-01', y: 48 },
+    { x: '2025-04-01', y: 50 },
+    { x: '2025-05-01', y: 50 },
+    { x: '2025-06-01', y: 50 },
+    { x: '2025-07-01', y: 50 },
+    { x: '2025-08-01', y: 50 },
+    { x: '2025-09-01', y: 50 },
+    { x: '2025-10-01', y: 50 },
+    { x: '2025-11-01', y: 50 }
 
 
-const imgPath = 'https://cdn.rawgit.com/highcharts/highcharts/0b81a74ecd2fbd2e9b24489bf476f8baecc218e1/samples/graphics/homepage/';
+];
+// const revData = [
+//     [1259622000000, 16],
+//     [1262300400000, 15],
+//     [1264978800000, 12],
+//     [1267398000000, 15],
+//     [1270072800000, 13],
+//     [1272664800000, 13],
+//     [1275343200000, 14],
+//     [1277935200000, 13],
+//     [1280613600000, 14],
+//     [1283292000000, 16],
+//     [1285884000000, 19],
+//     [1288566000000, 16],
+//     [1291158000000, 18],
+//     [1293836400000, 16],
+//     [1296514800000, 14],
+//     [1298934000000, 17],
+//     [1301608800000, 14],
+//     [1304200800000, 14],
+//     [1306879200000, 16],
+//     [1309471200000, 14],
+//     [1312149600000, 15],
+//     [1314828000000, 18],
+//     [1317420000000, 21],
+//     [1320102000000, 17],
+//     [1322694000000, 20],
+//     [1325372400000, 18],
+//     [1328050800000, 15],
+//     [1330556400000, 23],
+//     [1333231200000, 19],
+//     [1335823200000, 19],
+//     [1338501600000, 22],
+//     [1341093600000, 19],
+//     [1343772000000, 21],
+//     [1346450400000, 24],
+//     [1349042400000, 29],
+//     [1351724400000, 24],
+//     [1354316400000, 27],
+//     [1356994800000, 25],
+//     [1359673200000, 19],
+//     [1362092400000, 22],
+//     [1364767200000, 28],
+//     [1367359200000, 29],
+//     [1370037600000, 30],
+//     [1372629600000, 33],
+//     [1375308000000, 36],
+//     [1377986400000, 34],
+//     [1380578400000, 37],
+//     [1383260400000, 36],
+//     [1385852400000, 33],
+//     [1388530800000, 31],
+//     [1391209200000, 28],
+//     [1393628400000, 29],
+//     [1396303200000, 38],
+//     [1398895200000, 31],
+//     [1401573600000, 38],
+//     [1404165600000, 33],
+//     [1406844000000, 35],
+//     [1409522400000, 35],
+//     [1412114400000, 48],
+//     [1414796400000, 54],
+//     [1417388400000, 46],
+//     [1420066800000, 65],
+//     [1422745200000, 39],
+//     [1425164400000, 47],
+//     [1427839200000, 70],
+//     [1430431200000, 53],
+//     [1433109600000, 43],
+//     [1435701600000, 60],
+//     [1438380000000, 58],
+//     [1441058400000, 53],
+//     [1443650400000, 67],
+//     [1446332400000, 81],
+//     [1448924400000, 63],
+//     [1451602800000, 65],
+//     [1454281200000, 45],
+//     [1456786800000, 58],
+//     [1459461600000, 71],
+//     [1462053600000, 57],
+//     [1464732000000, 59],
+//     [1467324000000, 59],
+//     [1470002400000, 60],
+//     [1472680800000, 72],
+//     [1475272800000, 63],
+//     [1477954800000, 69],
+//     [1480546800000, 70],
+//     [1483225200000, 68],
+//     [1485903600000, 35],
+//     [1488322800000, 51],
+//     [1490997600000, 70],
+//     [1493589600000, 56],
+//     [1496268000000, 53],
+//     [1498860000000, 65],
+//     [1501538400000, 48],
+//     [1504216800000, 80],
+//     [1506808800000, 44],
+//     [1509490800000, 70],
+//     [1512082800000, 62],
+//     [1514761200000, 72],
+//     [1517439600000, 46],
+//     [1519858800000, 46],
+//     [1522533600000, 77],
+//     [1525125600000, 61],
+//     [1527804000000, 72],
+//     [1530396000000, 65],
+//     [1533074400000, 48],
+//     [1535752800000, 51],
+//     [1538344800000, 59],
+//     [1541026800000, 71],
+//     [1543618800000, 77],
+//     [1546297200000, 64],
+//     [1548975600000, 55],
+//     [1551394800000, 50],
+//     [1554069600000, 63],
+//     [1556661600000, 51],
+//     [1559340000000, 67],
+//     [1561932000000, 50],
+//     [1564610400000, 63],
+//     [1567288800000, 54],
+//     [1569880800000, 45],
+//     [1572480000000, 63],
+//     [1575072000000, 59],
+//     [1577750400000, 68],
+//     [1580428800000, 56],
+//     [1582848000000, 53],
+//     [1585612800000, 48],
+//     [1588204800000, 69],
+//     [1590883200000, 55],
+//     [1593475200000, 47],
+//     [1596153600000, 59],
+//     [1598832000000, 45],
+//     [1601424000000, 58],
+//     [1604102400000, 62],
+//     [1606694400000, 45],
+//     [1609372800000, 49],
+//     [1612051200000, 52],
+//     [1614470400000, 45],
+//     [1617148800000, 62],
+//     [1619740800000, 43],
+//     [1622419200000, 58],
+//     [1625011200000, 50],
+//     [1627689600000, 59],
+//     [1630368000000, 46],
+//     [1632960000000, 53],
+//     [1635638400000, 59],
+//     [1638230400000, 50],
+//     [1640908800000, 49],
+//     [1643587200000, 81],
+//     [1646006400000, 52],
+//     [1648684800000, 74],
+//     [1651276800000, 38],
+//     [1653955200000, 53],
+//     [1656547200000, 65],
+//     [1659225600000, 57],
+//     [1661904000000, 49],
+//     [1664496000000, 45],
+//     [1667174400000, 60],
+//     [1669766400000, 60],
+//     [1672444800000, 50],
+//     [1675141200000, 73],
+//     [1677560400000, 100],
+//     [1680235200000, 94],
+//     [1682827200000, 68],
+//     [1685505600000, 66],
+//     [1688097600000, 61],
+//     [1690776000000, 60],
+//     [1693454400000, null]
+// ];
+
+const revData = [
+    { x: '2009-11-31', y: 100.0 },
+    { x: '2010-11-31', y: 111.1 },
+    { x: '2011-11-31', y: 123.5 },
+    { x: '2012-11-31', y: 137.2 },
+    { x: '2013-11-31', y: 187.9 },
+    { x: '2014-11-31', y: 244.5 },
+    { x: '2015-11-31', y: 357.0 },
+    { x: '2016-11-31', y: 382.7 },
+    { x: '2017-11-31', y: 359.2 },
+    { x: '2018-11-31', y: 375.9 },
+    { x: '2019-11-31', y: 418.6 },
+    { x: '2020-11-31', y: 399.7 },
+    { x: '2021-11-31', y: 387.2 },
+    { x: '2022-11-31', y: 423.7 },
+    { x: '2023-11-31', y: 597.8 },
+    { x: '2024-11-31', y: 653.9 },
+    { x: '2025-11-31', y: 643.9 }
+];
+
 const options = {
     chart: {
         height: 600,
-        styledMode: (true),
+        styledMode: true,
         scrollablePlotArea: {
             minWidth: 700,
             scrollPositionX: 1
@@ -53,73 +331,76 @@ const options = {
     exporting: {
         enabled: false
     },
-    xAxis: {
-        type: 'datetime',
-        minTickInterval: 365 * 24 * 36e5,
-        max: Date.UTC(2020, 11, 31),
-        labels: {
-            align: 'left',
-            style: {
-                fontSize: '16px'
-            }
-        },
-        plotBands: [{
-            from: Date.UTC(2009, 10, 27),
-            to: Date.UTC(2010, 11, 1),
-            className: 'time-1',
-            label: {
-                text: 'Torstein\'s<br>basement',
-                useHTML: true,
+    xAxis: [
+        {
+            type: 'datetime',
+            minTickInterval: 365 * 24 * 36e5,
+            labels: {
+                align: 'left',
                 style: {
-                    color: '#000'
-                },
-                y: 20
-            }
-        }, {
-            from: Date.UTC(2010, 11, 1),
-            to: Date.UTC(2013, 9, 1),
-            className: 'time-2',
-            label: {
-                text: 'Tomtebu<br>Norway',
-                style: {
-                    color: '#000'
-                },
-                y: 20
-            }
-        }, {
-            from: Date.UTC(2013, 9, 1),
-            to: Date.UTC(2016, 2, 10),
-            className: 'time-3',
-            label: {
-                text: 'VikØrsta<br>Norway',
-                style: {
-                    color: '#000'
-                },
-                y: 20
-            }
-        }, {
-            from: Date.UTC(2016, 2, 10),
-            to: Date.now(),
-            className: 'time-4',
-            label: {
-                text: 'Blix Hotel<br>Norway',
-                style: {
-                    color: '#000'
-                },
-                y: 20
-            }
-        }]
-    },
+                    fontSize: '16px'
+                }
+            },
+            plotBands: [{
+                from: '2009-11-27',
+                to: '2010-12-01',
+                className: 'time-1',
+                label: {
+                    text: 'Torstein\'s<br>basement',
+                    style: {
+                        color: 'var(--text-secondary)'
+                    },
+                    y: 20
+                }
+            }, {
+                from: '2010-12-01',
+                to: '2013-10-01',
+                className: 'time-2',
+                label: {
+                    text: 'Tomtebu<br>Norway',
+                    style: {
+                        color: 'var(--text-secondary)'
+                    },
+                    y: 20
+                }
+            }, {
+                from: '2013-10-01',
+                to: '2016-03-10',
+                className: 'time-3',
+                label: {
+                    text: 'VikØrsta<br>Norway',
+                    style: {
+                        color: 'var(--text-secondary)'
+                    },
+                    y: 20
+                }
+            }, {
+                from: '2016-03-10',
+                to: Date.now(),
+                className: 'time-4',
+                label: {
+                    text: 'Blix Hotel<br>Norway',
+                    style: {
+                        color: 'var(--text-secondary)'
+                    },
+                    y: 20
+                }
+            }]
+        }
+    ],
     title: {
         text: ''
     },
     tooltip: {
+        outside: true,
+        useHTML: true,
+        className: 'tip',
         style: {
             width: '250px'
         }
     },
     yAxis: [{
-        max: 100,
+        // max: 100,
         labels: {
             enabled: false
         },
@@ -127,11 +408,11 @@ const options = {
         title: {
             text: ''
         },
-        gridLineColor: 'rgba(0, 0, 0, 0.07)'
+        gridLineColor: 'var(--timeline-axes-lines)'
     }, {
         allowDecimals: false,
         min: 0,
-        max: 50,
+        max: 60,
         tickInterval: 5,
         startOnTick: false,
         title: {
@@ -153,7 +434,7 @@ const options = {
                 symbol: 'circle',
                 radius: 2
             },
-            fillOpacity: 0.5,
+            fillOpacity: 0.1,
             events: {
                 legendItemClick: function () {
                     return false;
@@ -164,154 +445,18 @@ const options = {
             clip: false,
             tooltip: {
                 xDateFormat: '%B %e, %Y'
-            },
-            allowOverlapX: false
+            }
         }
     },
     series: [{
-        name: 'Revenue',
+        name: 'Revenue Growth',
         type: 'areaspline',
         className: 'revenue',
         id: 'revenue',
-        data: [
-            [1259622000000, 16],
-            [1262300400000, 20],
-            [1264978800000, 16],
-            [1267398000000, 16],
-            [1270072800000, 18],
-            [1272664800000, 16],
-            [1275343200000, 18],
-            [1277935200000, 20],
-            [1280613600000, 25],
-            [1283292000000, 20],
-            [1285884000000, 23],
-            [1288566000000, 21],
-            [1291158000000, 18],
-            [1293836400000, 22],
-            [1296514800000, 18],
-            [1298934000000, 18],
-            [1301608800000, 21],
-            [1304200800000, 18],
-            [1306879200000, 20],
-            [1309471200000, 23],
-            [1312149600000, 28],
-            [1314828000000, 22],
-            [1317420000000, 25],
-            [1320102000000, 24],
-            [1322694000000, 20],
-            [1325372400000, 24],
-            [1328050800000, 20],
-            [1330556400000, 20],
-            [1333231200000, 23],
-            [1335823200000, 20],
-            [1338501600000, 22],
-            [1341093600000, 25],
-            [1343772000000, 31],
-            [1346450400000, 25],
-            [1349042400000, 28],
-            [1351724400000, 26],
-            [1354316400000, 22],
-            [1356994800000, 27],
-            [1359673200000, 22],
-            [1362092400000, 22],
-            [1364767200000, 25],
-            [1367359200000, 23],
-            [1370037600000, 24],
-            [1372629600000, 28],
-            [1375308000000, 34],
-            [1377986400000, 28],
-            [1380578400000, 32],
-            [1383260400000, 29],
-            [1385852400000, 27],
-            [1388530800000, 26],
-            [1391209200000, 33],
-            [1393628400000, 34],
-            [1396303200000, 36],
-            [1398895200000, 39],
-            [1401573600000, 42],
-            [1404165600000, 40],
-            [1406844000000, 43],
-            [1409522400000, 42],
-            [1412114400000, 39],
-            [1414796400000, 37],
-            [1417388400000, 41],
-            [1420066800000, 34],
-            [1422745200000, 45],
-            [1425164400000, 36],
-            [1427839200000, 44],
-            [1430431200000, 39],
-            [1433109600000, 41],
-            [1435701600000, 41],
-            [1438380000000, 56],
-            [1441058400000, 63],
-            [1443650400000, 53],
-            [1446332400000, 77],
-            [1448924400000, 56],
-            [1451602800000, 55],
-            [1454281200000, 83],
-            [1456786800000, 62],
-            [1459461600000, 50],
-            [1462053600000, 71],
-            [1464732000000, 68],
-            [1467324000000, 63],
-            [1470002400000, 79],
-            [1472680800000, 95],
-            [1475272800000, 74],
-            [1477954800000, 77],
-            [1480546800000, 65],
-            [1483225200000, 68],
-            [1485903600000, 83],
-            [1488322800000, 67],
-            [1490997600000, 70],
-            [1493589600000, 70],
-            [1496268000000, 70],
-            [1498860000000, 84],
-            [1501538400000, 74],
-            [1504216800000, 81],
-            [1506808800000, 82],
-            [1509490800000, 80],
-            [1512082800000, 51],
-            [1514761200000, 60],
-            [1517439600000, 83],
-            [1519858800000, 66],
-            [1522533600000, 62],
-            [1525125600000, 76],
-            [1527804000000, 56],
-            [1530396000000, 95],
-            [1533074400000, 52],
-            [1535752800000, 82],
-            [1538344800000, 73],
-            [1541026800000, 84],
-            [1543618800000, 66],
-            [1546297200000, 53],
-            [1548975600000, 91],
-            [1551394800000, 72],
-            [1554069600000, 85],
-            [1556661600000, 77],
-            [1559340000000, 56],
-            [1561932000000, 60],
-            [1564610400000, 69],
-            [1567288800000, 83],
-            [1569880800000, 91], ///september 2019
-            [1572480000000, 79],
-            [1575072000000, 65],
-            [1577750400000, 92],
-            [1580428800000, 85],
-            [1582848000000, 80],
-            [1585612800000, 82],
-            [1588204800000, 76],
-            [1590883200000, 70],
-            [1593475200000, 100],
-            [1596153600000, 80],
-            [1598832000000, 68],
-            [1601424000000, 85],
-            [1604102400000, 65],
-            [1606694400000, 84],
-            [1609372800000, 90]
-        ],
+        data: revData,
         tooltip: {
             xDateFormat: '%B %Y',
-            valueSuffix: ' % of best month'
+            valueSuffix: ' % since launch'
         }
     }, {
         yAxis: 1,
@@ -321,11 +466,12 @@ const options = {
         type: 'area',
         step: 'left',
         tooltip: {
-            headerFormat: '<span style="font-size: 11px;color:#666">{point.x:%B %e, %Y}</span><br>',
-            pointFormat: '{point.name}<br><b>{point.y}</b>',
-            valueSuffix: ' employees'
+            valueSuffix: ' employees',
+            useHTML: true,
+            pointFormat: '<p class="tip"><b>{point.y}</b></p>',
+            headerFormat: '<p class="tipheader">{point.x:%B %Y}</p>'
         },
-        data: getTurnover()
+        data: employees
 
     }
     ],
@@ -339,7 +485,7 @@ const options = {
                     margin: [0, 0, 30, 0]
                 },
                 legend: {
-                    enabled: true
+                    enabled: false
                 }
             }
         },
@@ -359,137 +505,145 @@ const options = {
     }
 };
 
-if (Highcharts.seriesTypes.flags) {
+if (Highcharts.Series.types.flags) {
     options.series.push(
+        // 0
         {
             type: 'flags',
-            name: 'Highmaps',
+            name: 'Products',
             className: 'product',
-            color: '#333333',
-            shape: 'url(' + imgPath + 'product.png)',
-            tooltip: {
-                distance: 60
-            },
+            allowOverlapX: true,
+            useHTML: true,
+            color: '#fff',
+            shape: 'eventLabel',
             data: [{
-                x: Date.UTC(2014, 5, 13),
+                x: '2011-10-18',
+                text: 'Highcharts Stock version 1.0 released',
+                title: 'Stock'
+            },
+            {
+                x: '2014-06-13',
                 text: 'Highmaps version 1.0 released',
                 title: 'Maps'
-            }],
-            showInLegend: false
-        },
-        {
-            type: 'flags',
-            name: 'Cloud',
-            className: 'cloud',
-            color: '#333333',
-            tooltip: {
-                distance: 40
-            },
-            shape: 'url(' + imgPath + 'cloud.png)',
-            data: [{
-                x: Date.UTC(2014, 4, 1),
-                text: 'Highcharts Cloud Beta',
-                title: 'Cloud'
+            }, {
+                x: '2018-10-17',
+                text: 'Gantt version 1.0 released',
+                title: 'Gantt'
             },
             {
-                x: Date.UTC(2017, 10, 24),
-                text: 'Highcharts Cloud v2',
-                title: 'Cloud v2'
+                x: '2023-05-05',
+                text: 'Highcharts GPT released',
+                title: 'Highcharts GPT'
             },
             {
-                x: Date.UTC(2018, 11, 6),
-                text: 'Highcharts Cloud v2',
-                title: 'Cloud v3'
+                x: '2024-06-29',
+                text: 'Highcharts Dashboards released',
+                title: 'Dashboards'
+            },
+            {
+                x: '2025-02-25',
+                text: 'Highcharts Grid released',
+                title: 'Grid'
             }
             ],
+            y: -70,
             showInLegend: false
         },
+        // 1
         {
             type: 'flags',
-            name: 'Highcharts',
+            name: 'Releases',
             color: '#333333',
-            shape: 'url(' + imgPath + 'version.png)',
-            className: 'product',
-            point: {
-                events: {
-                    mouseOver: function () {
-                        const chart = this.series.chart;
-                        if (this.title === 'Stock') {
-                            chart.update({
-                                tooltip: {
-                                    distance: 60
-                                }
-                            });
-                        } else {
-                            chart.update({
-                                tooltip: {
-                                    distance: 16
-                                }
-                            });
-                        }
-                    }
-                }
-            },
+            shape: 'eventLabel',
+            className: 'release',
+            // useHTML: true,
             data: [{
-                x: Date.UTC(2009, 10, 27),
+                x: '2009-11-27',
                 text: 'Highcharts version 1.0 released',
                 title: '1.0'
             },
             {
-                x: Date.UTC(2010, 6, 13),
+                x: '2010-07-13',
                 text: 'Ported from canvas to SVG rendering',
                 title: '2.0'
             },
             {
-                x: Date.UTC(2010, 10, 23),
+                x: '2010-11-23',
                 text: 'Dynamically resize and scale to text labels',
                 title: '2.1'
             },
             {
-                x: Date.UTC(2011, 9, 18),
-                text: 'Highcharts Stock version 1.0 released',
-                title: 'Stock',
-                shape: 'url(' + imgPath + 'product.png)'
-            },
-            {
-                x: Date.UTC(2012, 7, 24),
+                x: '2012-08-24',
                 text: 'Gauges, polar charts and range series',
                 title: '2.3'
             },
             {
-                x: Date.UTC(2013, 2, 22),
+                x: '2013-03-22',
                 text: 'Multitouch support, more series types',
                 title: '3.0'
             },
             {
-                x: Date.UTC(2014, 3, 22),
+                x: '2014-04-22',
                 text: '3D charts, heatmaps',
                 title: '4.0'
             },
             {
-                x: Date.UTC(2016, 8, 29),
-                text: 'Styled mode, responsive options, accessibility, chart.update',
+                x: '2016-09-29',
+                text: 'Styled mode, responsive options, accessibility, ' +
+                    'chart.update',
                 title: '5.0'
             },
             {
-                x: Date.UTC(2017, 9, 4),
+                x: '2017-10-04',
                 text: 'Annotations, Boost, Series labels, new series types',
                 title: '6.0'
             },
             {
-                x: Date.UTC(2018, 11, 11),
+                x: '2018-12-11',
                 text: 'Sonification, TypeScript (beta), new series types',
                 title: '7.0'
+            },
+            {
+                x: '2019-12-10',
+                text: 'Accessibility, data sorting, marker clusters',
+                title: '8.0'
+            },
+            {
+                x: '2021-02-02',
+                text: 'Improved security, accessibility options, zoom by ' +
+                    'single touch',
+                title: '9.0'
+            },
+            {
+                x: '2022-03-07',
+                text: 'Bread crumbs, improved Boost pixel ratio,<br>' +
+                    'threshold alignment in charts<br>with multiple axes',
+                title: '10.0'
+            },
+            {
+                x: '2023-04-27',
+                text: 'Design upgrade, Faster codebase,<br>Flow maps, ' +
+                    'Pictorial charts,<br>Treegraphs, Geographical<br>' +
+                    'heatmaps, Audio charts',
+                title: '11.0'
+            },
+            {
+                x: '2024-10-27',
+                text: `Locale-aware date and number formatting,
+                human-friendly date inputs, and two new Stock series.`,
+                title: '12.0'
             }
             ],
+            y: -32,
             showInLegend: false
         },
+        // 2
         {
             type: 'flags',
             name: 'logo',
             shape: 'url(https://wp-assets.highcharts.com/www-highcharts-com/blog/wp-content/uploads/2021/05/19085042/favicon-1.ico)',
             data: [{
-                x: Date.UTC(2014, 4, 21),
+                x: '2014-05-21',
                 text: 'New logo',
                 title: ' '
             }],
@@ -497,41 +651,48 @@ if (Highcharts.seriesTypes.flags) {
             showInLegend: false
 
         },
+        // 3
         {
             type: 'flags',
-            useHTML: true,
             name: 'Events',
             className: 'award',
-            shape: 'url(' + imgPath + 'award.png)',
+            shape: 'eventLabel',
             data: [{
-                x: Date.UTC(2012, 10, 1),
-                text: 'Highsoft won "Entrepeneur of the Year" in Sogn og Fjordane, Norway',
-                title: 'Award'
+                x: '2012-11-01',
+                text: 'Highsoft won "Entrepeneur of the Year" in Sogn og ' +
+                    'Fjordane, Norway',
+                title: '<p>Award</p>'
             },
             {
-                x: Date.UTC(2012, 11, 25),
-                text: 'Packt Publishing published <em>Learning Highcharts by Example</em>. Since then, many other books are written about Highcharts.',
-                title: 'First book'
+                x: '2012-12-25',
+                text:
+                `<p style="margin-top:20px">Packt Publishing published
+                <em>Learning Highcharts by Example</em>.<br>Since
+                then, many other books have
+                been written about Highcharts.</p>`,
+                title: '<p class="wide">First Book</p>',
+                className: 'book'
             },
             {
-                x: Date.UTC(2013, 4, 25),
+                x: '2013-05-25',
                 text: 'Highsoft nominated Norway\'s Startup of the Year',
-                title: 'Award'
+                title: '<p>Award</p>'
             },
             {
-                x: Date.UTC(2014, 4, 25),
-                text: 'Highsoft nominated Best Startup in Nordic Startup Awards',
-                title: 'Award'
+                x: '2014-05-25',
+                text: 'Highsoft nominated Best Startup in Nordic Startup ' +
+                    'Awards',
+                title: '<p>Award</p>'
             },
             {
-                x: Date.UTC(2017, 9, 20),
+                x: '2017-10-20',
                 text: 'Torstein awarded EY Entrepeneur of the Year, Vestlandet',
-                title: 'Award'
+                title: '<p>Award</p>'
             },
             {
-                x: Date.UTC(2018, 11, 13),
+                x: '2018-12-13',
                 text: 'Grethe awarded NCE Ambassador',
-                title: 'Award'
+                title: '<p>Award</p>'
             }
             ],
             style: {
@@ -545,4 +706,4 @@ if (Highcharts.seriesTypes.flags) {
 
     );
 }
-Highcharts.chart('timeline', options);
+Highcharts.chart('container', options);

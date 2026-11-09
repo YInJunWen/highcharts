@@ -1,8 +1,9 @@
 /* *
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -14,6 +15,7 @@
  *
  * */
 
+import type { IndicatorLinkedSeriesBase } from '../IndicatorBase';
 import type IndicatorValuesObject from '../IndicatorValuesObject';
 import type LinePoint from '../../../Series/Line/LinePoint';
 import type LineSeries from '../../../Series/Line/LineSeries';
@@ -25,17 +27,9 @@ import type SVGElement from '../../../Core/Renderer/SVG/SVGElement';
 import type SVGPath from '../../../Core/Renderer/SVG/SVGPath';
 
 import PivotPointsPoint from './PivotPointsPoint.js';
+import SMAIndicator from '../SMA/SMAIndicator.js';
 import SeriesRegistry from '../../../Core/Series/SeriesRegistry.js';
-const {
-    sma: SMAIndicator
-} = SeriesRegistry.seriesTypes;
-import U from '../../../Core/Utilities.js';
-const {
-    merge,
-    extend,
-    defined,
-    isArray
-} = U;
+import { defined, extend, isArray, merge } from '../../../Shared/Utilities.js';
 
 /**
  *
@@ -46,7 +40,6 @@ const {
 /**
  * The Pivot Points series type.
  *
- * @private
  * @class
  * @name Highcharts.seriesTypes.pivotpoints
  *
@@ -64,25 +57,26 @@ class PivotPointsIndicator extends SMAIndicator {
      * Pivot points indicator. This series requires the `linkedTo` option to be
      * set and should be loaded after `stock/indicators/indicators.js` file.
      *
-     * @sample stock/indicators/pivot-points
+     * @sample {highstock} stock/indicators/pivot-points
      *         Pivot points
      *
      * @extends      plotOptions.sma
      * @since        6.0.0
      * @product      highstock
-     * @requires     stock/indicators/indicators
-     * @requires     stock/indicators/pivotpoints
+     * @requires     indicators/indicators
+     * @requires     indicators/pivot-points
      * @optionparent plotOptions.pivotpoints
+     * @internal
      */
     public static defaultOptions: PivotPointsOptions = merge(SMAIndicator.defaultOptions, {
         /**
          * @excluding index
          */
         params: {
-            index: void 0, // unchangeable index, do not inherit (#15362)
+            index: void 0, // Unchangeable index, do not inherit (#15362)
             period: 28,
             /**
-             * Algorithm used to calculate ressistance and support lines based
+             * Algorithm used to calculate resistance and support lines based
              * on pivot points. Implemented algorithms: `'standard'`,
              * `'fibonacci'` and `'camarilla'`
              */
@@ -107,11 +101,13 @@ class PivotPointsIndicator extends SMAIndicator {
      *
      * */
 
-    public data: Array<PivotPointsPoint> = void 0 as any;
-    public options: PivotPointsOptions = void 0 as any;
-    public points: Array<PivotPointsPoint> = void 0 as any;
-    public endPoint: number = void 0 as any;
-    public plotEndPoint: number = void 0 as any;
+    public data!: Array<PivotPointsPoint>;
+    public options!: PivotPointsOptions;
+    public points!: Array<PivotPointsPoint>;
+    /** @internal */
+    public endPoint!: number;
+    /** @internal */
+    public plotEndPoint!: number;
 
     /* *
      *
@@ -119,16 +115,18 @@ class PivotPointsIndicator extends SMAIndicator {
      *
      * */
 
+    /** @internal */
     public toYData(
         point: PivotPointsPoint
     ): Array<number> {
         return [point.P]; // The rest should not affect extremes
     }
 
+    /** @internal */
     public translate(this: PivotPointsIndicator): void {
         const indicator = this;
 
-        SeriesRegistry.seriesTypes.sma.prototype.translate.apply(indicator);
+        super.translate.apply(indicator);
 
         indicator.points.forEach(
             function (
@@ -158,17 +156,18 @@ class PivotPointsIndicator extends SMAIndicator {
         );
     }
 
+    /** @internal */
     public getGraphPath(this: PivotPointsIndicator, points: Array<LinePoint>): SVGPath {
-        let indicator = this,
-            pointsLength: number = points.length,
+        const indicator = this,
             allPivotPoints: Array<Array<LinePoint>> = (
                 [[], [], [], [], [], [], [], [], []]
             ),
+            pointArrayMapLength: number = indicator.pointArrayMap.length;
+        let endPoint: (number|undefined) = indicator.plotEndPoint,
             path: SVGPath = [],
-            endPoint: (number|undefined) = indicator.plotEndPoint,
-            pointArrayMapLength: number = indicator.pointArrayMap.length,
             position: string,
             point: LinePoint,
+            pointsLength: number = points.length,
             i: number;
 
         while (pointsLength--) {
@@ -197,11 +196,9 @@ class PivotPointsIndicator extends SMAIndicator {
             }
             endPoint = point.plotX;
         }
-        allPivotPoints.forEach(function (
-            pivotPoints: Array<LinePoint>
-        ): void {
+        allPivotPoints.forEach((pivotPoints): void => {
             path = path.concat(
-                SeriesRegistry.seriesTypes.sma.prototype.getGraphPath.call(
+                super.getGraphPath.call(
                     indicator,
                     pivotPoints
                 )
@@ -211,11 +208,12 @@ class PivotPointsIndicator extends SMAIndicator {
         return path;
     }
 
-    // TODO: Rewrite this logic to use multiple datalabels
+    // TODO: Rewrite this logic to use multiple dataLabels
+    /** @internal */
     public drawDataLabels(this: PivotPointsIndicator): void {
-        let indicator = this,
-            pointMapping: Array<(string|boolean)> = indicator.pointArrayMap,
-            currentLabel: (SVGElement|null),
+        const indicator = this,
+            pointMapping: Array<(string|boolean)> = indicator.pointArrayMap;
+        let currentLabel: (SVGElement|null),
             pointsLength: number,
             point: PivotPointsPoint,
             i: number;
@@ -223,11 +221,11 @@ class PivotPointsIndicator extends SMAIndicator {
         if ((indicator.options as any).dataLabels.enabled) {
             pointsLength = indicator.points.length;
 
-            // For every Ressitance/Support group we need to render labels.
+            // For every Resistance/Support group we need to render labels.
             // Add one more item, which will just store dataLabels from
             // previous iteration
             pointMapping.concat([false]).forEach(
-                function (position: (string|boolean), k: number): void {
+                (position: (string|boolean), k: number): void => {
                     i = pointsLength;
                     while (i--) {
                         point = indicator.points[i];
@@ -265,19 +263,20 @@ class PivotPointsIndicator extends SMAIndicator {
                                     null;
                         }
                     }
-                    SeriesRegistry.seriesTypes.sma.prototype.drawDataLabels
+                    super.drawDataLabels
                         .call(indicator);
                 }
             );
         }
     }
 
+    /** @internal */
     public getValues<TLinkedSeries extends LineSeries>(
         this: PivotPointsIndicator,
-        series: TLinkedSeries,
+        series: TLinkedSeries&IndicatorLinkedSeriesBase,
         params: PivotPointsParamsOptions
     ): (IndicatorValuesObject<TLinkedSeries>|undefined) {
-        let period: number = (params.period as any),
+        const period: number = (params.period as any),
             xVal: Array<number> = (series.xData as any),
             yVal: Array<Array<number>> = (series.yData as any),
             yValLen: number = yVal ? yVal.length : 0,
@@ -286,9 +285,9 @@ class PivotPointsIndicator extends SMAIndicator {
             ],
             // 0- from, 1- to, 2- R1, 3- R2, 4- pivot, 5- S1 etc.
             PP: Array<Array<number>> = [],
-            endTimestamp: (number|undefined),
             xData: Array<number> = [],
-            yData: Array<Array<number>> = [],
+            yData: Array<Array<number>> = [];
+        let endTimestamp: (number|undefined),
             slicedXLen: (number|undefined),
             slicedX: (Array<number>|undefined),
             slicedY: Array<Array<number>>,
@@ -342,23 +341,24 @@ class PivotPointsIndicator extends SMAIndicator {
         } as IndicatorValuesObject<TLinkedSeries>;
     }
 
+    /** @internal */
     public getPivotAndHLC(
         values: Array<Array<number>>
     ): [number, number, number, number] {
+        const close: number = values[values.length - 1][3];
         let high = -Infinity,
-            low = Infinity,
-            close: number = values[values.length - 1][3],
-            pivot: number;
+            low = Infinity;
 
         values.forEach(function (p: Array<number>): void {
             high = Math.max(high, p[1]);
             low = Math.min(low, p[2]);
         });
-        pivot = (high + low + close) / 3;
+        const pivot: number = (high + low + close) / 3;
 
         return [pivot, high, low, close];
     }
 
+    /** @internal */
     public standardPlacement(
         values: Array<number>
     ): Array<(number|null)> {
@@ -378,6 +378,7 @@ class PivotPointsIndicator extends SMAIndicator {
         return avg;
     }
 
+    /** @internal */
     public camarillaPlacement(
         values: Array<number>
     ): Array<number> {
@@ -397,6 +398,7 @@ class PivotPointsIndicator extends SMAIndicator {
         return avg;
     }
 
+    /** @internal */
     public fibonacciPlacement(
         values: Array<number>
     ): Array<(number|null)> {
@@ -424,9 +426,13 @@ class PivotPointsIndicator extends SMAIndicator {
  * */
 
 interface PivotPointsIndicator{
+    /** @internal */
     nameBase: string;
+    /** @internal */
     pointArrayMap: Array<string>;
+    /** @internal */
     pointClass: typeof PivotPointsPoint;
+    /** @internal */
     pointValKey: string;
 }
 extend(PivotPointsIndicator.prototype, {
@@ -465,10 +471,9 @@ export default PivotPointsIndicator;
  * @extends   series,plotOptions.pivotpoints
  * @since     6.0.0
  * @product   highstock
- * @excluding dataParser, dataURL
- * @requires  stock/indicators/indicators
- * @requires  stock/indicators/pivotpoints
+ * @requires  indicators/indicators
+ * @requires  indicators/pivot-points
  * @apioption series.pivotpoints
  */
 
-''; // to include the above in the js output'
+''; // To include the above in the js output'

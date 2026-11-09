@@ -2,11 +2,13 @@
  *
  *  Organization chart module
  *
- *  (c) 2018-2021 Torstein Honsi
+ *  (c) 2018-2026 Highsoft AS
+ *  Author: Torstein Hønsi
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -17,12 +19,11 @@
  * */
 
 import type OrganizationPoint from './OrganizationPoint';
-import type OrganizationSeries from './OrganizationSeries';
 import type Point from '../../Core/Series/Point';
 import type {
-    SankeyDataLabelFormatterContext,
     SankeyDataLabelOptions
 } from '../Sankey/SankeyDataLabelOptions';
+import type SankeyPoint from '../Sankey/SankeyPoint';
 
 /* *
  *
@@ -32,21 +33,33 @@ import type {
 
 export interface OrganizationDataLabelsFormatterCallbackFunction {
     (
-        this: (
-            OrganizationDataLabelFormatterContext|
-            SankeyDataLabelFormatterContext|
-            Point.PointLabelObject
-        )
+        this: (Point|OrganizationPoint|SankeyPoint),
+        options: OrganizationDataLabelOptions|SankeyDataLabelOptions
     ): (string|undefined);
-}
-export interface OrganizationDataLabelFormatterContext extends SankeyDataLabelFormatterContext {
-    point: OrganizationPoint;
-    series: OrganizationSeries;
 }
 
 
 export interface OrganizationDataLabelOptions extends SankeyDataLabelOptions {
     nodeFormatter?: OrganizationDataLabelsFormatterCallbackFunction;
+    linkFormat?: string;
+    linkFormatter?: OrganizationDataLabelsFormatterCallbackFunction;
+
+    style?: SankeyDataLabelOptions['style'] & {
+        /** @default '0.9em' */
+        fontSize?: Required<SankeyDataLabelOptions>['style']['fontSize'];
+
+        /** @default 'normal' */
+        fontWeight?: Required<SankeyDataLabelOptions>['style']['fontWeight'];
+
+        /** @default 'left' */
+        textAlign?: Required<SankeyDataLabelOptions>['style']['textAlign'];
+    };
 }
+
+/* *
+ *
+ *  Default Export
+ *
+ * */
 
 export default OrganizationDataLabelOptions;

@@ -1,0 +1,26 @@
+
+<script src="https://code.highcharts.com/maps/highmaps.js"></script>
+
+<figure class="highcharts-figure">
+    <div id="container"></div>
+
+    <div class="button-row">
+        <button id="multipoint" class="highcharts-demo-button">Fit to MultiPoint</button>
+        <button id="polygon" class="highcharts-demo-button">Fit to Polygon</button>
+        <button id="country" class="highcharts-demo-button">Fit to Brazil</button>
+        <button id="region" class="highcharts-demo-button">Fit to Arabia</button>
+        <button id="none" class="highcharts-demo-button">None</button>
+    </div>
+
+    <div class="highcharts-description">
+        <p>When the map view is fitted to a <code>MultiPoint</code> geometry, it
+        makes sure that those points are within the view. When fitted to a
+        <code>Polygon</code> geometry, the <a
+        href="https://en.wikipedia.org/wiki/Geodesic">geodesic</a>
+        between the points in the polygon is fitted within the view.</p>
+
+        <p>The Brazil and Arabia buttons demonstrate how extract the geometries
+        from the source map and fit to one shape or multiple shapes
+        respectively.</p>
+    </div>
+</figure>

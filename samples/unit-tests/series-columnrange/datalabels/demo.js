@@ -1,6 +1,9 @@
 // Highcharts 4.0.1, Issue #3017
 // Column range - centered data labels
-QUnit.test('Columnrange align datalabels (#3017)', function (assert) {
+// Skipped when testing for v11. Chart was not being inverted, so the test was
+// not doing what it was supposed to do. Furthermore, the data label positioning
+// is likely covered by visual tests.
+QUnit.skip('Columnrange align datalabels (#3017)', function (assert) {
     TestTemplate.test(
         'highcharts/columnrange',
         {
@@ -50,7 +53,7 @@ QUnit.test('Columnrange align datalabels (#3017)', function (assert) {
                         // close tolerance
                         Chrome: 4.5,
                         Edge: 1.5,
-                        Firefox: 4,
+                        Firefox: 5.5,
                         MSIE: 2.5,
                         Safari: 2.5,
                         '': 1
@@ -95,11 +98,11 @@ QUnit.test('Change of label alignment after add(#4605)', function (assert) {
             },
             plotOptions: {
                 columnrange: {
-                    //cropThreshold: Number.MAX_VALUE,
+                    // cropThreshold: Number.MAX_VALUE,
                     dataLabels: {
-                        //allowOverlap: true,
-                        //crop: false,
-                        //overflow: 'none',
+                        // allowOverlap: true,
+                        // crop: false,
+                        // overflow: 'none',
                         enabled: true,
                         inside: true
                     }
@@ -143,6 +146,26 @@ QUnit.test('Change of label alignment after add(#4605)', function (assert) {
         allLabelsVisible(chart),
         true,
         'All labels are visible when inverted'
+    );
+
+    chart.series[0].update({
+        data: [[-15, 15]],
+        dataLabels: [{
+            enabled: true,
+            inside: true,
+            align: 'center'
+        }]
+    });
+
+    const point = chart.series[0].points[0],
+        labelRect = point.dataLabelUpper.element.getBoundingClientRect(),
+        barRect = point.graphic.element.getBoundingClientRect();
+
+    assert.close(
+        labelRect.left + labelRect.width / 2,
+        barRect.left + barRect.width / 2,
+        20,
+        'Single inside, center label is centered within the bar'
     );
 });
 

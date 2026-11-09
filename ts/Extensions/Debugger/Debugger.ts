@@ -1,10 +1,12 @@
 /* *
  *
- *  (c) 2010-2021 Torstein Honsi
+ *  (c) 2010-2026 Highsoft AS
+ *  Author: Torstein Hønsi
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -17,19 +19,21 @@
  * */
 
 import type Chart from '../../Core/Chart/Chart';
-import type GlobalsLike from '../../Core/GlobalsLike';
+import type GlobalsBase from '../../Core/GlobalsBase';
 import type SVGElement from '../../Core/Renderer/SVG/SVGElement';
 
+import D from '../../Core/Defaults.js';
+const { setOptions } = D;
 import ErrorMessages from './ErrorMessages.js';
 import H from '../../Core/Globals.js';
-import D from '../../Core/DefaultOptions.js';
-const { setOptions } = D;
-import U from '../../Core/Utilities.js';
-const {
+const { composed } = H;
+import {
     addEvent,
     find,
-    isNumber
-} = U;
+    isNumber,
+    pushUnique
+} from '../../Shared/Utilities.js';
+import { type ErrorMessageEventObject } from '../../Core/Utilities.js';
 
 /* *
  *
@@ -37,14 +41,26 @@ const {
  *
  * */
 
-declare module '../../Core/Chart/ChartLike'{
-    interface ChartLike {
+/** @internal */
+declare module '../../Core/Chart/ChartBase'{
+    interface ChartBase {
         errorElements?: Array<SVGElement>;
     }
 }
 
 declare module '../../Core/Chart/ChartOptions'{
     interface ChartOptions {
+        /**
+         * Whether to display errors on the chart. When `false`, the errors will
+         * be shown only in the console.
+         *
+         * @sample highcharts/chart/display-errors/
+         *         Show errors on chart
+         *
+         * @since    7.0.0
+         * @default  true
+         * @requires modules/debugger
+         */
         displayErrors?: boolean;
     }
 }
@@ -54,8 +70,6 @@ declare module '../../Core/Chart/ChartOptions'{
  *  Constants
  *
  * */
-
-const composedClasses: Array<(Function|GlobalsLike)> = [];
 
 const defaultOptions = {
     /**
@@ -82,36 +96,22 @@ const defaultOptions = {
  *
  * */
 
-/**
- * @private
- */
+/** @internal */
 function compose(
     ChartClass: typeof Chart
 ): void {
 
-    if (composedClasses.indexOf(ChartClass) === -1) {
-        composedClasses.push(ChartClass);
-
+    if (pushUnique(composed, 'Debugger')) {
         addEvent(ChartClass, 'beforeRedraw', onChartBeforeRedraw);
-    }
-
-    if (composedClasses.indexOf(H) === -1) {
-        composedClasses.push(H);
 
         addEvent(H, 'displayError', onHighchartsDisplayError);
-    }
-
-    if (composedClasses.indexOf(setOptions) === -1) {
-        composedClasses.push(setOptions);
 
         setOptions(defaultOptions);
     }
 
 }
 
-/**
- * @private
- */
+/** @internal */
 function onChartBeforeRedraw(
     this: Chart
 ): void {
@@ -126,12 +126,10 @@ function onChartBeforeRedraw(
     delete this.errorElements;
 }
 
-/**
- * @private
- */
+/** @internal */
 function onHighchartsDisplayError(
-    this: GlobalsLike,
-    e: U.ErrorMessageEventObject
+    this: GlobalsBase,
+    e: ErrorMessageEventObject
 ): void {
     // Display error on the chart causing the error or the last created chart.
     const chart = (
@@ -174,7 +172,7 @@ function onHighchartsDisplayError(
         msg = msg
             .replace(
                 /<h1>(.*)<\/h1>/g,
-                '<br><span style="font-size: 24px">$1</span><br>'
+                '<br><span style="font-size: 2em">$1</span><br>'
             )
             .replace(/<p>/g, '')
             .replace(/<\/p>/g, '<br>');
@@ -204,6 +202,7 @@ function onHighchartsDisplayError(
             'debugger'
         ).css({
             color: '#ffffff',
+            fontSize: '0.8em',
             width: (chartWidth - 16) + 'px',
             padding: 0
         }).attr({
@@ -225,8 +224,10 @@ function onHighchartsDisplayError(
  *
  * */
 
+/** @internal */
 const Debugger = {
     compose
 };
 
+/** @internal */
 export default Debugger;

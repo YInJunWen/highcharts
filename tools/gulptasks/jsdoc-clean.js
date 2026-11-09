@@ -18,13 +18,13 @@ const gulp = require('gulp');
  */
 function jsdDocClean() {
 
-    const fsLib = require('./lib/fs');
-    const logLib = require('./lib/log');
+    const fsLib = require('../libs/fs');
+    const logLib = require('../libs/log');
 
     return new Promise((resolve, reject) => {
 
         try {
-            fsLib.deleteDirectory('build/api', true);
+            fsLib.deleteDirectory(fsLib.path(['build', 'api']));
             resolve();
         } catch (catchedError) {
             logLib.failure(catchedError);

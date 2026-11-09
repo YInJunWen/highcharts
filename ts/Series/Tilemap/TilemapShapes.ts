@@ -1,13 +1,14 @@
 /* *
  *
- *  Tilemaps module
+ *  Tilemap module
  *
- *  (c) 2010-2021 Highsoft AS
+ *  (c) 2010-2026 Highsoft AS
  *  Author: Øystein Moseng
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -27,24 +28,22 @@ import type SVGPath from '../../Core/Renderer/SVG/SVGPath';
 import type TilemapPoint from './TilemapPoint';
 import type TilemapSeries from './TilemapSeries';
 import type { TilemapShapeValue } from './TilemapSeriesOptions';
+
 import H from '../../Core/Globals.js';
 const { noop } = H;
-import SeriesRegistry from '../../Core/Series/SeriesRegistry.js';
-const {
-    seriesTypes: {
-        heatmap: HeatmapSeries,
-        scatter: ScatterSeries
-    }
-} = SeriesRegistry;
-import U from '../../Core/Utilities.js';
-const {
-    clamp,
-    pick
-} = U;
+import HeatmapSeries from '../Heatmap/HeatmapSeries.js';
+import ScatterSeries from '../Scatter/ScatterSeries.js';
+import { clamp } from '../../Shared/Utilities.js';
+
+/* *
+ *
+ *  Functions
+ *
+ * */
 
 /**
  * Utility func to get padding definition from tile size division
- * @private
+ * @internal
  */
 function tilePaddingFromTileSize(
     series: TilemapSeries,
@@ -67,6 +66,13 @@ function tilePaddingFromTileSize(
 
 namespace TilemapShapes {
 
+    /* *
+     *
+     *  Declarations
+     *
+     * */
+
+    /** @internal */
     export interface DefinitionObject {
         alignDataLabel(
             this: TilemapSeries,
@@ -84,6 +90,7 @@ namespace TilemapShapes {
         translate(this: TilemapSeries): void;
     }
 
+    /** @internal */
     export interface PaddingObject {
         xPad: number;
         yPad: number;
@@ -99,7 +106,7 @@ namespace TilemapShapes {
 
 /**
  * Map of shape types.
- * @private
+ * @internal
  */
 const TilemapShapes: Record<TilemapShapeValue, TilemapShapes.DefinitionObject> = {
 
@@ -131,18 +138,19 @@ const TilemapShapes: Record<TilemapShapeValue, TilemapShapes.DefinitionObject> =
             ];
         },
         translate: function (this: TilemapSeries): void {
-            let series = this,
+            const series = this,
                 options = series.options,
                 xAxis = series.xAxis,
                 yAxis = series.yAxis,
                 seriesPointPadding = options.pointPadding || 0,
                 xPad = (options.colsize || 1) / 3,
-                yPad = (options.rowsize || 1) / 2,
-                yShift: (number|undefined);
+                yPad = (options.rowsize || 1) / 2;
+
+            let yShift: (number|undefined);
 
             series.generatePoints();
 
-            series.points.forEach(function (point): void {
+            for (const point of series.points) {
                 let x1 = clamp(
                         Math.floor(
                             xAxis.len -
@@ -223,8 +231,8 @@ const TilemapShapes: Record<TilemapShapeValue, TilemapShapes.DefinitionObject> =
                         )),
                         -yAxis.len,
                         2 * yAxis.len
-                    ),
-                    pointPadding = pick(point.pointPadding, seriesPointPadding),
+                    );
+                const pointPadding = point.pointPadding ?? seriesPointPadding,
                     // We calculate the point padding of the midpoints to
                     // preserve the angles of the shape.
                     midPointPadding = pointPadding *
@@ -276,7 +284,7 @@ const TilemapShapes: Record<TilemapShapeValue, TilemapShapes.DefinitionObject> =
                         ['Z']
                     ]
                 };
-            });
+            }
 
             series.translateColors();
         }
@@ -308,18 +316,19 @@ const TilemapShapes: Record<TilemapShapeValue, TilemapShapes.DefinitionObject> =
             ];
         },
         translate: function (this: TilemapSeries): void {
-            let series = this,
+            const series = this,
                 options = series.options,
                 xAxis = series.xAxis,
                 yAxis = series.yAxis,
                 seriesPointPadding = options.pointPadding || 0,
                 xPad = (options.colsize || 1),
-                yPad = (options.rowsize || 1) / 2,
-                yShift;
+                yPad = (options.rowsize || 1) / 2;
+
+            let yShift;
 
             series.generatePoints();
 
-            series.points.forEach(function (point): void {
+            for (const point of series.points) {
                 let x1 = clamp(
                         Math.round(
                             xAxis.len -
@@ -332,18 +341,7 @@ const TilemapShapes: Record<TilemapShapeValue, TilemapShapes.DefinitionObject> =
                             )
                         ), -xAxis.len, 2 * xAxis.len
                     ),
-                    x2 = clamp(
-                        Math.round(
-                            xAxis.len -
-                            xAxis.translate(
-                                point.x,
-                                0 as any,
-                                1 as any,
-                                0 as any,
-                                0 as any
-                            )
-                        ), -xAxis.len, 2 * xAxis.len
-                    ),
+
                     x3 = clamp(
                         Math.round(
                             xAxis.len -
@@ -388,8 +386,20 @@ const TilemapShapes: Record<TilemapShapeValue, TilemapShapes.DefinitionObject> =
                         )),
                         -yAxis.len,
                         2 * yAxis.len
+                    );
+                const x2 = clamp(
+                        Math.round(
+                            xAxis.len -
+                            xAxis.translate(
+                                point.x,
+                                0 as any,
+                                1 as any,
+                                0 as any,
+                                0 as any
+                            )
+                        ), -xAxis.len, 2 * xAxis.len
                     ),
-                    pointPadding = pick(point.pointPadding, seriesPointPadding),
+                    pointPadding = (point.pointPadding ?? seriesPointPadding),
                     // We calculate the point padding of the midpoints to
                     // preserve the angles of the shape.
                     midPointPadding = pointPadding *
@@ -434,7 +444,7 @@ const TilemapShapes: Record<TilemapShapeValue, TilemapShapes.DefinitionObject> =
                         ['Z']
                     ]
                 };
-            });
+            }
 
             series.translateColors();
         }
@@ -451,7 +461,7 @@ const TilemapShapes: Record<TilemapShapeValue, TilemapShapes.DefinitionObject> =
         haloPath: function (
             this: TilemapPoint,
             size: number
-        ): SVGPath { // eslint-disable-line @typescript-eslint/indent
+        ): SVGPath { // eslint-disable-line @stylistic/indent
             return ScatterSeries.prototype.pointClass.prototype.haloPath
                 .call(
                     this,
@@ -459,34 +469,37 @@ const TilemapShapes: Record<TilemapShapeValue, TilemapShapes.DefinitionObject> =
                 );
         },
         translate: function (this: TilemapSeries): void {
-            let series = this,
+            const series = this,
                 options = series.options,
                 xAxis = series.xAxis,
                 yAxis = series.yAxis,
                 seriesPointPadding = options.pointPadding || 0,
                 yRadius = (options.rowsize || 1) / 2,
-                colsize = (options.colsize || 1),
-                colsizePx: (number|undefined),
+                colsize = (options.colsize || 1);
+
+            let colsizePx: (number|undefined),
                 yRadiusPx: (number|undefined),
                 xRadiusPx: (number|undefined),
-                radius: number,
+                radius: (number|undefined),
                 forceNextRadiusCompute = false;
 
             series.generatePoints();
 
-            series.points.forEach(function (point): void {
-                let x = clamp(
-                        Math.round(
-                            xAxis.len -
-                            xAxis.translate(
-                                point.x,
-                                0 as any,
-                                1 as any,
-                                0 as any,
-                                0 as any
-                            )
-                        ), -xAxis.len, 2 * xAxis.len
-                    ),
+            for (const point of series.points) {
+                const x = clamp(
+                    Math.round(
+                        xAxis.len -
+                        xAxis.translate(
+                            point.x,
+                            0 as any,
+                            1 as any,
+                            0 as any,
+                            0 as any
+                        )
+                    ), -xAxis.len, 2 * xAxis.len
+                );
+                let pointPadding = seriesPointPadding,
+                    hasPerPointPadding = false,
                     y = clamp(
                         Math.round(yAxis.translate(
                             point.y,
@@ -497,9 +510,7 @@ const TilemapShapes: Record<TilemapShapeValue, TilemapShapes.DefinitionObject> =
                         )),
                         -yAxis.len,
                         2 * yAxis.len
-                    ),
-                    pointPadding = seriesPointPadding,
-                    hasPerPointPadding = false;
+                    );
 
                 // If there is point padding defined on a single point, add it
                 if (typeof point.pointPadding !== 'undefined') {
@@ -593,7 +604,7 @@ const TilemapShapes: Record<TilemapShapeValue, TilemapShapes.DefinitionObject> =
                     y: y,
                     r: radius
                 };
-            });
+            }
 
             series.translateColors();
         }
@@ -606,6 +617,7 @@ const TilemapShapes: Record<TilemapShapeValue, TilemapShapes.DefinitionObject> =
         getSeriesPadding: noop as any,
         haloPath: HeatmapSeries.prototype.pointClass.prototype.haloPath
     }
+
 };
 
 /* *

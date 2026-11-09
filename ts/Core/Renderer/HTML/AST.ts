@@ -1,10 +1,12 @@
 /* *
  *
- *  (c) 2010-2020 Torstein Honsi
+ *  (c) 2010-2026 Highsoft AS
+ *  Author: Torstein Hønsi
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -25,17 +27,15 @@ const {
     SVG_NS,
     win
 } = H;
-import U from '../../Utilities.js';
-const {
+import {
     attr,
-    createElement,
     css,
-    error,
     isFunction,
     isString,
     objectEach,
     splat
-} = U;
+} from '../../../Shared/Utilities.js';
+import { error } from '../../Utilities.js';
 const {
     trustedTypes
 } = win;
@@ -61,18 +61,6 @@ const emptyHTML = trustedTypesPolicy ?
     trustedTypesPolicy.createHTML('') as unknown as string :
     '';
 
-
-// In IE8, DOMParser is undefined. IE9 and PhantomJS are only able to parse XML.
-const hasValidDOMParser = (function (): boolean {
-    try {
-        return Boolean(new DOMParser().parseFromString(
-            emptyHTML,
-            'text/html'
-        ));
-    } catch (e) {
-        return false;
-    }
-}());
 
 /* *
  *
@@ -104,14 +92,18 @@ class AST {
      * potentially harmful content from the chart configuration before adding to
      * the DOM.
      *
+     * @see [Source code with default values](
+     * https://github.com/highcharts/highcharts/blob/master/ts/Core/Renderer/HTML/AST.ts#:~:text=public%20static%20allowedAttributes)
+     *
      * @example
      * // Allow a custom, trusted attribute
      * Highcharts.AST.allowedAttributes.push('data-value');
      *
      * @name Highcharts.AST.allowedAttributes
-     * @static
+     * @type {Array<string>}
      */
     public static allowedAttributes = [
+        'alt',
         'aria-controls',
         'aria-describedby',
         'aria-expanded',
@@ -124,6 +116,7 @@ class AST {
         'aria-readonly',
         'aria-roledescription',
         'aria-selected',
+        'aria-sort',
         'class',
         'clip-path',
         'color',
@@ -131,42 +124,50 @@ class AST {
         'cx',
         'cy',
         'd',
+        'disabled',
         'dx',
         'dy',
-        'disabled',
         'fill',
+        'filterUnits',
+        'flood-color',
+        'flood-opacity',
         'height',
         'href',
         'id',
         'in',
+        'in2',
         'markerHeight',
         'markerWidth',
         'offset',
         'opacity',
+        'operator',
         'orient',
         'padding',
         'paddingLeft',
         'paddingRight',
         'patternUnits',
         'r',
+        'radius',
         'refX',
         'refY',
+        'result',
         'role',
+        'rowspan',
         'scope',
         'slope',
         'src',
         'startOffset',
         'stdDeviation',
-        'stroke',
+        'stop-color',
+        'stop-opacity',
         'stroke-linecap',
         'stroke-width',
+        'stroke',
         'style',
-        'tableValues',
-        'result',
-        'rowspan',
         'summary',
-        'target',
         'tabindex',
+        'tableValues',
+        'target',
         'text-align',
         'text-anchor',
         'textAnchor',
@@ -178,6 +179,7 @@ class AST {
         'x',
         'x1',
         'x2',
+        'xlink:href',
         'y',
         'y1',
         'y2',
@@ -189,12 +191,15 @@ class AST {
      * `src`. Attribute values will only be allowed if they start with one of
      * these strings.
      *
+     * @see [Source code with default values](
+     * https://github.com/highcharts/highcharts/blob/master/ts/Core/Renderer/HTML/AST.ts#:~:text=public%20static%20allowedReferences)
+     *
      * @example
      * // Allow tel:
      * Highcharts.AST.allowedReferences.push('tel:');
      *
-     * @name Highcharts.AST.allowedReferences
-     * @static
+     * @name    Highcharts.AST.allowedReferences
+     * @type    {Array<string>}
      */
     public static allowedReferences = [
         'https://',
@@ -210,14 +215,18 @@ class AST {
      * The list of allowed SVG or HTML tags, used for sanitizing potentially
      * harmful content from the chart configuration before adding to the DOM.
      *
+     * @see [Source code with default values](
+     * https://github.com/highcharts/highcharts/blob/master/ts/Core/Renderer/HTML/AST.ts#:~:text=public%20static%20allowedTags)
+     *
      * @example
      * // Allow a custom, trusted tag
      * Highcharts.AST.allowedTags.push('blink'); // ;)
      *
-     * @name Highcharts.AST.allowedTags
-     * @static
+     * @name    Highcharts.AST.allowedTags
+     * @type    {Array<string>}
      */
     public static allowedTags = [
+        '#text',
         'a',
         'abbr',
         'b',
@@ -234,14 +243,18 @@ class AST {
         'dt',
         'em',
         'feComponentTransfer',
+        'feComposite',
+        'feDropShadow',
+        'feFlood',
         'feFuncA',
         'feFuncB',
         'feFuncG',
         'feFuncR',
         'feGaussianBlur',
-        'feOffset',
         'feMerge',
         'feMergeNode',
+        'feMorphology',
+        'feOffset',
         'filter',
         'h1',
         'h2',
@@ -265,30 +278,30 @@ class AST {
         'span',
         'stop',
         'strong',
-        'style',
         'sub',
         'sup',
         'svg',
         'table',
+        'tbody',
+        'td',
         'text',
         'textPath',
-        'thead',
-        'tbody',
-        'tspan',
-        'td',
         'th',
+        'thead',
+        'title',
         'tr',
+        'tspan',
         'u',
-        'ul',
-        '#text'
+        'ul'
     ];
 
+    /** @internal */
     public static emptyHTML = emptyHTML;
 
     /**
      * Allow all custom SVG and HTML attributes, references and tags (together
      * with potentially harmful ones) to be added to the DOM from the chart
-     * configuration. In other words, disable the the allow-listing which is the
+     * configuration. In other words, disable the allow-listing which is the
      * primary functionality of the AST.
      *
      * WARNING: Setting this property to `true` while allowing untrusted user
@@ -341,7 +354,7 @@ class AST {
                 valid = false;
             }
             if (
-                ['background', 'dynsrc', 'href', 'lowsrc', 'src']
+                ['background', 'dynsrc', 'href', 'lowsrc', 'src', 'xlink:href']
                     .indexOf(key) !== -1
             ) {
                 valid = isString(val) && AST.allowedReferences.some(
@@ -354,10 +367,24 @@ class AST {
                 });
                 delete attributes[key];
             }
+
+            // #17753, < is not allowed in SVG attributes
+            if (isString(val) && attributes[key]) {
+                attributes[key] = val.replace(/</g, '&lt;') as any;
+            }
         });
         return attributes;
     }
 
+    /**
+     * Utility function to parse a style string to a CSSObject.
+     *
+     * @internal
+     * @param {string} style
+     * The style string to parse.
+     * @return {Highcharts.CSSObject}
+     * The parsed CSSObject.
+     */
     public static parseStyle(style: string): CSSObject {
         return style
             .split(';')
@@ -444,11 +471,11 @@ class AST {
     ): HTMLElement|SVGElement {
 
         /**
-         * @private
+         * @internal
          * @param {Highcharts.ASTNode} subtree
-         * HTML/SVG definition
+         * HTML/SVG definition.
          * @param {Element} [subParent]
-         * parent node
+         * Parent node.
          * @return {Highcharts.SVGDOMElement|Highcharts.HTMLDOMElement}
          * The inserted node.
          */
@@ -543,13 +570,11 @@ class AST {
      * Parse HTML/SVG markup into AST Node objects. Used internally from the
      * constructor.
      *
-     * @private
-     *
-     * @function Highcharts.AST#getNodesFromMarkup
-     *
-     * @param {string} markup The markup string.
-     *
-     * @return {Array<Highcharts.ASTNode>} The parsed nodes.
+     * @internal
+     * @param {string} markup
+     * The markup string.
+     * @return {Array<Highcharts.ASTNode>}
+     * The parsed nodes.
      */
     private parseMarkup(markup: string): Array<AST.Node> {
         interface Attribute {
@@ -567,24 +592,42 @@ class AST {
             .replace(/ style=(["'])/g, ' data-style=$1');
 
         let doc;
-        if (hasValidDOMParser) {
+        try {
             doc = new DOMParser().parseFromString(
                 trustedTypesPolicy ?
                     trustedTypesPolicy.createHTML(markup) as unknown as string :
                     markup,
                 'text/html'
             );
-        } else {
-            const body = createElement('div');
-            body.innerHTML = markup;
-            doc = { body };
+        } catch {
+            // Due to a Chromium issue where chart redraws are triggered by a
+            // `beforeprint` event (#16931),
+            // https://issues.chromium.org/issues/40222135, the Trusted
+            // Types `createHTML` callback can throw "The provided callback
+            // is no longer runnable" while the browser is mid-print. Retry
+            // with the raw string - `DOMParser` itself is not a Trusted
+            // Types sink, so parsing it directly is safe.
+            try {
+                doc = new DOMParser().parseFromString(markup, 'text/html');
+            } catch {
+                // Ignore, fall through to the inert-document fallback below.
+            }
+        }
+
+        if (!doc) {
+            // Never assign untrusted markup to a live document's innerHTML.
+            // Parse into a detached, inert document instead.
+            doc = H.doc.implementation.createHTMLDocument('');
+            doc.body.innerHTML = markup;
         }
 
         const appendChildNodes = (
             node: ChildNode,
             addTo: Array<AST.Node>
         ): void => {
-            const tagName = node.nodeName.toLowerCase();
+            // Preserve the camelCase of SVG tags via localName (#24702).
+            const tagName = (node as Element).localName ||
+                node.nodeName.toLowerCase();
 
             // Add allowed tags
             const astNode: AST.Node = {
@@ -648,6 +691,9 @@ namespace AST {
      *
      * */
 
+    /**
+     * Serialized form of an SVG/HTML definition, including children.
+     */
     export interface Node {
         attributes?: (HTMLAttributes&SVGAttributes);
         children?: Array<Node>;
@@ -690,4 +736,4 @@ export default AST;
  * @type {string|undefined}
  */
 
-(''); // keeps doclets above in file
+(''); // Keeps doclets above in file

@@ -1,27 +1,72 @@
 QUnit.test('Selection event', function (assert) {
-    var chart = Highcharts.chart('container', {
+    const chart = Highcharts.chart('container', {
         chart: {
             zoomType: 'x',
+            events: {
+                selection: evt => {
+                    const xAxis = evt.xAxis[0].axis,
+                        chart = xAxis.chart,
+                        series = chart.series[0],
+                        pointWidth = series.options.pointWidth,
+                        minPx = xAxis.toPixels(evt.xAxis[0].min),
+                        maxPx = xAxis.toPixels(evt.xAxis[0].max),
+                        firstColStart = xAxis.toPixels(series.data[0].x) -
+                            pointWidth / 2,
+                        lastColEnd = xAxis.toPixels(series.data.at(-1).x) +
+                            pointWidth / 2;
+
+                    assert.ok(
+                        minPx < firstColStart,
+                        'Selection starts outside first column bounds (#22945)'
+                    );
+                    assert.ok(
+                        maxPx > lastColEnd,
+                        'Selection ends outside last column bounds (#22945)'
+                    );
+
+                    return false;
+                }
+            }
+        },
+        series: [{
+            type: 'column',
+            pointWidth: 50,
+            data: [{
+                x: 0,
+                y: 1
+            }, {
+                x: 1,
+                y: 2
+            }]
+        }]
+    });
+
+    const controller = new TestController(chart),
+        startX = chart.plotLeft,
+        endX = chart.plotLeft + chart.xAxis[0].len;
+
+    controller.pan([startX + 1, 100], [endX - 1, 100], void 0, true);
+
+    chart.series[0].update({
+        type: 'column',
+        name: 'USD to EUR',
+        data: [1, 3, 2, 4, 3, 5, 4, 6, 5, 7]
+    }, false);
+
+    chart.update({
+        chart: {
             events: {
                 selection: function () {
                     this.destroy();
                     return false;
                 }
             }
-        },
-        series: [
-            {
-                type: 'area',
-                name: 'USD to EUR',
-                data: [1, 3, 2, 4, 3, 5, 4, 6, 5, 7]
-            }
-        ]
+        }
     });
-
-    var controller = new TestController(chart);
 
     // Pan
     controller.pan([200, 100], [150, 100], { shiftKey: true });
+
     assert.strictEqual(
         chart.index,
         undefined,
@@ -31,7 +76,8 @@ QUnit.test('Selection event', function (assert) {
 
 QUnit.test('Chart select points by drag', function (assert) {
     /**
-     * Custom selection handler that selects points and cancels the default zoom behaviour
+     * Custom selection handler that selects points and cancels the default zoom
+     * behaviour
      */
     var selectPointsByDrag = function (e) {
         // Select points

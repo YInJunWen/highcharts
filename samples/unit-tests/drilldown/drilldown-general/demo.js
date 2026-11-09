@@ -217,6 +217,7 @@ QUnit.test('Drilldown methods', function (assert) {
         '#15771: Point should be at correct index in ddPoints'
     );
 
+    chart.xAxis[0].update({ min: void 0 });
     chart.series[0].update({
         point: {
             events: {
@@ -234,6 +235,58 @@ QUnit.test('Drilldown methods', function (assert) {
         true,
         `Adding drill down series through mouseover should not
         generate errors in console, #16820.`
+    );
+
+    chart.drillUp();
+    chart.update({
+        chart: {
+            width: 150
+        },
+        xAxis: {
+            min: void 0
+        },
+        series: [{
+            data: [{
+                name: 'A',
+                y: 3,
+                drilldown: 'A'
+            }]
+        }],
+        drilldown: {
+            series: [{
+                name: 'A',
+                id: 'A',
+                data: [
+                    [
+                        'v65.0',
+                        0.1
+                    ],
+                    [
+                        'v64.0',
+                        1.3
+                    ],
+                    [
+                        'v63.0',
+                        53.02
+                    ],
+                    [
+                        'v62.0',
+                        1.4
+                    ],
+                    [
+                        'v61.0',
+                        0.88
+                    ]
+                ]
+            }]
+        }
+    });
+    chart.series[0].points[0].doDrilldown();
+
+    assert.strictEqual(
+        chart.xAxis[0].ticks[0].label.element.style.textDecoration,
+        '',
+        '#17933: Labels should not have underline.'
     );
 });
 
@@ -278,8 +331,17 @@ QUnit.test('Chart type update after drilldown', function (assert) {
         }
     });
 
+    const initialSeriesColor = chart.series[0].color;
+
     chart.series[0].points[0].doDrilldown();
     chart.drillUp();
+
+    assert.strictEqual(
+        chart.series[0].color,
+        initialSeriesColor,
+        `Series after the drill-up should be the same color as before the
+        drilldown (#19134).`
+    );
 
     chart.update({
         chart: {
@@ -2572,7 +2634,7 @@ QUnit.test('Named categories (#6704)', function (assert) {
     });
 
     assert.strictEqual(
-        chart.xAxis[0].tickPositions.length,
+        chart.xAxis[0].names.length,
         20,
         'Initial category length'
     );

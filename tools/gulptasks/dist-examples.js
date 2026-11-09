@@ -4,9 +4,10 @@
 
 /* eslint no-use-before-define: 0 */
 
+const Babel = require('@babel/core');
 const Gulp = require('gulp');
 const Path = require('path');
-const { getS3Object } = require('./lib/uploadS3');
+const { createDemoIndexContent } = require('./lib/demoIndex.js');
 
 /* *
  *
@@ -42,29 +43,45 @@ function indexTemplate(options) {
             * {
                 font-family: sans-serif;
             }
-            ul.nav > li > div {
+            body {
+                margin: 1rem 1.5rem;
+            }
+            .sidebar-category-list,
+            .sidebar-demo-list {
+                list-style: none;
+                padding-left: 0;
+                margin-left: 0;
+            }
+            .sidebar-category-group {
+                margin: 0 0 1rem 0;
+            }
+            .sidebar-category {
                 font-size: 1.5em;
                 font-weight: bold;
                 margin: 1em 0 0.3em 0;
             }
-            ul.nav > li {
-                list-style: none;
-                display: black
-            }
-            div > ul > li {
-                padding-bottom: 0.5em;
-            }
-            ul ul {
-                list-style-type: initial;
+            .sidebar-demo-list {
                 padding-left: 1.25em;
                 font-size: 1.15em;
             }
-            li a {
+            .sidebar-demo-list > li {
+                padding-bottom: 0.5em;
+            }
+            a {
                 text-decoration: none;
                 color: #6065c8;
             }
-            li a:hover {
+            a:hover {
                 text-decoration: underline;
+            }
+            @media (prefers-color-scheme: dark) {
+                body {
+                    background-color: #141414;
+                    color: #ddd;
+                }
+                a {
+                    color: #2caffe;
+                }
             }
         </style>
     </head>
@@ -82,6 +99,8 @@ function indexTemplate(options) {
  * */
 
 /**
+ * Assembles samples
+ *
  * @param {string} template
  *        Template string
  *
@@ -102,6 +121,8 @@ function assembleSample(template, variables) {
 }
 
 /**
+ * Creates examples
+ *
  * @param {string} title
  *        Example title
  *
@@ -114,15 +135,17 @@ function assembleSample(template, variables) {
  * @param {string} template
  *        Template string
  *
+ * @param {string} demoIndexProductPath
+ *        Demo index product path
+ *
  * @return {Promise<void>}
  *         Promise to keep
  */
-async function createExamples(title, sourcePath, targetPath, template) {
+async function createExamples(title, sourcePath, targetPath, template, demoIndexProductPath) {
 
     const FS = require('fs');
-    const FSLib = require('./lib/fs');
-    const LogLib = require('./lib/log');
-    const MkDirP = require('mkdirp');
+    const FSLib = require('../libs/fs');
+    const LogLib = require('../libs/log');
 
     const directoryPaths = FSLib.getDirectoryPaths(sourcePath);
 
@@ -133,19 +156,27 @@ async function createExamples(title, sourcePath, targetPath, template) {
         let path;
 
         const content = [
-            'html', 'css', 'js'
+            'html', 'css', 'js', 'ts'
         ].reduce(
             (obj, ext) => {
                 path = Path.join(directoryPath, 'demo.' + ext);
                 obj[ext] = (
                     FS.existsSync(path) &&
-                        FS.readFileSync(path).toString() ||
-                        ''
+                    FS.readFileSync(path).toString() ||
+                    ''
                 );
                 return obj;
             },
             { title }
         );
+
+        if (content.ts) {
+            content.js = '/* eslint-disable */\n' +
+                Babel.transformSync(content.ts, {
+                    presets: ['@babel/preset-typescript'],
+                    filename: Path.join(directoryPath, 'demo.ts')
+                }).code;
+        }
 
         const sample = assembleSample(template, content);
 
@@ -153,7 +184,7 @@ async function createExamples(title, sourcePath, targetPath, template) {
             targetPath, directoryPath.substr(sourcePath.length)
         );
 
-        MkDirP.sync(path);
+        FS.mkdirSync(path, { recursive: true });
 
         FS.writeFileSync(
             Path.join(path, 'index.html'),
@@ -161,30 +192,16 @@ async function createExamples(title, sourcePath, targetPath, template) {
         );
     });
 
-    /**
-     *
-     * @param {string} path
-     * The subpath for the product. Will substitute 'highcharts' with ''
-     * @return {Promise<string>}
-     * The S3 promise
-     */
-    function downloadSidebar(path) {
-        return getS3Object(
-            'assets.highcharts.com',
-            `demos/demo${path === 'highcharts' ? '' : `/${path}`}/sidebar`
-        );
-    }
-
-    LogLib.success('Created', targetPath);
-    const indexContent = (await downloadSidebar(sourcePath.replace(/samples\//, '').replace(/\/demo/, '')))
-        .replace(/style=\"display:none;\"/g, '') // remove hidden style
-        .replace(/(?!href= ")(\.\/.+?)(?=")/g, 'examples\/$1\/index.html'); // replace links
+    const indexContent = createDemoIndexContent({
+        productPath: demoIndexProductPath,
+        sourcePath
+    });
 
     // eslint-disable-next-line node/no-unsupported-features/node-builtins
     return FS.promises.writeFile(
         Path.join(targetPath, '..', 'index.html'),
         indexTemplate({ title, content: indexContent })
-    );
+    ).then(() => LogLib.success('Created', targetPath));
 }
 
 /**
@@ -226,34 +243,67 @@ function convertURLToLocal(str) {
  * */
 
 /**
+ * Creates examples for distribution.
+ *
  * @return {Promise<void>}
  *         Promise to keep
  */
 function distExamples() {
-
     const FS = require('fs');
+    const argv = require('yargs').argv;
+    const distProduct = argv.product || 'Highcharts';
 
     return new Promise((resolve, reject) => {
 
         const promises = [];
-        const samplesSubfolder = {
-            highcharts: {
-                path: ['highcharts', 'demo'],
-                title: 'Highcharts'
-            },
-            highstock: {
-                path: ['stock', 'demo'],
-                title: 'Highstock'
-            },
-            highmaps: {
-                path: ['maps', 'demo'],
-                title: 'Highmaps'
-            },
-            gantt: {
-                path: ['gantt', 'demo'],
-                title: 'Highcharts Gantt'
-            }
-        };
+        let samplesSubfolder = {};
+
+        if (distProduct === 'Highcharts') {
+            samplesSubfolder = {
+                highcharts: {
+                    path: ['highcharts', 'demo'],
+                    title: 'Highcharts',
+                    demoIndexProductPath: 'highcharts'
+                },
+                highstock: {
+                    path: ['stock', 'demo'],
+                    title: 'Highstock',
+                    demoIndexProductPath: 'stock'
+                },
+                highmaps: {
+                    path: ['maps', 'demo'],
+                    title: 'Highmaps',
+                    demoIndexProductPath: 'maps'
+                },
+                gantt: {
+                    path: ['gantt', 'demo'],
+                    title: 'Highcharts Gantt',
+                    demoIndexProductPath: 'gantt'
+                }
+            };
+        } else if (distProduct === 'Grid') {
+            samplesSubfolder = {
+                'grid-lite': {
+                    path: ['grid-lite', 'demo'],
+                    title: 'Highcharts Grid Lite',
+                    demoIndexProductPath: 'grid-lite'
+                },
+                'grid-pro': {
+                    path: ['grid-pro', 'demo'],
+                    title: 'Highcharts Grid Pro',
+                    demoIndexProductPath: 'grid-pro'
+                }
+            };
+        } else if (distProduct === 'Dashboards') {
+            samplesSubfolder = {
+                dashboards: {
+                    path: ['dashboards', 'demo'],
+                    title: 'Highcharts Dashboards',
+                    demoIndexProductPath: 'dashboards'
+                }
+            };
+        }
+
         const template = FS
             .readFileSync(TEMPLATE_FILE)
             .toString();
@@ -267,7 +317,8 @@ function distExamples() {
                         SOURCE_DIRECTORY, ...samplesSubfolder[product].path
                     ),
                     Path.join(TARGET_DIRECTORY, product, 'examples'),
-                    template
+                    template,
+                    samplesSubfolder[product].demoIndexProductPath
                 ));
             });
 

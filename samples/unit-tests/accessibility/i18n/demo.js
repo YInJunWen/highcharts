@@ -86,7 +86,9 @@ QUnit.test('i18nFormat', function (assert) {
         'Indexing non-array 2'
     );
     assert.strictEqual(
-        Highcharts.i18nFormat('Test {substitute.arr[3]}', { substitute: { arr: [0, 1, 2, 3] } }),
+        Highcharts.i18nFormat(
+            'Test {substitute.arr[3]}', { substitute: { arr: [0, 1, 2, 3] } }
+        ),
         'Test 3',
         'Indexing nested array'
     );
@@ -96,7 +98,9 @@ QUnit.test('i18nFormat', function (assert) {
         'Simple array each'
     );
     assert.strictEqual(
-        Highcharts.i18nFormat('Test {#each(nested.arr)}', { nested: { arr: [0, 1, 2, 3, 4, 5] } }),
+        Highcharts.i18nFormat(
+            'Test {#each(nested.arr)}', { nested: { arr: [0, 1, 2, 3, 4, 5] } }
+        ),
         'Test 012345',
         'Simple nested array each'
     );
@@ -151,6 +155,17 @@ QUnit.test('i18nFormat', function (assert) {
         'Array each combination'
     );
     assert.strictEqual(
+        Highcharts.i18nFormat(
+            'Parens: [{#each(arr, -1), }{arr[-1]}]. ' +
+            'Block handler: [{#each arr}{this}{#unless @last}, ' +
+            '{/unless}{/each}].',
+            { arr: [0, 1, 2, 3, 4, 5] }
+        ),
+        'Parens: [0, 1, 2, 3, 4, 5]. Block handler: [0, 1, 2, 3, 4, 5].',
+        'Parenthesis-based #each function should live side by side with ' +
+        'block handler syntax'
+    );
+    assert.strictEqual(
         Highcharts.i18nFormat('Items: {#plural(num, many, one)}.', { num: 1 }),
         'Items: one.',
         'Plural conditional 1'
@@ -192,7 +207,10 @@ QUnit.test('i18nFormat', function (assert) {
         'Plural conditional 7'
     );
     assert.strictEqual(
-        Highcharts.i18nFormat('Items: {#plural(nested.deep.arr.length, two, one)}.', { nested: { deep: { arr: [0] } } }),
+        Highcharts.i18nFormat(
+            'Items: {#plural(nested.deep.arr.length, two, ' +
+            'one)}.', { nested: { deep: { arr: [0] } } }
+        ),
         'Items: one.',
         'Plural nested'
     );
@@ -223,4 +241,38 @@ QUnit.test('Chart lang can be configured', function (assert) {
                 '<div>testing3</div>'
             ) > -1
     );
+
+    // #23744
+    chart.update({
+        lang: {
+            accessibility: {
+                axis: {
+                    defaultAxisNames: {
+                        categories: '类别'
+                    }
+                }
+            }
+        },
+        xAxis: {
+            type: 'category'
+        }
+    });
+
+    const defaultAxisNames = chart.options.lang.accessibility.axis
+        .defaultAxisNames;
+
+    assert.ok(
+        defaultAxisNames.categories === '类别',
+        'defaultAxisNames.categories is configurable'
+    );
+
+    const screenReaderHTML = chart.accessibility.components.infoRegions
+        .screenReaderSections.before.element.innerHTML;
+
+    assert.ok(
+        screenReaderHTML.includes('类别') &&
+        !screenReaderHTML.includes('categories'),
+        'Screen reader uses translated "类别" instead of default "categories"'
+    );
+
 });

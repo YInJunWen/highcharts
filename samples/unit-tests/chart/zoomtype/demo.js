@@ -2,7 +2,7 @@ QUnit.test('Zoom type', function (assert) {
     var chart = Highcharts.chart('container', {
         chart: {
             type: 'line',
-            zoomType: 'x',
+            zoomType: 'y',
             width: 600,
             height: 300
         },
@@ -26,6 +26,11 @@ QUnit.test('Zoom type', function (assert) {
                 'Nov',
                 'Dec'
             ]
+        },
+
+        lang: {
+            resetZoom: 'Test zoom label',
+            resetZoomTitle: 'Test zoom title'
         },
 
         series: [
@@ -64,7 +69,7 @@ QUnit.test('Zoom type', function (assert) {
     );
 
     // Zoom
-    controller.pan([200, 150], [250, 150]);
+    controller.pan([200, 150], [250, 200]);
     assert.strictEqual(
         chart.resetZoomButton.zIndex,
         6,
@@ -82,13 +87,227 @@ QUnit.test('Zoom type', function (assert) {
         buttonY,
         'The zoom button should have been re-aligned'
     );
+
+    chart.zoomOut();
+    chart.update({
+        chart: {
+            inverted: true
+        }
+    });
+    const plotTop = chart.plotTop;
+
+    // zoom at the top of the plot
+    controller.pan([500, plotTop + 10], [530, plotTop + 10]);
+    assert.ok(
+        chart.resetZoomButton,
+        'Y zoom should work when panning at the top of the plot on inverted ' +
+        'chart (#18103)'
+    );
+
+    assert.strictEqual(
+        chart.resetZoomButton.textStr,
+        'Test zoom label',
+        'Zoom button should have a correct label #23429.'
+    );
+    assert.strictEqual(
+        chart.resetZoomButton.element.querySelector('title').textContent,
+        'Test zoom title',
+        'Zoom title should be correct #23429.'
+    );
+});
+
+QUnit.test('Non-cartesian series zooming', function (assert) {
+    let chart = Highcharts.chart('container', {
+            chart: {
+                zooming: {
+                    type: 'xy'
+                },
+                panning: {
+                    enabled: true,
+                    type: 'xy'
+                },
+                panKey: 'shift'
+            },
+            series: [{}]
+        }),
+        series = chart.series[0],
+        controller = new TestController(chart);
+
+    const defaultData = [1, 2, 3],
+        nonCartesianSeries = [{
+            type: 'pie'
+        }, {
+            type: 'packedbubble'
+        }, {
+            type: 'item'
+        }, {
+            type: 'funnel'
+        }, {
+            type: 'pyramid'
+        }, {
+            type: 'sankey',
+            data: [{
+                from: 'Category1',
+                to: 'Category2',
+                weight: 2
+            }, {
+                from: 'Category1',
+                to: 'Category3',
+                weight: 5
+            }]
+        }, {
+            type: 'arcdiagram',
+            data: [{
+                from: 'Category1',
+                to: 'Category2',
+                weight: 2
+            }, {
+                from: 'Category1',
+                to: 'Category3',
+                weight: 5
+            }]
+        }, {
+            type: 'dependencywheel',
+            data: [{
+                from: 'Category1',
+                to: 'Category2',
+                weight: 2
+            }, {
+                from: 'Category1',
+                to: 'Category3',
+                weight: 5
+            }]
+        }, {
+            type: 'sunburst'
+        }, {
+            type: 'variablepie'
+        }, {
+            type: 'venn',
+            data: [{
+                sets: ['Core'],
+                value: 10,
+                name: 'Highcharts Core'
+            }]
+        }, {
+            type: 'wordcloud',
+            data: [['Lorem', 1]]
+        }, {
+            type: 'organization',
+            data: [{
+                from: 'Category1',
+                to: 'Category2',
+                weight: 2
+            }, {
+                from: 'Category1',
+                to: 'Category3',
+                weight: 5
+            }]
+        }],
+        testZoomingAndPanning = (cont, ser, el) => {
+            // Zoom
+            cont.pan([200, 150], [250, 200]);
+            assert.ok(
+                ser.group.scaleX > 1,
+                `Zooming works for ${el.type} series.`
+            );
+
+            let { translateX, translateY } = ser.group;
+            // Pan to the right (right side of chart) - horizontally
+            cont.pan([350, 200], [300, 200], { shiftKey: true });
+            assert.ok(
+                ser.group.translateX < translateX,
+                `Chart should be panned to right, ${el.type} series.`
+            );
+
+            // Pan to the top (top side of chart) - vertically
+            cont.pan([250, 200], [250, 150], { shiftKey: true });
+            assert.ok(
+                ser.group.translateY < translateY,
+                `Chart should be panned to top, ${el.type} series.`
+            );
+
+            ({ translateX, translateY } = series.group);
+
+            // Pan to the left (left side of chart) - horizontally
+            cont.pan([250, 200], [300, 200], { shiftKey: true });
+            assert.ok(
+                ser.group.translateX > translateX,
+                `Chart should be panned to left, ${el.type} series.`
+            );
+
+            // Pan to the top (top side of chart) - vertically
+            cont.pan([250, 150], [250, 200], { shiftKey: true });
+            assert.ok(
+                ser.group.translateY > translateY,
+                `Chart should be panned to top, ${el.type} series.`
+            );
+
+            series.update({
+                zoomEnabled: false
+            });
+
+            cont.pan([200, 150], [250, 200]);
+            assert.ok(
+                ser.group.scaleX = 1,
+                `Zooming should not work for ${el.type} series, when zooming
+                is disabled.`
+            );
+        };
+
+    nonCartesianSeries.forEach(seriesEl => {
+        series.update({
+            type: seriesEl.type,
+            zoomEnabled: true,
+            data: seriesEl.data || defaultData
+        });
+
+        testZoomingAndPanning(controller, series, seriesEl);
+        chart.zoomOut();
+    });
+
+    chart.destroy();
+
+    // Due to errors when updating from other series to networkgraph or
+    // treegraph series test them as new chart instance
+    const otherNonCartSeries = [{
+        type: 'networkgraph',
+        data: [['A', 'B'], ['A', 'C']]
+    }, {
+        type: 'treegraph',
+        data: [{
+            id: 'A'
+        }, {
+            id: 'B',
+            parent: 'A'
+        }]
+    }];
+
+    otherNonCartSeries.forEach(seriesEl => {
+        chart = Highcharts.chart('container', {
+            chart: {
+                zooming: {
+                    type: 'xy'
+                },
+                panning: {
+                    enabled: true,
+                    type: 'xy'
+                },
+                panKey: 'shift'
+            },
+            series: [seriesEl]
+        });
+        series = chart.series[0];
+        controller = new TestController(chart);
+
+        testZoomingAndPanning(controller, series, seriesEl);
+    });
 });
 
 QUnit.test('Zooming scatter charts', function (assert) {
     var chart = Highcharts.chart('container', {
         chart: {
             type: 'scatter',
-            zoomType: 'xy',
+            zoomType: 'y',
             width: 600,
             height: 400
         },
@@ -349,54 +568,70 @@ QUnit.test('Zooming scatter charts', function (assert) {
         ]
     });
 
+    // Update the deprecated properties
+    chart.update({
+        chart: {
+            zoomType: 'xy'
+        }
+    });
+
+    assert.strictEqual(
+        chart.zooming.type,
+        'xy',
+        'There should be support for updating the deprecated zoomType (#17861)'
+    );
+
+    chart.update({
+        chart: {
+            resetZoomButton: {
+                theme: {
+                    zIndex: 8
+                }
+            }
+        }
+    });
+
+    assert.strictEqual(
+        chart.zooming.resetButton.theme.zIndex,
+        8,
+        'Deprecated zooming properties should be updated (#17861)'
+    );
+
     // Do the first zoom
     chart.pointer.zoomX = chart.pointer.zoomY = true;
-    chart.zoom({
-        xAxis: [
-            {
-                axis: chart.xAxis[0],
-                min: 196,
-                max: 199
-            }
-        ],
-        yAxis: [
-            {
-                axis: chart.yAxis[0],
-                min: 81,
-                max: 93
-            }
-        ]
+    let x1 = chart.xAxis[0].toPixels(196),
+        x2 = chart.xAxis[0].toPixels(199),
+        y1 = chart.yAxis[0].toPixels(81),
+        y2 = chart.yAxis[0].toPixels(93);
+    chart.transform({
+        from: {
+            x: x1,
+            y: y1,
+            width: x2 - x1,
+            height: y2 - y1
+        },
+        trigger: 'zoom'
     });
 
     // Do the second zoom
     chart.pointer.zoomX = chart.pointer.zoomY = true;
-    chart.zoom({
-        xAxis: [
-            {
-                axis: chart.xAxis[0],
-                min: 197,
-                max: 199
-            }
-        ],
-        yAxis: [
-            {
-                axis: chart.yAxis[0],
-                min: 84,
-                max: 91
-            }
-        ]
+    x1 = chart.xAxis[0].toPixels(197);
+    x2 = chart.xAxis[0].toPixels(199);
+    y1 = chart.yAxis[0].toPixels(84);
+    y2 = chart.yAxis[0].toPixels(91);
+    chart.transform({
+        from: {
+            x: x1,
+            y: y1,
+            width: x2 - x1,
+            height: y2 - y1
+        },
+        trigger: 'zoom'
     });
 
-    assert.deepEqual(
-        chart.yAxis[0].getExtremes(),
-        {
-            min: 85,
-            max: 91,
-            dataMin: 85.5,
-            dataMax: 90.9,
-            userMin: 85.5,
-            userMax: 90.9
-        },
+    assert.strictEqual(
+        chart.series[0].points.filter(p => p.isInside).length,
+        2,
         'Two points should be within the zoomed area (#7639)'
     );
 });
@@ -453,7 +688,8 @@ QUnit.test('Zooming chart with multiple panes', function (assert) {
     assert.deepEqual(
         [chart.yAxis[1].min, chart.yAxis[1].max],
         yAxis1,
-        'Y zoom on the first pane should not affect y-zoom on the second pane (#1289)'
+        'Y zoom on the first pane should not affect y-zoom on the second ' +
+        'pane (#1289)'
     );
 
     chart.zoomOut();
@@ -464,7 +700,8 @@ QUnit.test('Zooming chart with multiple panes', function (assert) {
     assert.deepEqual(
         [chart.yAxis[0].min, chart.yAxis[0].max],
         yAxis0,
-        'Y zoom on the second pane should not affect y-zoom on the first pane (#1289)'
+        'Y zoom on the second pane should not affect y-zoom on the first ' +
+        'pane (#1289)'
     );
 
     chart = Highcharts.stockChart('container', {
@@ -517,7 +754,8 @@ QUnit.test('Zooming chart with multiple panes', function (assert) {
     assert.deepEqual(
         [chart.yAxis[1].min, chart.yAxis[1].max],
         yAxis1,
-        'Y zoom on the first pane should not affect y-zoom on the second pane when chart inverted (#1289)'
+        'Y zoom on the first pane should not affect y-zoom on the second ' +
+        'pane when chart inverted (#1289)'
     );
 
     chart.zoomOut();
@@ -528,6 +766,49 @@ QUnit.test('Zooming chart with multiple panes', function (assert) {
     assert.deepEqual(
         [chart.yAxis[0].min, chart.yAxis[0].max],
         yAxis0,
-        'Y zoom on the second pane should not affect y-zoom on the first pane when chart inverted (#1289)'
+        'Y zoom on the second pane should not affect y-zoom on the first ' +
+        'pane when chart inverted (#1289)'
     );
+});
+
+QUnit.test('Zooming accross multiple charts, #15569', assert => {
+    const options = {
+        chart: {
+            zooming: {
+                type: 'x'
+            },
+            width: 300,
+            height: 400
+        },
+        series: [{
+            data: [1, 2, 5, 13, 4, 5, 12, 4]
+        }]
+    };
+
+    // Add two containers in a flexbox and append them to the HC container
+    const mainContainer = document.querySelector('#container'),
+        flexContainer = document.createElement('div'),
+        container1 = document.createElement('div'),
+        container2 = document.createElement('div');
+
+    flexContainer.style.display = 'flex';
+    flexContainer.appendChild(container1);
+    flexContainer.appendChild(container2);
+    mainContainer.appendChild(flexContainer);
+
+    const chart0 = Highcharts.chart(container1, options);
+    Highcharts.chart(container2, options);
+
+    const controller = new TestController(chart0);
+
+    controller.pan(
+        [chart0.xAxis[0].toPixels(6), 250],
+        [chart0.xAxis[0].toPixels(6) + 300, 250]
+    );
+
+    assert.ok(
+        chart0.resetZoomButton,
+        'Ending a zoom on a different chart should result in a zoom in.'
+    );
+    flexContainer.remove(); // Remove this line to visually debug the chart
 });

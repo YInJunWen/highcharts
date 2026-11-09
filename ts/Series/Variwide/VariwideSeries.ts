@@ -2,11 +2,13 @@
  *
  *  Highcharts variwide module
  *
- *  (c) 2010-2021 Torstein Honsi
+ *  (c) 2010-2026 Highsoft AS
+ *  Author: Torstein Hønsi
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -19,23 +21,23 @@
  * */
 
 import type StackingAxis from '../../Core/Axis/Stacking/StackingAxis';
+import type { TypedArray } from '../../Shared/Types';
+import type RangeSelector from '../../Stock/RangeSelector/RangeSelector';
 import type VariwideSeriesOptions from './VariwideSeriesOptions';
 
+import ColumnSeries from '../Column/ColumnSeries.js';
 import SeriesRegistry from '../../Core/Series/SeriesRegistry.js';
-const {
-    seriesTypes: {
-        column: ColumnSeries
-    }
-} = SeriesRegistry;
 import VariwideComposition from './VariwideComposition.js';
 import VariwidePoint from './VariwidePoint.js';
-import U from '../../Core/Utilities.js';
-const {
+import VariwideSeriesDefaults from './VariwideSeriesDefaults.js';
+import {
+    addEvent,
+    arrayMax,
+    arrayMin,
+    crisp,
     extend,
-    merge,
-    pick
-} = U;
-
+    merge
+} from '../../Shared/Utilities.js';
 
 /* *
  *
@@ -44,7 +46,6 @@ const {
  * */
 
 /**
- * @private
  * @class
  * @name Highcharts.seriesTypes.variwide
  *
@@ -59,39 +60,14 @@ class VariwideSeries extends ColumnSeries {
      *
      * */
 
+    /** @internal */
     public static compose = VariwideComposition.compose;
 
-    /**
-     * A variwide chart (related to marimekko chart) is a column chart with a
-     * variable width expressing a third dimension.
-     *
-     * @sample {highcharts} highcharts/demo/variwide/
-     *         Variwide chart
-     * @sample {highcharts} highcharts/series-variwide/inverted/
-     *         Inverted variwide chart
-     * @sample {highcharts} highcharts/series-variwide/datetime/
-     *         Variwide columns on a datetime axis
-     *
-     * @extends      plotOptions.column
-     * @since        6.0.0
-     * @product      highcharts
-     * @excluding    boostThreshold, crisp, depth, edgeColor, edgeWidth,
-     *               groupZPadding, boostBlending
-     * @requires     modules/variwide
-     * @optionparent plotOptions.variwide
-     */
-    public static defaultOptions: VariwideSeriesOptions = merge(ColumnSeries.defaultOptions, {
-        /**
-         * In a variwide chart, the point padding is 0 in order to express the
-         * horizontal stacking of items.
-         */
-        pointPadding: 0,
-        /**
-         * In a variwide chart, the group padding is 0 in order to express the
-         * horizontal stacking of items.
-         */
-        groupPadding: 0
-    });
+    /** @internal */
+    public static defaultOptions: VariwideSeriesOptions = merge(
+        ColumnSeries.defaultOptions,
+        VariwideSeriesDefaults
+    );
 
     /* *
      *
@@ -99,12 +75,17 @@ class VariwideSeries extends ColumnSeries {
      *
      * */
 
-    public data: Array<VariwidePoint> = void 0 as any;
-    public options: VariwideSeriesOptions = void 0 as any;
-    public points: Array<VariwidePoint> = void 0 as any;
-    public relZ: Array<number> = void 0 as any;
-    public totalZ: number = void 0 as any;
-    public zData?: Array<number> = void 0 as any;
+    /** @internal */
+    public crispOption?: boolean;
+    public data!: Array<VariwidePoint>;
+    public options!: VariwideSeriesOptions;
+    public points!: Array<VariwidePoint>;
+    /** @internal */
+    public relZ!: Array<number>;
+    /** @internal */
+    public totalZ!: number;
+    /** @internal */
+    public zData?: Array<number>;
 
     /* *
      *
@@ -112,6 +93,7 @@ class VariwideSeries extends ColumnSeries {
      *
      * */
 
+    /** @internal */
     public processData(force?: boolean): undefined {
         this.totalZ = 0;
         this.relZ = [];
@@ -120,9 +102,11 @@ class VariwideSeries extends ColumnSeries {
             force
         );
 
+        const zData = this.getColumn('z');
+
         (this.xAxis.reversed ?
-            (this.zData as any).slice().reverse() :
-            (this.zData as any)
+            zData.slice().reverse() :
+            zData
         ).forEach(
             function (
                 this: VariwideSeries,
@@ -137,7 +121,7 @@ class VariwideSeries extends ColumnSeries {
 
         if (this.xAxis.categories) {
             this.xAxis.variwide = true;
-            this.xAxis.zData = this.zData; // Used for label rank
+            this.xAxis.zData = zData; // Used for label rank
         }
         return;
     }
@@ -146,7 +130,7 @@ class VariwideSeries extends ColumnSeries {
      * Translate an x value inside a given category index into the distorted
      * axis translation.
      *
-     * @private
+     * @internal
      * @function Highcharts.Series#postTranslate
      *
      * @param {number} index
@@ -171,12 +155,16 @@ class VariwideSeries extends ColumnSeries {
             relZ = this.relZ,
             i = axis.reversed ? relZ.length - index : index,
             goRight = axis.reversed ? -1 : 1,
-            minPx = axis.toPixels(axis.reversed ?
-                (axis.dataMax || 0) + axis.pointRange :
-                (axis.dataMin || 0)),
-            maxPx = axis.toPixels(axis.reversed ?
-                (axis.dataMin || 0) :
-                (axis.dataMax || 0) + axis.pointRange),
+            minPx = axis.toPixels(
+                axis.reversed ?
+                    (axis.dataMax || 0) + axis.pointRange :
+                    (axis.dataMin || 0)
+            ),
+            maxPx = axis.toPixels(
+                axis.reversed ?
+                    (axis.dataMin || 0) :
+                    (axis.dataMax || 0) + axis.pointRange
+            ),
             len = Math.abs(maxPx - minPx),
             totalZ = this.totalZ,
             left = this.chart.inverted ?
@@ -184,8 +172,8 @@ class VariwideSeries extends ColumnSeries {
                 minPx - this.chart.plotLeft - goRight * axis.minPixelPadding,
             linearSlotLeft = i / relZ.length * len,
             linearSlotRight = (i + goRight) / relZ.length * len,
-            slotLeft = (pick(relZ[i], totalZ) / totalZ) * len,
-            slotRight = (pick(relZ[i + goRight], totalZ) / totalZ) * len,
+            slotLeft = ((relZ[i] ?? totalZ) / totalZ) * len,
+            slotRight = ((relZ[i + goRight] ?? totalZ) / totalZ) * len,
             xInsideLinearSlot = (x - (left + linearSlotLeft));
 
         // Set crosshairWidth for every point (#8173)
@@ -198,90 +186,22 @@ class VariwideSeries extends ColumnSeries {
             (linearSlotRight - linearSlotLeft);
     }
 
-    /* eslint-enable valid-jsdoc */
 
-    // Extend translation by distoring X position based on Z.
+    /** @internal */
     public translate(): void {
-
         // Temporarily disable crisping when computing original shapeArgs
-        const crispOption = this.options.crisp,
-            xAxis = this.xAxis;
-
+        this.crispOption = this.options.crisp;
         this.options.crisp = false;
 
-        SeriesRegistry.seriesTypes.column.prototype.translate.call(this);
+        super.translate();
 
         // Reset option
-        this.options.crisp = crispOption;
-
-        const inverted = this.chart.inverted,
-            crisp = this.borderWidth % 2 / 2;
-
-        // Distort the points to reflect z dimension
-        this.points.forEach(function (
-            point: VariwidePoint,
-            i: number
-        ): void {
-            let left: number, right: number;
-
-            if (xAxis.variwide) {
-                left = this.postTranslate(
-                    i,
-                    (point.shapeArgs as any).x,
-                    point
-                );
-
-                right = this.postTranslate(
-                    i,
-                    (point.shapeArgs as any).x +
-                    (point.shapeArgs as any).width
-                );
-
-                // For linear or datetime axes, the variwide column should
-                // start with X and extend Z units, without modifying the
-                // axis.
-            } else {
-                left = point.plotX as any;
-                right = xAxis.translate(
-                    (point.x as any) + (point.z as any),
-                    0 as any,
-                    0 as any,
-                    0 as any,
-                    1 as any
-                );
-            }
-
-            if (this.options.crisp) {
-                left = Math.round(left) - crisp;
-                right = Math.round(right) - crisp;
-            }
-
-            (point.shapeArgs as any).x = left;
-            (point.shapeArgs as any).width = Math.max(right - left, 1);
-
-            // Crosshair position (#8083)
-            point.plotX = (left + right) / 2;
-
-            // Adjust the tooltip position
-            if (!inverted) {
-                (point.tooltipPos as any)[0] =
-                    (point.shapeArgs as any).x +
-                    (point.shapeArgs as any).width / 2;
-            } else {
-                (point.tooltipPos as any)[1] =
-                    xAxis.len - (point.shapeArgs as any).x -
-                    (point.shapeArgs as any).width / 2;
-            }
-        }, this);
-
-        if (this.options.stacking) {
-            this.correctStackLabels();
-        }
+        this.options.crisp = this.crispOption;
     }
 
     /**
      * Function that corrects stack labels positions
-     * @private
+     * @internal
      */
     public correctStackLabels(): void {
         const series = this,
@@ -315,14 +235,84 @@ class VariwideSeries extends ColumnSeries {
                         pointWidth || 0,
                         void 0,
                         void 0,
-                        point.plotX
+                        point.plotX,
+                        series.xAxis
                     );
                 }
             }
         }
     }
 
+    /** @internal */
+    public getXExtremes(
+        xData: Array<number>|TypedArray
+    ): RangeSelector.RangeObject {
+        const max = arrayMax(xData),
+            maxZ = this.getColumn('z')[xData.indexOf(max)];
+
+        return {
+            min: arrayMin(xData),
+            max: max + (this.xAxis.categories ? 0 : maxZ)
+        };
+    }
 }
+
+// Extend translation by distorting X position based on Z.
+addEvent(VariwideSeries, 'afterColumnTranslate', function (): void {
+
+    // Temporarily disable crisping when computing original shapeArgs
+    const xAxis = this.xAxis,
+        inverted = this.chart.inverted;
+
+    let i = -1;
+
+    // Distort the points to reflect z dimension
+    for (const point of this.points) {
+        ++i;
+
+        const shapeArgs = point.shapeArgs || {},
+            { x = 0, width = 0 } = shapeArgs,
+            { plotX = 0, tooltipPos, z = 0 } = point;
+
+        let left: number, right: number;
+
+        if (xAxis.variwide) {
+            left = this.postTranslate(i, x, point);
+            right = this.postTranslate(i, x + width);
+
+        // For linear or datetime axes, the variwide column should start with X
+        // and extend Z units, without modifying the axis.
+        } else {
+            left = plotX;
+            right = xAxis.translate(point.x + z, false, false, false, true);
+        }
+
+        if (this.crispOption) {
+            left = crisp(left, this.borderWidth);
+            right = crisp(right, this.borderWidth);
+        }
+
+        shapeArgs.x = left;
+        shapeArgs.width = Math.max(right - left, 1);
+
+        // Crosshair position (#8083)
+        point.plotX = (left + right) / 2;
+
+        // Adjust the tooltip position
+        if (tooltipPos) {
+            if (!inverted) {
+                tooltipPos[0] = shapeArgs.x + shapeArgs.width / 2;
+            } else {
+                tooltipPos[1] = xAxis.len - shapeArgs.x - shapeArgs.width / 2;
+            }
+        }
+    }
+
+    if (this.options.stacking) {
+        this.correctStackLabels();
+    }
+
+}, { order: 2 });
 
 /* *
  *
@@ -331,13 +321,19 @@ class VariwideSeries extends ColumnSeries {
  * */
 
 interface VariwideSeries {
+    /** @internal */
     irregularWidths: boolean;
+    /** @internal */
     parallelArrays: Array<string>;
+    /** @internal */
     pointArrayMap: Array<string>;
+    /** @internal */
     pointClass: typeof VariwidePoint;
 }
+
 extend(VariwideSeries.prototype, {
     irregularWidths: true,
+    keysAffectYAxis: ['y'],
     pointArrayMap: ['y', 'z'],
     parallelArrays: ['x', 'y', 'z'],
     pointClass: VariwidePoint
@@ -364,88 +360,3 @@ SeriesRegistry.registerSeriesType('variwide', VariwideSeries);
  * */
 
 export default VariwideSeries;
-
-/* *
- *
- *  API Options
- *
- * */
-
-/**
- * A `variwide` series. If the [type](#series.variwide.type) option is not
- * specified, it is inherited from [chart.type](#chart.type).
- *
- * @extends   series,plotOptions.variwide
- * @excluding boostThreshold, boostBlending
- * @product   highcharts
- * @requires  modules/variwide
- * @apioption series.variwide
- */
-
-/**
- * An array of data points for the series. For the `variwide` series type,
- * points can be given in the following ways:
- *
- * 1. An array of arrays with 3 or 2 values. In this case, the values correspond
- *    to `x,y,z`. If the first value is a string, it is applied as the name of
- *    the point, and the `x` value is inferred. The `x` value can also be
- *    omitted, in which case the inner arrays should be of length 2. Then the
- *    `x` value is automatically calculated, either starting at 0 and
- *    incremented by 1, or from `pointStart` and `pointInterval` given in the
- *    series options.
- *    ```js
- *       data: [
- *           [0, 1, 2],
- *           [1, 5, 5],
- *           [2, 0, 2]
- *       ]
- *    ```
- *
- * 2. An array of objects with named values. The following snippet shows only a
- *    few settings, see the complete options set below. If the total number of
- *    data points exceeds the series'
- *    [turboThreshold](#series.variwide.turboThreshold), this option is not
- *    available.
- *    ```js
- *       data: [{
- *           x: 1,
- *           y: 1,
- *           z: 1,
- *           name: "Point2",
- *           color: "#00FF00"
- *       }, {
- *           x: 1,
- *           y: 5,
- *           z: 4,
- *           name: "Point1",
- *           color: "#FF00FF"
- *       }]
- *    ```
- *
- * @sample {highcharts} highcharts/series/data-array-of-arrays/
- *         Arrays of numeric x and y
- * @sample {highcharts} highcharts/series/data-array-of-arrays-datetime/
- *         Arrays of datetime x and y
- * @sample {highcharts} highcharts/series/data-array-of-name-value/
- *         Arrays of point.name and y
- * @sample {highcharts} highcharts/series/data-array-of-objects/
- *         Config objects
- *
- * @type      {Array<Array<(number|string),number>|Array<(number|string),number,number>|*>}
- * @extends   series.line.data
- * @excluding marker
- * @product   highcharts
- * @apioption series.variwide.data
- */
-
-/**
- * The relative width for each column. On a category axis, the widths are
- * distributed so they sum up to the X axis length. On linear and datetime axes,
- * the columns will be laid out from the X value and Z units along the axis.
- *
- * @type      {number}
- * @product   highcharts
- * @apioption series.variwide.data.z
- */
-
-''; // adds doclets above to transpiled file

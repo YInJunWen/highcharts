@@ -1,14 +1,20 @@
+// SPDX-License-Identifier: LicenseRef-Highcharts
 /**
  * @license Highstock JS v@product.version@ (@product.date@)
  * @module highcharts/indicators/obv
  * @requires highcharts
  * @requires highcharts/modules/stock
+ * @requires highcharts/indicators/indicators
  *
  * Indicator series type for Highcharts Stock
  *
- * (c) 2010-2021 Karol Kolodziej
+ * (c) 2010-2026 Highsoft AS
+ * Author: Karol Kołodziej
  *
- * License: www.highcharts.com/license
+ * A commercial license may be required depending on use,
+ * see www.highcharts.com/license
  */
 'use strict';
+import Highcharts from '../../Core/Globals.js';
 import '../../Stock/Indicators/OBV/OBVIndicator.js';
+export default Highcharts;

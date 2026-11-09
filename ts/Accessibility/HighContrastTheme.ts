@@ -1,12 +1,14 @@
 /* *
  *
- *  (c) 2009-2021 Øystein Moseng
+ *  (c) 2009-2026 Highsoft AS
+ *  Author: Øystein Moseng
  *
  *  Default theme for Windows High Contrast Mode.
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -19,6 +21,7 @@
  * */
 
 import type ColorType from '../Core/Color/ColorType';
+import type { DeepPartial } from '../Shared/Types';
 import type Options from '../Core/Options';
 
 /* *
@@ -27,6 +30,7 @@ import type Options from '../Core/Options';
  *
  * */
 
+/** @internal */
 declare module '../Core/Series/DataLabelOptions' {
     interface DataLabelOptions {
         connectorColor?: ColorType;
@@ -39,7 +43,11 @@ declare module '../Core/Series/DataLabelOptions' {
  *
  * */
 
-const theme: DeepPartial<Options> = {
+/** @internal */
+export type HighContrastThemeOptions = DeepPartial<Options>;
+
+/** @internal */
+const theme: HighContrastThemeOptions = {
     chart: {
         backgroundColor: 'window'
     },
@@ -56,7 +64,8 @@ const theme: DeepPartial<Options> = {
     colorAxis: {
         minColor: 'windowText',
         maxColor: 'windowText',
-        stops: []
+        stops: [],
+        dataClasses: []
     },
     colors: ['windowText'],
     xAxis: {
@@ -117,7 +126,7 @@ const theme: DeepPartial<Options> = {
                 lineColor: 'windowText',
                 fillColor: 'windowText'
             }
-        } as any,
+        },
         pie: {
             color: 'window',
             colors: ['window'],
@@ -153,11 +162,6 @@ const theme: DeepPartial<Options> = {
         }
     },
     credits: {
-        style: {
-            color: 'windowText'
-        }
-    },
-    labels: {
         style: {
             color: 'windowText'
         }
@@ -244,4 +248,5 @@ const theme: DeepPartial<Options> = {
  *
  * */
 
+/** @internal */
 export default theme;

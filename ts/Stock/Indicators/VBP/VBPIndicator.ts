@@ -1,12 +1,14 @@
 /* *
  *
- *  (c) 2010-2021 Paweł Dalek
+ *  (c) 2010-2026 Highsoft AS
+ *  Author: Paweł Dalek
  *
  *  Volume By Price (VBP) indicator for Highcharts Stock
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -20,11 +22,11 @@
 
 import type AxisType from '../../../Core/Axis/AxisType';
 import type Chart from '../../../Core/Chart/Chart';
-import type ColumnSeries from '../../../Series/Column/ColumnSeries';
 import type CSSObject from '../../../Core/Renderer/CSSObject';
+import type DataExtremesObject from '../../../Core/Series/DataExtremesObject';
+import type { IndicatorLinkedSeriesBase } from '../IndicatorBase';
 import type IndicatorValuesObject from '../IndicatorValuesObject';
 import type LineSeries from '../../../Series/Line/LineSeries';
-import type SMAIndicatorType from '../SMA/SMAIndicator';
 import type SVGAttributes from '../../../Core/Renderer/SVG/SVGAttributes';
 import type SVGElement from '../../../Core/Renderer/SVG/SVGElement';
 import type SVGPath from '../../../Core/Renderer/SVG/SVGPath';
@@ -32,34 +34,35 @@ import type {
     VBPOptions,
     VBPParamsOptions
 } from './VBPOptions';
+import type { TypedArray } from '../../../Shared/Types';
+
 import VBPPoint from './VBPPoint.js';
 
-import A from '../../../Core/Animation/AnimationUtilities.js';
-const { animObject } = A;
+import { animObject } from '../../../Core/Animation/AnimationUtilities.js';
+import ColumnSeries from '../../../Series/Column/ColumnSeries.js';
 import H from '../../../Core/Globals.js';
-const {
-    noop
-} = H;
+const { noop } = H;
+import SMAIndicator from '../SMA/SMAIndicator.js';
 import SeriesRegistry from '../../../Core/Series/SeriesRegistry.js';
-const {
-    column: {
-        prototype: columnProto
-    },
-    sma: SMAIndicator
-} = SeriesRegistry.seriesTypes;
-import U from '../../../Core/Utilities.js';
-import StockChart from '../../../Core/Chart/StockChart.js';
-const {
+import {
     addEvent,
     arrayMax,
     arrayMin,
     correctFloat,
     defined,
-    error,
     extend,
     isArray,
     merge
-} = U;
+} from '../../../Shared/Utilities.js';
+import { error } from '../../../Core/Utilities.js';
+
+/* *
+ *
+ *  Constants
+ *
+ * */
+
+const abs = Math.abs;
 
 /* *
  *
@@ -68,11 +71,17 @@ const {
  * */
 
 // Utils
+/**
+ * Calculate extremes for OHLC data.
+ *
+ * @internal
+ */
 function arrayExtremesOHLC(
     data: Array<Array<number>>
 ): Record<string, number> {
-    let dataLength: number = data.length,
-        min: number = data[0][3],
+    const dataLength: number = data.length;
+
+    let min: number = data[0][3],
         max: number = min,
         i = 1,
         currentPoint: number;
@@ -94,8 +103,6 @@ function arrayExtremesOHLC(
     };
 }
 
-const abs = Math.abs;
-
 /* *
  *
  *  Class
@@ -105,7 +112,6 @@ const abs = Math.abs;
 /**
  * The Volume By Price (VBP) series type.
  *
- * @private
  * @class
  * @name Highcharts.seriesTypes.vbp
  *
@@ -124,15 +130,16 @@ class VBPIndicator extends SMAIndicator {
      *
      * This series requires `linkedTo` option to be set.
      *
-     * @sample stock/indicators/volume-by-price
+     * @sample {highstock} stock/indicators/volume-by-price
      *         Volume By Price indicator
      *
      * @extends      plotOptions.sma
      * @since        6.0.0
      * @product      highstock
-     * @requires     stock/indicators/indicators
-     * @requires     stock/indicators/volume-by-price
+     * @requires     indicators/indicators
+     * @requires     indicators/volume-by-price
      * @optionparent plotOptions.vbp
+     * @internal
      */
     public static defaultOptions: VBPOptions = merge(SMAIndicator.defaultOptions, {
         /**
@@ -209,13 +216,14 @@ class VBPIndicator extends SMAIndicator {
             enabled: false
         },
         dataLabels: {
+            align: 'left',
             allowOverlap: true,
+            distance: 0,
             enabled: true,
             format: 'P: {point.volumePos:.2f} | N: {point.volumeNeg:.2f}',
             padding: 0,
             style: {
-                /** @internal */
-                fontSize: '7px'
+                fontSize: '0.5em'
             },
             verticalAlign: 'top'
         }
@@ -227,16 +235,23 @@ class VBPIndicator extends SMAIndicator {
      *
      * */
 
-    public data: Array<VBPPoint> = void 0 as any;
-    public negWidths: Array<number> = void 0 as any;
-    public options: VBPOptions = void 0 as any;
-    public points: Array<VBPPoint> = void 0 as any;
-    public posWidths: Array<number> = void 0 as any;
-    public priceZones: Array<VBPIndicator.VBPIndicatorPriceZoneObject> = void 0 as any;
-    public rangeStep: number = void 0 as any;
-    public volumeDataArray: Array<number> = void 0 as any;
-    public zoneStarts: Array<number> = void 0 as any;
-    public zoneLinesSVG?: SVGElement = void 0 as any;
+    public data!: Array<VBPPoint>;
+    /** @internal */
+    public negWidths!: Array<number>;
+    public options!: VBPOptions;
+    public points!: Array<VBPPoint>;
+    /** @internal */
+    public posWidths!: Array<number>;
+    /** @internal */
+    public priceZones!: Array<VBPIndicator.VBPIndicatorPriceZoneObject>;
+    /** @internal */
+    public rangeStep!: number;
+    /** @internal */
+    public volumeDataArray!: Array<number>;
+    /** @internal */
+    public zoneStarts!: Array<number>;
+    /** @internal */
+    public zoneLinesSVG?: SVGElement;
 
     /* *
      *
@@ -244,31 +259,38 @@ class VBPIndicator extends SMAIndicator {
      *
      * */
 
+    /** @internal */
     public init(
-        chart: Chart
+        chart: Chart,
+        options: VBPOptions
     ): VBPIndicator {
-        let indicator = this,
-            params: VBPParamsOptions,
-            baseSeries: LineSeries,
-            volumeSeries: LineSeries;
+        const indicator = this;
 
-        H.seriesTypes.sma.prototype.init.apply(indicator, arguments);
+        // Series.update() sends data that is not necessary as everything is
+        // calculated in getValues(), #17007
+        delete options.data;
+
+        super.init.apply(indicator, arguments);
 
         // Only after series are linked add some additional logic/properties.
         const unbinder = addEvent(
-            StockChart,
+            this.chart.constructor,
             'afterLinkSeries',
             function (): void {
                 // Protection for a case where the indicator is being updated,
                 // for a brief moment the indicator is deleted.
                 if (indicator.options) {
-                    params = (indicator.options.params as any);
-                    baseSeries = indicator.linkedParent;
-                    volumeSeries = (
-                        chart.get((params.volumeSeriesID as any)) as any
-                    );
+                    const params = indicator.options.params,
+                        baseSeries = indicator.linkedParent,
+                        volumeSeries = params?.volumeSeriesID ?
+                            chart.get(
+                                params?.volumeSeriesID
+                            ) as LineSeries|undefined :
+                            void 0;
 
-                    indicator.addCustomEvents(baseSeries, volumeSeries);
+                    if (baseSeries && volumeSeries) {
+                        indicator.addCustomEvents(baseSeries, volumeSeries);
+                    }
 
                 }
                 unbinder();
@@ -280,24 +302,22 @@ class VBPIndicator extends SMAIndicator {
     }
 
     // Adds events related with removing series
+    /** @internal */
     public addCustomEvents(
         baseSeries: LineSeries,
         volumeSeries: LineSeries
     ): VBPIndicator {
-        const indicator = this;
+        const indicator = this,
+            toEmptyIndicator = (): void => {
+                indicator.chart.redraw();
 
-        /* eslint-disable require-jsdoc */
-        function toEmptyIndicator(): void {
-            indicator.chart.redraw();
+                indicator.setData([]);
+                indicator.zoneStarts = [];
 
-            indicator.setData([]);
-            indicator.zoneStarts = [];
-
-            if (indicator.zoneLinesSVG) {
-                indicator.zoneLinesSVG = indicator.zoneLinesSVG.destroy();
-            }
-        }
-        /* eslint-enable require-jsdoc */
+                if (indicator.zoneLinesSVG) {
+                    indicator.zoneLinesSVG = indicator.zoneLinesSVG.destroy();
+                }
+            };
 
         // If base series is deleted, indicator series data is filled with
         // an empty array
@@ -321,17 +341,18 @@ class VBPIndicator extends SMAIndicator {
     }
 
     // Initial animation
+    /** @internal */
     public animate(
         init: boolean
     ): void {
-        let series = this,
+        const series = this,
             inverted = series.chart.inverted,
             group = series.group,
-            attr: SVGAttributes = {},
-            position;
+            attr: SVGAttributes = {};
 
         if (!init && group) {
-            position = inverted ? series.yAxis.top : series.xAxis.left;
+            const position = inverted ? series.yAxis.top : series.xAxis.left;
+
             if (inverted) {
                 group['forceAnimate:translateY'] = true;
                 attr.translateY = position;
@@ -339,6 +360,7 @@ class VBPIndicator extends SMAIndicator {
                 group['forceAnimate:translateX'] = true;
                 attr.translateX = position;
             }
+
             group.animate(
                 attr,
                 extend(animObject(series.options.animation), {
@@ -349,36 +371,38 @@ class VBPIndicator extends SMAIndicator {
                     }
                 })
             );
-
         }
     }
 
+    /** @internal */
     public drawPoints(): void {
         const indicator = this;
 
         if ((indicator.options.volumeDivision as any).enabled) {
             indicator.posNegVolume(true, true);
-            columnProto.drawPoints.apply(indicator, arguments);
+            ColumnSeries.prototype.drawPoints.apply(indicator, arguments);
             indicator.posNegVolume(false, false);
         }
 
-        columnProto.drawPoints.apply(indicator, arguments);
+        ColumnSeries.prototype.drawPoints.apply(indicator, arguments);
     }
 
     // Function responsible for dividing volume into positive and negative
+    /** @internal */
     public posNegVolume(
         initVol: boolean,
         pos: boolean
     ): void {
-        let indicator = this,
+        const indicator = this,
             signOrder: Array<string> = pos ?
                 ['positive', 'negative'] :
                 ['negative', 'positive'],
             volumeDivision: VBPIndicator.VBPIndicatorStyleOptions = (
                 indicator.options.volumeDivision as any
             ),
-            pointLength: number = indicator.points.length,
-            posWidths: Array<number> = [],
+            pointLength: number = indicator.points.length;
+
+        let posWidths: Array<number> = [],
             negWidths: Array<number> = [],
             i = 0,
             pointWidth: number,
@@ -429,8 +453,9 @@ class VBPIndicator extends SMAIndicator {
         }
     }
 
+    /** @internal */
     public translate(): void {
-        let indicator = this,
+        const indicator = this,
             options: VBPOptions = indicator.options,
             chart: Chart = indicator.chart,
             yAxis: AxisType = indicator.yAxis,
@@ -440,9 +465,9 @@ class VBPIndicator extends SMAIndicator {
             ),
             priceZones: Array<VBPIndicator.VBPIndicatorPriceZoneObject> = (
                 indicator.priceZones
-            ),
-            yBarOffset = 0,
-            indicatorPoints: Array<VBPPoint>,
+            );
+
+        let yBarOffset = 0,
             volumeDataArray: Array<number>,
             maxVolume: number,
             primalBarWidth: number,
@@ -455,8 +480,9 @@ class VBPIndicator extends SMAIndicator {
             barX: number,
             barY: number;
 
-        columnProto.translate.apply(indicator);
-        indicatorPoints = indicator.points;
+        ColumnSeries.prototype.translate.apply(indicator);
+
+        const indicatorPoints = indicator.points;
 
         // Do translate operation when points exist
         if (indicatorPoints.length) {
@@ -467,10 +493,14 @@ class VBPIndicator extends SMAIndicator {
             maxVolume = arrayMax(volumeDataArray);
             primalBarWidth = chart.plotWidth / 2;
             chartPlotTop = chart.plotTop;
-            barHeight = abs(yAxis.toPixels(yAxisMin) -
-                yAxis.toPixels(yAxisMin + indicator.rangeStep));
-            oldBarHeight = abs(yAxis.toPixels(yAxisMin) -
-                yAxis.toPixels(yAxisMin + indicator.rangeStep));
+            barHeight = abs(
+                yAxis.toPixels(yAxisMin) -
+                yAxis.toPixels(yAxisMin + indicator.rangeStep)
+            );
+            oldBarHeight = abs(
+                yAxis.toPixels(yAxisMin) -
+                yAxis.toPixels(yAxisMin + indicator.rangeStep)
+            );
 
             if (pointPadding) {
                 barHeightP = abs(barHeight * (1 - 2 * pointPadding));
@@ -508,6 +538,12 @@ class VBPIndicator extends SMAIndicator {
                     point.volumeNeg = priceZones[index].negativeVolumeData;
                     point.volumePos = priceZones[index].positiveVolumeData;
                     point.volumeAll = priceZones[index].wholeVolumeData;
+
+                    // ColumnSeries.translate adds an origin if chart is already
+                    // rendered. Remove it to avoid issues with fading in data
+                    // labels from overlapping labels logic.
+                    delete point.origin;
+                    point.isInside = indicator.isPointInside(point);
                 }
             );
 
@@ -516,27 +552,51 @@ class VBPIndicator extends SMAIndicator {
                     chart,
                     yAxis,
                     indicator.zoneStarts,
-                    (zoneLinesOptions.styles as any)
+                    (zoneLinesOptions.styles as any
+                    )
                 );
             }
         }
     }
 
+    /** @internal */
+    public getExtremes(): DataExtremesObject {
+        const prevCompare = this.options.compare,
+            prevCumulative = this.options.cumulative;
+        let ret: DataExtremesObject;
+
+        // Temporarily disable cumulative and compare while getting the extremes
+        if (this.options.compare) {
+            this.options.compare = void 0;
+            ret = super.getExtremes();
+            this.options.compare = prevCompare;
+        } else if (this.options.cumulative) {
+            this.options.cumulative = false;
+            ret = super.getExtremes();
+            this.options.cumulative = prevCumulative;
+        } else {
+            ret = super.getExtremes();
+        }
+
+        return ret;
+    }
+
+    /** @internal */
     public getValues <TLinkedSeries extends LineSeries>(
-        series: TLinkedSeries,
+        series: TLinkedSeries&IndicatorLinkedSeriesBase,
         params: VBPParamsOptions
     ): (IndicatorValuesObject<TLinkedSeries>|undefined) {
-        let indicator = this,
-            xValues: Array<number> = series.processedXData,
-            yValues: Array<Array<number>> = (series.processedYData as any),
+        const indicator = this,
+            xValues = series.getColumn('x', true),
+            yValues = series.processedYData as Array<Array<number>>,
             chart = indicator.chart,
             ranges: number = (params.ranges as any),
             VBP: Array<Array<number>> = [],
             xData: Array<number> = [],
             yData: Array<number> = [],
-            isOHLC: boolean,
-            volumeSeries: LineSeries,
-            priceZones: Array<VBPIndicator.VBPIndicatorPriceZoneObject>;
+            volumeSeries: LineSeries = (
+                chart.get(params.volumeSeriesID) as LineSeries
+            );
 
         // Checks if base series exists
         if (!series.chart) {
@@ -549,14 +609,20 @@ class VBPIndicator extends SMAIndicator {
             return;
         }
 
-        // Checks if volume series exists
-        if (!(volumeSeries = (
-            chart.get(params.volumeSeriesID as any)) as any
-        )) {
+        // Checks if volume series exists and if it has data
+        if (
+            !volumeSeries ||
+            !volumeSeries.getColumn('x', true).length
+        ) {
+            const errorMessage =
+                volumeSeries &&
+                !volumeSeries.getColumn('x', true).length ?
+                    ' does not contain any data.' :
+                    ' not found! Check `volumeSeriesID`.';
+
             error(
                 'Series ' +
-                params.volumeSeriesID +
-                ' not found! Check `volumeSeriesID`.',
+                params.volumeSeriesID + errorMessage,
                 true,
                 chart
             );
@@ -564,7 +630,7 @@ class VBPIndicator extends SMAIndicator {
         }
 
         // Checks if series data fits the OHLC format
-        isOHLC = isArray(yValues[0]);
+        const isOHLC = isArray(yValues[0]);
 
         if (isOHLC && yValues[0].length !== 4) {
             error(
@@ -579,7 +645,7 @@ class VBPIndicator extends SMAIndicator {
 
         // Price zones contains all the information about the zones (index,
         // start, end, volumes, etc.)
-        priceZones = indicator.priceZones = indicator.specifyZones(
+        const priceZones = indicator.priceZones = indicator.specifyZones(
             isOHLC,
             xValues,
             yValues,
@@ -605,30 +671,30 @@ class VBPIndicator extends SMAIndicator {
         } as IndicatorValuesObject<TLinkedSeries>;
     }
 
-    // Specifing where each zone should start ans end
+    // Specifying where each zone should start ans end
+    /** @internal */
     public specifyZones(
         isOHLC: boolean,
-        xValues: Array<number>,
+        xValues: Array<number>|TypedArray,
         yValues: Array<Array<number>>,
         ranges: number,
         volumeSeries: LineSeries
     ): Array<VBPIndicator.VBPIndicatorPriceZoneObject> {
-        let indicator = this,
+        const indicator = this,
             rangeExtremes: (boolean|Record<string, number>) = (
                 isOHLC ? arrayExtremesOHLC(yValues) : false
             ),
-            lowRange: number = rangeExtremes ?
+            zoneStarts: Array<number> = indicator.zoneStarts = [],
+            priceZones: Array<VBPIndicator.VBPIndicatorPriceZoneObject> = [];
+
+        let lowRange: number = rangeExtremes ?
                 rangeExtremes.min :
                 arrayMin(yValues),
             highRange: number = rangeExtremes ?
                 rangeExtremes.max :
                 arrayMax(yValues),
-            zoneStarts: Array<number> = indicator.zoneStarts = [],
-            priceZones: Array<VBPIndicator.VBPIndicatorPriceZoneObject> = [],
             i = 0,
-            j = 1,
-            rangeStep: number,
-            zoneStartsLength: number;
+            j = 1;
 
         // If the compare mode is set on the main series, change the VBP
         // zones to fit new extremes, #16277.
@@ -652,7 +718,7 @@ class VBPIndicator extends SMAIndicator {
             return [];
         }
 
-        rangeStep = indicator.rangeStep =
+        const rangeStep = indicator.rangeStep =
             correctFloat(highRange - lowRange) / ranges;
         zoneStarts.push(lowRange);
 
@@ -661,7 +727,8 @@ class VBPIndicator extends SMAIndicator {
         }
 
         zoneStarts.push(highRange);
-        zoneStartsLength = zoneStarts.length;
+
+        const zoneStartsLength = zoneStarts.length;
 
         //    Creating zones
         for (; j < zoneStartsLength; j++) {
@@ -683,22 +750,22 @@ class VBPIndicator extends SMAIndicator {
     }
 
     // Calculating sum of volume values for a specific zone
+    /** @internal */
     public volumePerZone(
         isOHLC: boolean,
         priceZones: Array<VBPIndicator.VBPIndicatorPriceZoneObject>,
         volumeSeries: LineSeries,
-        xValues: Array<number>,
+        xValues: Array<number>|TypedArray,
         yValues: Array<Array<number>>
     ): Array<VBPIndicator.VBPIndicatorPriceZoneObject> {
-        let indicator = this,
-            volumeXData: Array<number> = volumeSeries.processedXData,
-            volumeYData: Array<number> = (
-                volumeSeries.processedYData as any
-            ),
+        const indicator = this,
+            volumeXData = volumeSeries.getColumn('x', true),
+            volumeYData = volumeSeries.getColumn('y', true),
             lastZoneIndex: number = priceZones.length - 1,
             baseSeriesLength: number = yValues.length,
-            volumeSeriesLength: number = volumeYData.length,
-            previousValue: number,
+            volumeSeriesLength: number = volumeYData.length;
+
+        let previousValue: number,
             startFlag: boolean,
             endFlag: boolean,
             value: number,
@@ -707,7 +774,7 @@ class VBPIndicator extends SMAIndicator {
         // Checks if each point has a corresponding volume value
         if (abs(baseSeriesLength - volumeSeriesLength)) {
             // If the first point don't have volume, add 0 value at the
-            // beggining of the volume array
+            // beginning of the volume array
             if (xValues[0] !== volumeXData[0]) {
                 volumeYData.unshift(0);
             }
@@ -786,20 +853,22 @@ class VBPIndicator extends SMAIndicator {
         return priceZones;
     }
 
-    // Function responsoble for drawing additional lines indicating zones
+    // Function responsible for drawing additional lines indicating zones
+    /** @internal */
     public drawZones(
         chart: Chart,
         yAxis: AxisType,
         zonesValues: Array<number>,
         zonesStyles: CSSObject
     ): void {
-        let indicator = this,
+        const indicator = this,
             renderer = chart.renderer,
-            zoneLinesSVG = indicator.zoneLinesSVG,
-            zoneLinesPath: SVGPath = [],
             leftLinePos = 0,
             rightLinePos: number = chart.plotWidth,
-            verticalOffset: number = chart.plotTop,
+            verticalOffset: number = chart.plotTop;
+
+        let zoneLinesSVG = indicator.zoneLinesSVG,
+            zoneLinesPath: SVGPath = [],
             verticalLinePos: number;
 
         zonesValues.forEach(function (value: number): void {
@@ -822,12 +891,14 @@ class VBPIndicator extends SMAIndicator {
             });
         } else {
             zoneLinesSVG = indicator.zoneLinesSVG =
-                renderer.path(zoneLinesPath).attr({
-                    'stroke-width': (zonesStyles as any).lineWidth,
-                    'stroke': zonesStyles.color,
-                    'dashstyle': (zonesStyles as any).dashStyle,
-                    'zIndex': (indicator.group as any).zIndex + 0.1
-                })
+                renderer
+                    .path(zoneLinesPath)
+                    .attr({
+                        'stroke-width': (zonesStyles as any).lineWidth,
+                        'stroke': zonesStyles.color,
+                        'dashstyle': (zonesStyles as any).dashStyle,
+                        'zIndex': (indicator.group as any).zIndex + 0.1
+                    })
                     .add(indicator.group);
         }
     }
@@ -840,11 +911,16 @@ class VBPIndicator extends SMAIndicator {
  * */
 
 interface VBPIndicator {
+    /** @internal */
     nameBase: string;
+    /** @internal */
     nameComponents: Array<string>;
+    /** @internal */
     pointClass: typeof VBPPoint;
 
+    /** @internal */
     crispCol: ColumnSeries['crispCol'];
+    /** @internal */
     getColumnMetrics: ColumnSeries['getColumnMetrics'];
 }
 
@@ -858,8 +934,8 @@ extend(VBPIndicator.prototype, {
     pointClass: VBPPoint,
     markerAttribs: noop as any,
     drawGraph: noop,
-    getColumnMetrics: columnProto.getColumnMetrics,
-    crispCol: columnProto.crispCol
+    getColumnMetrics: ColumnSeries.prototype.getColumnMetrics,
+    crispCol: ColumnSeries.prototype.crispCol
 });
 
 /* *
@@ -869,6 +945,8 @@ extend(VBPIndicator.prototype, {
  * */
 
 namespace VBPIndicator {
+
+    /** @internal */
     export interface VBPIndicatorPriceZoneObject {
         end: number;
         index: number;
@@ -883,6 +961,7 @@ namespace VBPIndicator {
         enabled?: boolean;
         styles?: CSSObject;
     }
+
 }
 
 /* *
@@ -920,10 +999,10 @@ export default VBPIndicator;
  * @extends   series,plotOptions.vbp
  * @since     6.0.0
  * @product   highstock
- * @excluding dataParser, dataURL, compare, compareBase, compareStart
- * @requires  stock/indicators/indicators
- * @requires  stock/indicators/volume-by-price
+ * @excluding compare, compareBase, compareStart
+ * @requires  indicators/indicators
+ * @requires  indicators/volume-by-price
  * @apioption series.vbp
  */
 
-''; // to include the above in the js output
+''; // To include the above in the js output

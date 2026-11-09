@@ -2,11 +2,13 @@
  *
  *  Money Flow Index indicator for Highcharts Stock
  *
- *  (c) 2010-2021 Grzegorz Blachliński
+ *  (c) 2010-2026 Highsoft AS
+ *  Author: Grzegorz Blachliński
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -18,6 +20,7 @@
  *
  * */
 
+import type { IndicatorLinkedSeriesBase } from '../IndicatorBase';
 import type IndicatorValuesObject from '../IndicatorValuesObject';
 import type LineSeries from '../../../Series/Line/LineSeries';
 import type {
@@ -26,17 +29,10 @@ import type {
 } from '../MFI/MFIOptions';
 import type MFIPoint from './MFIPoint';
 
+import SMAIndicator from '../SMA/SMAIndicator.js';
 import SeriesRegistry from '../../../Core/Series/SeriesRegistry.js';
-const {
-    sma: SMAIndicator
-} = SeriesRegistry.seriesTypes;
-import U from '../../../Core/Utilities.js';
-const {
-    extend,
-    merge,
-    error,
-    isArray
-} = U;
+import { extend, isArray, merge } from '../../../Shared/Utilities.js';
+import { error } from '../../../Core/Utilities.js';
 
 /* *
  *
@@ -45,6 +41,7 @@ const {
  * */
 
 // Utils:
+/** @internal */
 function sumArray(array: Array<number>): number {
 
     return array.reduce(function (prev: number, cur: number): number {
@@ -52,14 +49,17 @@ function sumArray(array: Array<number>): number {
     });
 }
 
+/** @internal */
 function toFixed(a: number, n: number): number {
     return parseFloat(a.toFixed(n));
 }
 
+/** @internal */
 function calculateTypicalPrice(point: Array<number>): number {
     return (point[1] + point[2] + point[3]) / 3;
 }
 
+/** @internal */
 function calculateRawMoneyFlow(typicalPrice: number, volume: number): number {
     return typicalPrice * volume;
 }
@@ -73,7 +73,6 @@ function calculateRawMoneyFlow(typicalPrice: number, volume: number): number {
 /**
  * The MFI series type.
  *
- * @private
  * @class
  * @name Highcharts.seriesTypes.mfi
  *
@@ -91,22 +90,23 @@ class MFIIndicator extends SMAIndicator {
      * Money Flow Index. This series requires `linkedTo` option to be set and
      * should be loaded after the `stock/indicators/indicators.js` file.
      *
-     * @sample stock/indicators/mfi
+     * @sample {highstock} stock/indicators/mfi
      *         Money Flow Index Indicator
      *
      * @extends      plotOptions.sma
      * @since        6.0.0
      * @product      highstock
-     * @requires     stock/indicators/indicators
-     * @requires     stock/indicators/mfi
+     * @requires     indicators/indicators
+     * @requires     indicators/mfi
      * @optionparent plotOptions.mfi
+     * @internal
      */
     public static defaultOptions: MFIOptions = merge(SMAIndicator.defaultOptions, {
         /**
          * @excluding index
          */
         params: {
-            index: void 0, // unchangeable index, do not inherit (#15362)
+            index: void 0, // Unchangeable index, do not inherit (#15362)
             /**
              * The id of volume series which is mandatory.
              * For example using OHLC data, volumeSeriesID='volume' means
@@ -127,9 +127,9 @@ class MFIIndicator extends SMAIndicator {
      *
      * */
 
-    public data: Array<MFIPoint> = void 0 as any;
-    public options: MFIOptions = void 0 as any;
-    public points: Array<MFIPoint> = void 0 as any;
+    public data!: Array<MFIPoint>;
+    public options!: MFIOptions;
+    public points!: Array<MFIPoint>;
 
     /* *
      *
@@ -137,38 +137,38 @@ class MFIIndicator extends SMAIndicator {
      *
      * */
 
+    /** @internal */
     public getValues<TLinkedSeries extends LineSeries>(
-        series: TLinkedSeries,
+        series: TLinkedSeries&IndicatorLinkedSeriesBase,
         params: MFIParamsOptions
     ): (IndicatorValuesObject<TLinkedSeries> | undefined) {
-        let period: number = (params.period as any),
+        const period: number = (params.period as any),
             xVal: Array<number> = (series.xData as any),
             yVal: Array<Array<number>> = (series.yData as any),
             yValLen: number = yVal ? yVal.length : 0,
             decimals: number = (params.decimals as any),
-            // MFI starts calculations from the second point
-            // Cause we need to calculate change between two points
-            range = 1,
             volumeSeries: (LineSeries | undefined) = (
                 series.chart.get((params.volumeSeriesID as any)) as any
             ),
-            yValVolume: Array<number> = (
-                volumeSeries && (volumeSeries.yData as any)
-            ),
+            yValVolume = volumeSeries?.getColumn('y') || [],
             MFI: Array<Array<number>> = [],
-            isUp = false,
             xData: Array<number> = [],
             yData: Array<number> = [],
             positiveMoneyFlow: Array<number> = [],
-            negativeMoneyFlow: Array<number> = [],
-            newTypicalPrice: number,
+            negativeMoneyFlow: Array<number> = [];
+
+        let newTypicalPrice: number,
             oldTypicalPrice: number,
             rawMoneyFlow: number,
             negativeMoneyFlowSum: number,
             positiveMoneyFlowSum: number,
             moneyFlowRatio: number,
             MFIPoint: number,
-            i: number;
+            i: number,
+            isUp = false,
+            // MFI starts calculations from the second point
+            // Cause we need to calculate change between two points
+            range = 1;
 
         if (!volumeSeries) {
             error(
@@ -189,8 +189,10 @@ class MFIIndicator extends SMAIndicator {
         ) {
             return;
         }
+
         // Calculate first typical price
         newTypicalPrice = calculateTypicalPrice(yVal[range]);
+
         // Accumulate first N-points
         while (range < period + 1) {
             // Calculate if up or down
@@ -297,11 +299,10 @@ export default MFIIndicator;
  *
  * @extends   series,plotOptions.mfi
  * @since     6.0.0
- * @excluding dataParser, dataURL
  * @product   highstock
- * @requires  stock/indicators/indicators
- * @requires  stock/indicators/mfi
+ * @requires  indicators/indicators
+ * @requires  indicators/mfi
  * @apioption series.mfi
  */
 
-''; // to include the above in the js output
+''; // To include the above in the js output

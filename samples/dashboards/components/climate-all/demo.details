@@ -1,0 +1,13 @@
+---
+name: Climate data
+authors:
+  - Sebastian Bochan, Wojciech Chmiel, Sophie Bremer, Karol Kołodziej, Paweł Lysy, Gøran Slettemark
+requiresManualTesting: true
+js_wrap: b
+tags:
+- Highcharts Dashboards demo
+categories:
+  - General:
+        priority: 2
+use_png_thumbnail: true
+...

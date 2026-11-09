@@ -1,6 +1,5 @@
 /* *
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -14,15 +13,12 @@
 
 import type Chart from '../Core/Chart/Chart';
 import type CoreSeriesOptions from '../Core/Series/SeriesOptions';
+import type { DeepPartial } from '../Shared/Types';
 
 import H from '../Core/Globals.js';
 const { noop } = H;
 import Series from '../Core/Series/Series.js';
-import U from '../Core/Utilities.js';
-const {
-    addEvent,
-    defined
-} = U;
+import { addEvent, defined } from '../Shared/Utilities.js';
 
 /* *
  *
@@ -30,8 +26,10 @@ const {
  *
  * */
 
-declare module '../Core/Series/SeriesLike' {
-    interface SeriesLike {
+/** @internal */
+declare module '../Core/Series/SeriesBase' {
+    interface SeriesBase {
+        /** @internal */
         hasDerivedData?: DerivedComposition.SeriesComposition['hasDerivedData'];
     }
 }
@@ -45,7 +43,7 @@ declare module '../Core/Series/SeriesLike' {
 /**
  * Provides methods for auto setting/updating series data based on the based
  * series data.
- * @private
+ * @internal
  */
 namespace DerivedComposition {
 
@@ -60,7 +58,9 @@ namespace DerivedComposition {
         eventRemovers: Array<Function>;
         hasDerivedData?: boolean;
         initialised?: boolean;
-        options: SeriesOptions;
+        options: Series['options'] & {
+            baseSeries?: (number|string);
+        };
         addBaseSeriesEvents(): void;
         addEvents(): void;
         destroy(keepEventsForUpdate?: boolean): void;
@@ -69,17 +69,11 @@ namespace DerivedComposition {
         setDerivedData(): void;
     }
 
-    export interface SeriesOptions extends CoreSeriesOptions {
-        baseSeries?: (number|string);
-    }
-
     /* *
      *
      *  Constants
      *
      * */
-
-    const composedClasses: Array<Function> = [];
 
     export const hasDerivedData = true;
 
@@ -88,7 +82,7 @@ namespace DerivedComposition {
      * access to the base series via m `this.baseSeries` and the bases data is
      * initialised. It should return data in the format accepted by
      * `Series.setData()` method
-     * @private
+     * @internal
      */
     export const setDerivedData = noop;
 
@@ -98,33 +92,27 @@ namespace DerivedComposition {
      *
      * */
 
-    /* eslint-disable valid-jsdoc */
 
     /**
-     * @private
+     * @internal
      */
     export function compose<T extends typeof Series>(
         SeriesClass: T
     ): (T&typeof SeriesComposition) {
+        const seriesProto = SeriesClass.prototype as SeriesComposition;
 
-        if (composedClasses.indexOf(SeriesClass) === -1) {
-            composedClasses.push(SeriesClass);
-
-            const seriesProto = SeriesClass.prototype as SeriesComposition;
-
-            seriesProto.addBaseSeriesEvents = addBaseSeriesEvents;
-            seriesProto.addEvents = addEvents;
-            seriesProto.destroy = destroy;
-            seriesProto.init = init;
-            seriesProto.setBaseSeries = setBaseSeries;
-        }
+        seriesProto.addBaseSeriesEvents = addBaseSeriesEvents;
+        seriesProto.addEvents = addEvents;
+        seriesProto.destroy = destroy;
+        seriesProto.init = init;
+        seriesProto.setBaseSeries = setBaseSeries;
 
         return SeriesClass as (T&typeof SeriesComposition);
     }
 
     /**
      * Initialise series
-     * @private
+     * @internal
      */
     export function init(this: SeriesComposition): void {
         Series.prototype.init.apply(this, arguments as any);
@@ -138,7 +126,7 @@ namespace DerivedComposition {
 
     /**
      * Sets base series for the series
-     * @private
+     * @internal
      */
     export function setBaseSeries(this: SeriesComposition): void {
         const chart = this.chart,
@@ -156,7 +144,7 @@ namespace DerivedComposition {
 
     /**
      * Adds events for the series
-     * @private
+     * @internal
      */
     export function addEvents(this: SeriesComposition): void {
         this.eventRemovers.push(
@@ -179,7 +167,7 @@ namespace DerivedComposition {
     /**
      * Adds events to the base series - it required for recalculating the data
      * in the series if the base series is updated / removed / etc.
-     * @private
+     * @internal
      */
     export function addBaseSeriesEvents(this: SeriesComposition): void {
         this.eventRemovers.push(
@@ -203,7 +191,7 @@ namespace DerivedComposition {
 
     /**
      * Destroys the series
-     * @private
+     * @internal
      */
     export function destroy(this: SeriesComposition): void {
         this.eventRemovers.forEach((remover: Function): void => {
@@ -220,4 +208,5 @@ namespace DerivedComposition {
  *
  * */
 
+/** @internal */
 export default DerivedComposition;

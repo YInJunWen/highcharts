@@ -6,7 +6,7 @@
  *
  * */
 
-/* eslint-disable no-use-before-define */
+/* eslint-disable no-use-before-define, require-unicode-regexp */
 
 /* *
  *
@@ -118,14 +118,14 @@ function processSrcJSFile(content) {
 /**
  * Simplifies template literals transpilation to plus concatination.
  *
- * @param {string} content
+ * @param {string|Buffer} content
  * Code content to process.
  *
  * @return {string}
  * Process code content.
  */
 function processTemplateLiterals(content) {
-    return content.replace(templateConcatsPattern, function (
+    return content.toString().replace(templateConcatsPattern, function (
         _match,
         prefix,
         concats
@@ -162,8 +162,8 @@ function processVariables(content) {
             variables.split(/\r\n|\r|\n/gu).map(function (line) {
 
                 if (
-                    variables.match(/\/\*\* @class \*\//gu) ||
-                    // eslint-disable-next-line require-unicode-regexp
+                    variables.match(/\/[^\/\n\r]+\//g) ||
+                    variables.match(/\/\*\* @class \*\//g) ||
                     variables.match(/(['"])[^\1\n]*,[^\1\n]*\1/g)
                 ) {
                     // skip lines with complex strings

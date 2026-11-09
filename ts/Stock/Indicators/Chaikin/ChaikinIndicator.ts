@@ -1,8 +1,9 @@
 /* *
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -23,17 +24,10 @@ import type IndicatorValuesObject from '../IndicatorValuesObject';
 import type LineSeries from '../../../Series/Line/LineSeries';
 
 import AD from '../AD/ADIndicator.js'; // For historic reasons, AD is built into Chaikin
+import EMAIndicator from '../EMA/EMAIndicator.js';
 import SeriesRegistry from '../../../Core/Series/SeriesRegistry.js';
-const {
-    ema: EMAIndicator
-} = SeriesRegistry.seriesTypes;
-import U from '../../../Core/Utilities.js';
-const {
-    correctFloat,
-    extend,
-    merge,
-    error
-} = U;
+import { correctFloat, extend, merge } from '../../../Shared/Utilities.js';
+import { error } from '../../../Core/Utilities.js';
 
 /* *
  *
@@ -44,7 +38,6 @@ const {
 /**
  * The Chaikin series type.
  *
- * @private
  * @class
  * @name Highcharts.seriesTypes.chaikin
  *
@@ -71,19 +64,20 @@ class ChaikinIndicator extends EMAIndicator {
      * @excluding    allAreas, colorAxis, joinBy, keys, navigatorOptions,
      *               pointInterval, pointIntervalUnit, pointPlacement,
      *               pointRange, pointStart, showInNavigator, stacking
-     * @requires     stock/indicators/indicators
-     * @requires     stock/indicators/chaikin
+     * @requires     indicators/indicators
+     * @requires     indicators/chaikin
      * @optionparent plotOptions.chaikin
+     * @internal
      */
     public static defaultOptions: ChaikinOptions = merge(EMAIndicator.defaultOptions, {
         /**
-         * Paramters used in calculation of Chaikin Oscillator
+         * Parameters used in calculation of Chaikin Oscillator
          * series points.
          *
          * @excluding index
          */
         params: {
-            index: void 0, // unused index, do not inherit (#15362)
+            index: void 0, // Unused index, do not inherit (#15362)
             /**
              * The id of volume series which is mandatory.
              * For example using OHLC data, volumeSeriesID='volume' means
@@ -112,9 +106,9 @@ class ChaikinIndicator extends EMAIndicator {
      *
      * */
 
-    public data: Array<ChaikinPoint> = void 0 as any;
-    public options: ChaikinOptions = void 0 as any;
-    public points: Array<ChaikinPoint> = void 0 as any;
+    public data!: Array<ChaikinPoint>;
+    public options!: ChaikinOptions;
+    public points!: Array<ChaikinPoint>;
 
     /* *
      *
@@ -122,32 +116,18 @@ class ChaikinIndicator extends EMAIndicator {
      *
      * */
 
-    getValues<TLinkedSeries extends LineSeries>(
+    /** @internal */
+    public getValues<TLinkedSeries extends LineSeries>(
         series: TLinkedSeries,
         params: ChaikinParamsOptions
     ): (IndicatorValuesObject<TLinkedSeries>|undefined) {
-        let periods: Array<number> = (params.periods as any),
+        const periods: Array<number> = (params.periods as any),
             period: number = (params.period as any),
-            // Accumulation Distribution Line data
-            ADL: (
-                IndicatorValuesObject<TLinkedSeries>|undefined
-            ),
             // 0- date, 1- Chaikin Oscillator
             CHA: Array<Array<number>> = [],
             xData: Array<number> = [],
-            yData: Array<number> = [],
-            periodsOffset: number,
-            // Shorter Period EMA
-            SPE: (
-                IndicatorValuesObject<TLinkedSeries>|
-                undefined
-            ),
-            // Longer Period EMA
-            LPE: (
-                IndicatorValuesObject<TLinkedSeries>|
-                undefined
-            ),
-            oscillator: number,
+            yData: Array<number> = [];
+        let oscillator: number,
             i: number;
 
         // Check if periods are correct
@@ -159,30 +139,35 @@ class ChaikinIndicator extends EMAIndicator {
             return;
         }
 
-        ADL = AD.prototype.getValues.call(this, series, {
-            volumeSeriesID: params.volumeSeriesID,
-            period: period
-        }) as IndicatorValuesObject<TLinkedSeries>;
+        // Accumulation Distribution Line data
+        const ADL: (IndicatorValuesObject<TLinkedSeries>|undefined) =
+            AD.prototype.getValues.call(this, series, {
+                volumeSeriesID: params.volumeSeriesID,
+                period: period
+            }) as IndicatorValuesObject<TLinkedSeries>;
 
         // Check if adl is calculated properly, if not skip
         if (!ADL) {
             return;
         }
 
-        SPE = EMAIndicator.prototype.getValues.call(this, (ADL as any), {
-            period: periods[0]
-        }) as IndicatorValuesObject<TLinkedSeries>;
-
-        LPE = EMAIndicator.prototype.getValues.call(this, (ADL as any), {
-            period: periods[1]
-        }) as IndicatorValuesObject<TLinkedSeries>;
+        // Shorter Period EMA
+        const SPE: (IndicatorValuesObject<TLinkedSeries>|undefined) =
+            super.getValues.call(this, (ADL as any), {
+                period: periods[0]
+            }) as IndicatorValuesObject<TLinkedSeries>;
+        // Longer Period EMA
+        const LPE: (IndicatorValuesObject<TLinkedSeries>|undefined) =
+            super.getValues.call(this, (ADL as any), {
+                period: periods[1]
+            }) as IndicatorValuesObject<TLinkedSeries>;
 
         // Check if ema is calculated properly, if not skip
         if (!SPE || !LPE) {
             return;
         }
 
-        periodsOffset = periods[1] - periods[0];
+        const periodsOffset: number = periods[1] - periods[0];
 
         for (i = 0; i < LPE.yData.length; i++) {
             oscillator = correctFloat(
@@ -252,12 +237,12 @@ export default ChaikinIndicator;
  * @extends   series,plotOptions.chaikin
  * @since     7.0.0
  * @product   highstock
- * @excluding allAreas, colorAxis, dataParser, dataURL, joinBy, keys,
+ * @excluding allAreas, colorAxis, joinBy, keys,
  *            navigatorOptions, pointInterval, pointIntervalUnit,
  *            pointPlacement, pointRange, pointStart, stacking, showInNavigator
- * @requires  stock/indicators/indicators
- * @requires  stock/indicators/chaikin
+ * @requires  indicators/indicators
+ * @requires  indicators/chaikin
  * @apioption series.chaikin
  */
 
-''; // to include the above in the js output
+''; // To include the above in the js output

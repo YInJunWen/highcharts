@@ -1,8 +1,9 @@
 Highcharts.addEvent(Highcharts.Chart, 'render', function () {
-    var table = this.dataTableDiv;
+    const table = this.exporting.dataTableDiv;
     if (table) {
 
-        // Apply styles inline because stylesheets are not passed to the exported SVG
+        // Apply styles inline because stylesheets are not passed to the
+        // exported SVG
         Highcharts.css(table.querySelector('table'), {
             'border-collapse': 'collapse',
             'border-spacing': 0,
@@ -12,7 +13,9 @@ Highcharts.addEvent(Highcharts.Chart, 'render', function () {
             'font-size': '14px'
         });
 
-        [].forEach.call(table.querySelectorAll('td, th, caption'), function (elem) {
+        [].forEach.call(table.querySelectorAll(
+            'td, th, caption'
+        ), function (elem) {
             Highcharts.css(elem, {
                 border: '1px solid silver',
                 padding: '0.5em'
@@ -25,7 +28,9 @@ Highcharts.addEvent(Highcharts.Chart, 'render', function () {
             'font-weight': 'bold'
         });
 
-        [].forEach.call(table.querySelectorAll('caption, tr'), function (elem, i) {
+        [].forEach.call(table.querySelectorAll(
+            'caption, tr'
+        ), function (elem, i) {
             if (i % 2) {
                 Highcharts.css(elem, {
                     background: '#f8f8f8'
@@ -42,7 +47,7 @@ Highcharts.addEvent(Highcharts.Chart, 'render', function () {
         if (table.parentNode) {
             table.parentNode.removeChild(table);
         }
-        delete this.dataTableDiv;
+        delete this.exporting.dataTableDiv;
     }
 });
 

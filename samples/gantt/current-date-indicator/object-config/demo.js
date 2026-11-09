@@ -1,4 +1,4 @@
-var today = new Date(),
+const today = new Date(),
     day = 1000 * 60 * 60 * 24;
 
 // Set to 00:00:00:000 today
@@ -19,7 +19,7 @@ Highcharts.chart('container', {
             dashStyle: 'dot',
             color: 'red',
             label: {
-                format: '%Y-%M-%d, %H:%M'
+                format: '%Y-%m-%d, %H:%M'
             }
         },
         type: 'datetime',

@@ -47,7 +47,7 @@ QUnit.test('Test current and last price indicator.', function (assert) {
     );
 
     assert.ok(
-        chart.series[1].crossLabel.hasClass('highcharts-color-1'),
+        chart.series[1].lastVisiblePriceLabel.hasClass('highcharts-color-1'),
         '#15706: Second lastVisiblePrice label should have correct color class'
     );
 });
@@ -89,14 +89,15 @@ QUnit.test(
     }
 );
 
-QUnit.test('The currentPriceIndicator label should be visible, #14879.',
+QUnit.test(
+    'Price indicator labels rendering and visibility, #14879, #17790.',
     function (assert) {
         const chart = Highcharts.stockChart('container', {
             stockTools: {
                 gui: {
                     enabled: true,
                     buttons: [
-                        "currentPriceIndicator"
+                        'currentPriceIndicator'
                     ]
                 }
             },
@@ -118,9 +119,103 @@ QUnit.test('The currentPriceIndicator label should be visible, #14879.',
         });
 
         assert.strictEqual(
-            chart.series[0].crossLabel.visibility,
+            chart.series[0].lastVisiblePrice.visibility,
             'inherit',
-            'Crosshair label should be visible.'
+            'Last visible price label should be visible, #14879.'
+        );
+
+        chart.series[0].update({
+            data: [1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1],
+            lastPrice: {
+                enabled: true,
+                label: {
+                    enabled: true
+                }
+            }
+        });
+
+        // 'Drag' the chart to redraw labels, values adjusted for #18528
+        chart.xAxis[0].setExtremes(2.1, 9.6);
+
+        assert.strictEqual(
+            document.querySelectorAll('.highcharts-crosshair-label').length,
+            2, // One for lastPrice label, one for lastVisiblePrice label
+            'There should only be two price labels rendered, #17790.'
+        );
+
+        const compared = chart.addSeries({
+            compare: 'percent',
+            data: [100, 150, 200],
+            lastPrice: {
+                enabled: true,
+                label: {
+                    enabled: true
+                }
+            }
+        });
+
+        assert.close(
+            compared.lastPrice?.pathArray[0][2],
+            compared.yAxis.toPixels(
+                compared.dataModify.modifyValue(compared.getColumn('y').at(-1))
+            ),
+            1,
+            `The lastPrice line should follow the compared value, not the raw
+            one, #23212.`
+        );
+
+        assert.notEqual(
+            compared.lastPriceLabel?.visibility,
+            'hidden',
+            'The lastPrice label should be visible with compare set, #23212.'
+        );
+
+        compared.remove();
+
+        const lvpLabel = chart.series[0].lastVisiblePriceLabel,
+            lpLabel = chart.series[0].lastPriceLabel;
+
+        assert.strictEqual(
+            lvpLabel.visibility !== 'hidden' && lpLabel.visibility !== 'hidden',
+            true,
+            'Both of the labels should always be visible, #18528.'
+        );
+
+        const points = chart.series[0].points,
+            pLength = points.length,
+            lastPoint = points[pLength - 1].isInside ?
+                points[pLength - 1] : points[pLength - 2];
+
+        assert.strictEqual(
+            lastPoint.y,
+            +lvpLabel.text.element.textContent,
+            `Last visible price label value should be equal to last inside point
+            value, #18528.`
+        );
+
+        chart.series[0].hide();
+        assert.strictEqual(
+            lvpLabel.visibility && lpLabel.visibility === 'hidden',
+            true,
+            'Both labels should be hidden after series hide, #22658.'
+        );
+        chart.series[0].show();
+
+        chart.addSeries({
+            data: [100],
+            visible: false,
+            lastPrice: {
+                enabled: true,
+                label: {
+                    enabled: true
+                }
+            }
+        });
+        assert.strictEqual(
+            chart.series[1].lastPriceLabel && chart.series[1].lastPrice,
+            undefined,
+            `Last price label should be hidden when series is not visible on
+            first render, #22658.`
         );
     }
 );

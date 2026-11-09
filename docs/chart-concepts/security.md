@@ -1,3 +1,10 @@
+---
+description: >-
+  Understand how Highcharts filters HTML in chart options, the limits of that
+  protection for callbacks and older versions, and how allow lists and Trusted
+  Types relate to chart security.
+---
+
 Highcharts Security
 ===
 
@@ -18,6 +25,8 @@ You may also opt to bypass the filtering completely through the
 flag.
 
 Since v9.3.2 Highcharts supports [Trusted Types](https://web.dev/trusted-types/) under the built-in policy name `highcharts`. Our Cypress tests and developer tools are set up with Trusted Types enabled, which enforces an added layer of security and greatly reduces the risk for one of our developers to accidentally introduce a DOM XSS vulnerability.
+
+*Important*: While Highcharts applies strict internal security measures, we cannot take responsibility for the security of external third-party libraries (including [optional dependencies](https://www.highcharts.com/docs/getting-started/optional-dependencies)). Such libraries are not covered by the Highcharts license and come without any guarantees or warranties from Highcharts.
 
 ### Scope
 Chart _configuration options_ that are valid JSON are filtered for known XSS vectors. JSON support types of object, strings, numbers, arrays, boolean or null. This implies that function callbacks and event handlers in the chart options structure is not covered by our scope. Functions are inherently unsafe because they by nature allow scripting towards the web page.
@@ -75,5 +84,11 @@ If you are using earlier Highcharts versions, consider either of these points:
 * The increased security only makes sense if you include content from untrusted sources in your charts. This may be user-defined chart titles, series names, point names, axis labels etc. - in short any text content that is rendered in the chart. If your chart configuration is static and trusted, there's no need for any action.
 * Consider the architecture of your application. If the user-defined input is allowed to pass unfiltered to the point where it is inserted into a chart, sanitation should probably be added at an earlier stage, regardless of Highcharts version.
 * Upgrade to Highcharts v9. It is fully backwards compatible and there is no need for changing any configuration.
-* If you are not using any of the pseudo-HTML capabilities of Highcharts to format text inputs, stripping the texts of HTML is a simple way to filter out malicious code. See the example of [allow-listing characters](https://jsfiddle.net/highcharts/2qrxyk84/). While this does not render gracefully, it does effectively strip out HTML.
-* For more sophisticated sanitizing of the options, consider using a third party library like [DOMPurify](https://github.com/cure53/DOMPurify), either on the server or client side. See [the example](https://jsfiddle.net/highcharts/zd3wcm5L/). This will strip out malicious code in a fast and secure way, while maintaining harmless markup.
+* If you are not using any of the pseudo-HTML capabilities of Highcharts to format text inputs, stripping the texts of HTML is a simple way to filter out malicious code. See the example of [allow-listing characters](https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/global/security-strip-html/). While this does not render gracefully, it does effectively strip out HTML.
+* For more sophisticated sanitizing of the options, consider using a third party library like [DOMPurify](https://github.com/cure53/DOMPurify), either on the server or client side. See [the example](https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/global/security-strip-html-dompurify/). This will strip out malicious code in a fast and secure way, while maintaining harmless markup.
+
+### Security reports and SAST code scanning
+
+We take security seriously and strive to ensure the safety of our codebase. We encourage our users and the community to report any security vulnerabilities they discover using the information that on our [GitHub repository](https://github.com/highcharts/highcharts/security/policy). If you have discovered a security vulnerability or have any security-related concerns, please report them to us.
+
+In addition to community reports, we also employ Static Application Security Testing (SAST) as part of our development workflow. SAST code scanning helps us identify and mitigate security risks by analyzing our codebase for potential vulnerabilities, such as common coding mistakes, insecure coding patterns, and known security issues.

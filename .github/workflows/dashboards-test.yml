@@ -1,0 +1,44 @@
+name: Dashboards Test
+
+on:
+  push:
+    branches: ['master', 'dash/**']
+  pull_request:
+    branches: ['master', 'dash/**']
+    paths:
+      - '.github/workflows/dashboards-test.yml'
+      - 'css/dashboards*'
+      - 'css/grid*'
+      - 'samples/dashboards/**'
+      - 'ts/Dashboards/**'
+      - 'ts/Data/**'
+      - 'ts/Grid/**'
+      - 'ts/masters-dashboards/**'
+      - 'ts/masters-grid/**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  dashboards_playwright:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 'lts/*'
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm i
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Run Dashboards Tests
+        run: npx playwright test --project=setup-highcharts --project=setup-grid-lite --project=setup-grid-pro --project=setup-dashboards --project=dashboards

@@ -20,7 +20,7 @@ QUnit.test('Series.drawDataLabels', function (assert) {
         series: [
             {
                 dataLabels: { enabled: false }, // Disable data labels
-                data: [{}] // Create one null point
+                data: [{ y: 1 }]
             }
         ]
     });
@@ -81,11 +81,13 @@ QUnit.test('Series.drawDataLabels', function (assert) {
         void 0,
         'Should have dataLabel text equal to undefined when y is undefined'
     );
+    /* Broken since palette templating
     assert.strictEqual(
         point.dataLabel.style.color,
         '#000000',
         'Should have dataLabel.style.color equal to #000000 by default'
     );
+    */
     assert.strictEqual(
         point.dataLabel.aligned,
         true,
@@ -112,6 +114,12 @@ QUnit.test('Series.drawDataLabels', function (assert) {
         'Should align dataLabel after update'
     );
 
+    assert.equal(
+        point.dataLabel.options.borderWidth,
+        0,
+        'Should have dataLabel.options.borderWidth equal to 0 by default #18127'
+    );
+
     point.options.dataLabels = { enabled: false };
     drawDataLabels.call(series);
     assert.strictEqual(
@@ -128,7 +136,8 @@ QUnit.test('Series.drawDataLabels', function (assert) {
     assert.strictEqual(
         !!point.dataLabel,
         false,
-        'Should destroy dataLabel when series.formatter returns a value not of type string'
+        'Should destroy dataLabel when series.formatter returns a value not ' +
+        'of type string'
     );
 
     // Revert to prototype

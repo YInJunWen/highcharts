@@ -1,10 +1,12 @@
 /* *
  *
- *  (c) 2010-2021 Torstein Honsi
+ *  (c) 2010-2026 Highsoft AS
+ *  Author: Torstein Hønsi
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -16,15 +18,17 @@
  *
  * */
 
+import type HeikinAshiSeries from './HeikinAshiSeries';
 
-import SeriesRegistry from '../../Core/Series/SeriesRegistry.js';
-import HeikinAshiSeries from './HeikinAshiSeries';
+import CandlestickSeries from '../Candlestick/CandlestickSeries.js';
 
-const {
-    seriesTypes: {
-        candlestick: CandlestickSeries
-    }
-} = SeriesRegistry;
+/* *
+ *
+ *  Constants
+ *
+ * */
+
+const CandlestickPoint = CandlestickSeries.prototype.pointClass;
 
 /* *
  *
@@ -32,22 +36,17 @@ const {
  *
  * */
 
-class HeikinAshiPoint extends CandlestickSeries.prototype.pointClass {
+class HeikinAshiPoint extends CandlestickPoint {
+}
 
-    /* *
-     *
-     *  Properties
-     *
-     * */
+/* *
+ *
+ *  Class Prototype
+ *
+ * */
 
-    public series: HeikinAshiSeries = void 0 as any;
-
-    /* *
-     *
-     *  Functions
-     *
-     * */
-
+interface HeikinAshiPoint {
+    series: HeikinAshiSeries;
 }
 
 /* *

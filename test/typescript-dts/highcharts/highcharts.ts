@@ -7,13 +7,77 @@
  * */
 
 import * as Highcharts from "highcharts";
+import "highcharts/modules/series-label";
 
+test_borderRadius();
+test_legend();
+test_selectEvent();
 test_seriesArea();
 test_seriesBar();
 test_seriesColumn();
 test_seriesDependencyWheel();
 test_seriesLine();
 test_seriesPie();
+test_templating();
+test_tooltip();
+test_yAxis();
+
+/**
+ * Tests Highcharts.BorderRadiusOptionsObject, whose members are all optional
+ * because they fall back to documented defaults. #24856
+ */
+function test_borderRadius() {
+    Highcharts.chart('container', {
+        plotOptions: {
+            column: {
+                borderRadius: {
+                    radius: '50%'
+                }
+            }
+        },
+        series: [{
+            type: 'column',
+            borderRadius: {
+                radius: 3,
+                scope: 'stack'
+            },
+            data: [1, 2, 3]
+        }]
+    });
+}
+
+/**
+ * Tests legend options.
+ */
+function test_legend() {
+    Highcharts.chart('container', {
+        legend: {
+            enabled: true,
+            labelFormatter: function (): string {
+                const series = this as Highcharts.Series;
+                if (series.legendItem) {
+                    return JSON.stringify(series.legendItem as Record<string, SVGElement>);
+                }
+                return '';
+            }
+        }
+    });
+}
+
+/**
+ * Tests type of select event.
+ */
+function test_selectEvent() {
+    Highcharts.chart('container', {
+        chart: {
+            events: {
+                selection: function (e: Highcharts.SelectEventObject): undefined {
+                    e.preventDefault();
+                }
+            }
+        }
+    });
+}
 
 /**
  * Tests Highcharts.seriesTypes.area in a common use case.
@@ -234,7 +298,10 @@ function test_seriesColumn() {
         series: [{
             type: 'column',
             name: 'Tokyo',
-            data: [49.9, 71.5, 106.4, 129.2, 144.0, 176.0, 135.6, 148.5, 216.4, 194.1, 95.6, 54.4],
+            data: [
+            49.9, 71.5, 106.4, 129.2, 144.0, 176.0, 135.6, 148.5, 216.4, 194.1,
+            95.6, 54.4
+        ],
         }, {
             type: 'column',
             name: 'New York',
@@ -464,4 +531,48 @@ function test_seriesPie() {
             }]
         }]
     });
+}
+
+/**
+ * Tests Highcharts.Templating and its documented `helpers` member. #24856
+ */
+function test_templating() {
+    const templating: Highcharts.TemplatingObject = Highcharts.Templating;
+    templating.helpers.abs = (value: number): number => Math.abs(value);
+    Highcharts.chart('container', {
+        series: [{
+            type: 'line',
+            data: [1, -2, 3],
+            dataLabels: {
+                format: 'Absolute value: {abs point.y}'
+            }
+        }]
+    });
+}
+
+/**
+ * Tests TooltipOptions in a common use cases.
+ */
+function test_tooltip() {
+    Highcharts.chart('container', {
+        tooltip: {
+            borderWidth: 10 // #18977
+        }
+    });
+}
+
+/**
+ * Tests YAxisLabelsOptions in a common use cases.
+ */
+function test_yAxis() {
+    Highcharts.chart('container', {
+        chart: {
+            polar: true
+        },
+        yAxis: {
+            labels: {
+                distance: "10%" // #18977
+            }
+        }
+    })
 }

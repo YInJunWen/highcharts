@@ -2,11 +2,13 @@
  *
  *  GUI generator for Stock tools
  *
- *  (c) 2009-2021 Sebastian Bochan
+ *  (c) 2009-2026 Highsoft AS
+ *  Author: Sebastian Bochan
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -28,17 +30,13 @@ import type {
     StockToolsOptions
 } from './StockToolsOptions';
 
-import O from '../../Core/DefaultOptions.js';
-const { setOptions } = O;
+import D from '../../Core/Defaults.js';
+const { setOptions } = D;
 import StockToolsDefaults from './StockToolsDefaults.js';
 import Toolbar from './StockToolbar.js';
-import U from '../../Core/Utilities.js';
-const {
-    addEvent,
-    getStyle,
-    merge,
-    pick
-} = U;
+import getIcon from '../../Shared/BaseFormUtils.js';
+import StockToolsIcons from './StockToolsIcons.js';
+import { addEvent, getStyle, merge } from '../../Shared/Utilities.js';
 
 /* *
  *
@@ -46,33 +44,24 @@ const {
  *
  * */
 
-declare module '../../Core/Chart/ChartLike'{
-    interface ChartLike {
+/** @internal */
+declare module '../../Core/Chart/ChartBase'{
+    interface ChartBase {
         stockTools?: Toolbar;
         /** @requires modules/stock-tools */
         setStockTools(options?: StockToolsOptions): void;
     }
 }
 
-declare module '../../Core/LangOptions'{
+/** @internal */
+declare module '../../Core/Options'{
     interface LangOptions {
         stockTools?: LangStockToolsOptions;
     }
-}
-
-declare module '../../Core/Options'{
     interface Options {
         stockTools?: StockToolsOptions;
     }
 }
-
-/* *
- *
- *  Constants
- *
- * */
-
-const composedClasses: Array<Function> = [];
 
 /* *
  *
@@ -82,7 +71,7 @@ const composedClasses: Array<Function> = [];
 
 /**
  * Verify if Toolbar should be added.
- * @private
+ * @internal
  */
 function chartSetStockTools(
     this: Chart,
@@ -103,30 +92,22 @@ function chartSetStockTools(
     }
 }
 
-/**
- * @private
- */
+/** @internal */
 function compose(
     ChartClass: typeof Chart,
     NavigationBindingsClass: typeof NavigationBindings
 ): void {
+    const chartProto = ChartClass.prototype;
 
-    if (composedClasses.indexOf(ChartClass) === -1) {
-        composedClasses.push(ChartClass);
-
+    if (!chartProto.setStockTools) {
         addEvent(ChartClass, 'afterGetContainer', onChartAfterGetContainer);
         addEvent(ChartClass, 'beforeRedraw', onChartBeforeRedraw);
         addEvent(ChartClass, 'beforeRender', onChartBeforeRedraw);
         addEvent(ChartClass, 'destroy', onChartDestroy);
         addEvent(ChartClass, 'getMargins', onChartGetMargins, { order: 0 });
-        addEvent(ChartClass, 'redraw', onChartRedraw);
         addEvent(ChartClass, 'render', onChartRender);
 
-        ChartClass.prototype.setStockTools = chartSetStockTools;
-    }
-
-    if (composedClasses.indexOf(NavigationBindingsClass) === -1) {
-        composedClasses.push(NavigationBindingsClass);
+        chartProto.setStockTools = chartSetStockTools;
 
         addEvent(
             NavigationBindingsClass,
@@ -138,10 +119,6 @@ function compose(
             'selectButton',
             onNavigationBindingsSelectButton
         );
-    }
-
-    if (composedClasses.indexOf(setOptions) === -1) {
-        composedClasses.push(setOptions);
 
         setOptions(StockToolsDefaults);
     }
@@ -149,7 +126,7 @@ function compose(
 
 /**
  * Run HTML generator
- * @private
+ * @internal
  */
 function onChartAfterGetContainer(
     this: Chart
@@ -159,50 +136,59 @@ function onChartAfterGetContainer(
 
 /**
  * Handle beforeRedraw and beforeRender
- * @private
+ * @internal
  */
-function onChartBeforeRedraw(
-    this: Chart
-): void {
+function onChartBeforeRedraw(this: Chart): void {
     if (this.stockTools) {
-        const optionsChart = this.options.chart as ChartOptions;
-        const listWrapper = this.stockTools.listWrapper,
-            offsetWidth = listWrapper && (
-                (
-                    (listWrapper as any).startWidth +
-                    getStyle(listWrapper, 'padding-left') +
-                    getStyle(listWrapper, 'padding-right')
-                ) || listWrapper.offsetWidth
-            );
+        this.stockTools.redraw();
+        setOffset(this);
+    }
+}
+
+/**
+ * Function to calculate and set the offset width for stock tools.
+ * @internal
+ */
+function setOffset(chart: Chart): void {
+    if (chart.stockTools?.guiEnabled) {
+        const optionsChart = chart.options.chart as ChartOptions;
+        const listWrapper = chart.stockTools.listWrapper;
+        const offsetWidth = listWrapper && (
+            (
+                (listWrapper as any).startWidth +
+                getStyle(listWrapper, 'padding-left') +
+                getStyle(listWrapper, 'padding-right')
+            ) || listWrapper.offsetWidth
+        );
+
+        chart.stockTools.width = offsetWidth;
 
         let dirty = false;
 
-        if (offsetWidth && offsetWidth < this.plotWidth) {
-            const nextX = pick(
-                optionsChart.spacingLeft,
-                optionsChart.spacing && optionsChart.spacing[3],
+        if (offsetWidth < chart.plotWidth) {
+            const nextX = (
+                optionsChart.spacingLeft ??
+                (optionsChart.spacing && optionsChart.spacing[3]) ??
                 0
             ) + offsetWidth;
-            const diff = nextX - this.spacingBox.x;
-            this.spacingBox.x = nextX;
-            this.spacingBox.width -= diff;
+            const diff = nextX - chart.spacingBox.x;
+            chart.spacingBox.x = nextX;
+            chart.spacingBox.width -= diff;
             dirty = true;
         } else if (offsetWidth === 0) {
             dirty = true;
         }
 
-        if (offsetWidth !== this.stockTools.prevOffsetWidth) {
-            this.stockTools.prevOffsetWidth = offsetWidth;
+        if (offsetWidth !== chart.stockTools.prevOffsetWidth) {
+            chart.stockTools.prevOffsetWidth = offsetWidth;
             if (dirty) {
-                this.isDirtyLegend = true;
+                chart.isDirtyLegend = true;
             }
         }
     }
 }
 
-/**
- * @private
- */
+/** @internal */
 function onChartDestroy(
     this: Chart
 ): void {
@@ -211,20 +197,12 @@ function onChartDestroy(
     }
 }
 
-/**
- * @private
- */
+/** @internal */
 function onChartGetMargins(
     this: Chart
 ): void {
-    const listWrapper = this.stockTools && this.stockTools.listWrapper,
-        offsetWidth = listWrapper && (
-            (
-                (listWrapper as any).startWidth +
-                getStyle(listWrapper, 'padding-left') +
-                getStyle(listWrapper, 'padding-right')
-            ) || listWrapper.offsetWidth
-        );
+    const offsetWidth = this.stockTools?.visible && this.stockTools.guiEnabled ?
+        this.stockTools.width : 0;
 
     if (offsetWidth && offsetWidth < this.plotWidth) {
         this.plotLeft += offsetWidth;
@@ -233,19 +211,8 @@ function onChartGetMargins(
 }
 
 /**
- * @private
- */
-function onChartRedraw(
-    this: Chart
-): void {
-    if (this.stockTools && this.stockTools.guiEnabled) {
-        this.stockTools.redraw();
-    }
-}
-
-/**
  * Check if the correct price indicator button is displayed, #15029.
- * @private
+ * @internal
  */
 function onChartRender(
     this: Chart
@@ -264,22 +231,21 @@ function onChartRender(
         this.options.series &&
         button
     ) {
+        const { iconsURL } = stockTools;
         if (
-            this.navigationBindings.constructor.prototype.utils
-                .isPriceIndicatorEnabled(this.series)
+            this.navigationBindings.utils
+                ?.isPriceIndicatorEnabled?.(this.series)
         ) {
             button.firstChild.style['background-image'] =
-            'url("' + stockTools.getIconsURL() + 'current-price-hide.svg")';
+                getIcon('current-price-hide.svg', iconsURL, StockToolsIcons);
         } else {
             button.firstChild.style['background-image'] =
-            'url("' + stockTools.getIconsURL() + 'current-price-show.svg")';
+                getIcon('current-price-show.svg', iconsURL, StockToolsIcons);
         }
     }
 }
 
-/**
- * @private
- */
+/** @internal */
 function onNavigationBindingsDeselectButton(
     this: NavigationBindings,
     event: Record<string, HTMLDOMElement>
@@ -294,14 +260,14 @@ function onNavigationBindingsDeselectButton(
         if (button.parentNode.className.indexOf(className) >= 0) {
             button = button.parentNode.parentNode;
         }
-        // Set active class on the current button
-        gui.toggleButtonActiveClass(button);
+
+        button.classList.remove('highcharts-active');
     }
 }
 
 /**
  * Communication with bindings
- * @private
+ * @internal
  */
 function onNavigationBindingsSelectButton(
     this: NavigationBindings,
@@ -313,7 +279,7 @@ function onNavigationBindingsSelectButton(
     if (gui && gui.guiEnabled) {
         let button = event.button;
 
-        // Unslect other active buttons
+        // Unselect other active buttons
         gui.unselectAllButtons(event.button);
 
         // If clicked on a submenu, select state for it's parent
@@ -331,8 +297,10 @@ function onNavigationBindingsSelectButton(
  *
  * */
 
+/** @internal */
 const StockToolsGui = {
     compose
 };
 
+/** @internal */
 export default StockToolsGui;

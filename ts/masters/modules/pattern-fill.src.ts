@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: LicenseRef-Highcharts
 /**
  * @license Highcharts JS v@product.version@ (@product.date@)
  * @module highcharts/modules/pattern-fill
@@ -5,10 +6,16 @@
  *
  * Module for adding patterns and images as point fills.
  *
- * (c) 2010-2021 Highsoft AS
+ * (c) 2010-2026 Highsoft AS
  * Author: Torstein Hønsi, Øystein Moseng
  *
- * License: www.highcharts.com/license
+ * A commercial license may be required depending on use,
+ * see www.highcharts.com/license
  */
 'use strict';
-import '../../Extensions/PatternFill.js';
+import Highcharts from '../../Core/Globals.js';
+import { composePatternFill, patterns } from '../../Extensions/PatternFill.js';
+const G: AnyRecord = Highcharts;
+G.patterns = patterns;
+composePatternFill(G.Chart, G.Series, G.SVGRenderer);
+export default Highcharts;

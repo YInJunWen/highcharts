@@ -1,10 +1,12 @@
 /* *
  *
- *  (c) 2010-2021 Torstein Honsi
+ *  (c) 2010-2026 Highsoft AS
+ *  Author: Torstein Hønsi
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -16,24 +18,14 @@
  *
  * */
 
-import type Chart from '../Chart/Chart';
+import type { DeepPartial } from '../../Shared/Types';
+import type { SeriesTypeRegistry } from './SeriesType';
 import type Series from './Series.js';
-import type SeriesOptions from './SeriesOptions';
-import type {
-    SeriesTypeOptions,
-    SeriesTypeRegistry
-} from './SeriesType';
 
 import H from '../Globals.js';
-import D from '../DefaultOptions.js';
-const { defaultOptions } = D;
+import { defaultOptions } from '../Defaults.js';
 import Point from './Point.js';
-import U from '../Utilities.js';
-const {
-    error,
-    extendClass,
-    merge
-} = U;
+import { extend, extendClass, merge } from '../../Shared/Utilities.js';
 
 /* *
  *
@@ -67,12 +59,20 @@ namespace SeriesRegistry {
     /**
      * Registers class pattern of a series.
      *
-     * @private
+     * @param {string} seriesType
+     * The series type as an identifier string in lower case.
+     *
+     * @param {Function} SeriesClass
+     * The series class as a class pattern or a constructor function with
+     * prototype.
+     *
+     * @return {boolean}
+     * True if series type was added, false if it already exists.
      */
     export function registerSeriesType(
         seriesType: string,
         SeriesClass: typeof Series
-    ): void {
+    ): boolean {
         const defaultPlotOptions = defaultOptions.plotOptions || {},
             seriesOptions = SeriesClass.defaultOptions,
             seriesProto = SeriesClass.prototype;
@@ -83,17 +83,23 @@ namespace SeriesRegistry {
             seriesProto.pointClass = Point;
         }
 
+        if (seriesTypes[seriesType]) {
+            return false;
+        }
+
         if (seriesOptions) {
             defaultPlotOptions[seriesType] = seriesOptions;
         }
 
         seriesTypes[seriesType] = SeriesClass;
+
+        return true;
     }
 
     /**
      * Old factory to create new series prototypes.
      *
-     * @deprecated
+     * @deprecated 9.0.0
      * @function Highcharts.seriesType
      *
      * @param {string} type
@@ -106,10 +112,10 @@ namespace SeriesRegistry {
      * @param {Highcharts.SeriesOptionsType|Highcharts.Dictionary<*>} options
      * The additional default options that are merged with the parent's options.
      *
-     * @param {Highcharts.Dictionary<*>} [props]
+     * @param {Highcharts.Dictionary<*>} [seriesProto]
      * The properties (functions and primitives) to set on the new prototype.
      *
-     * @param {Highcharts.Dictionary<*>} [pointProps]
+     * @param {Highcharts.Dictionary<*>} [pointProto]
      * Members for a series-specific extension of the {@link Point} prototype if
      * needed.
      *
@@ -118,7 +124,7 @@ namespace SeriesRegistry {
      * derivatives.
      */
     export function seriesType<T extends typeof Series>(
-        type: keyof SeriesTypeRegistry,
+        type: Extract<keyof SeriesTypeRegistry, string>,
         parent: (keyof SeriesTypeRegistry|undefined),
         options: T['prototype']['options'],
         seriesProto?: DeepPartial<T['prototype']>,
@@ -135,18 +141,21 @@ namespace SeriesRegistry {
         );
 
         // Create the class
-        registerSeriesType(type, extendClass(
-            seriesTypes[parent] as any || function (): void {},
-            seriesProto
-        ) as any);
+        delete seriesTypes[type];
+        const parentClass = (
+                seriesTypes[parent] as typeof Series ||
+                (H as unknown as { Series: typeof Series }).Series
+            ),
+            childClass = extendClass(parentClass, seriesProto) as typeof Series;
+
+        registerSeriesType(type, childClass);
         seriesTypes[type].prototype.type = type;
 
         // Create the point class if needed
         if (pointProto) {
-            seriesTypes[type].prototype.pointClass = extendClass(
-                Point,
-                pointProto
-            ) as any;
+            class PointClass extends Point {}
+            extend(PointClass.prototype, pointProto as any);
+            seriesTypes[type].prototype.pointClass = PointClass;
         }
 
         return seriesTypes[type] as unknown as T;

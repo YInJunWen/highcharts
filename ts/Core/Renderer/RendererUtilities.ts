@@ -1,10 +1,12 @@
 /* *
  *
- *  (c) 2010-2021 Torstein Honsi
+ *  (c) 2010-2026 Highsoft AS
+ *  Author: Torstein Hønsi
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -15,13 +17,7 @@
  *  Imports
  *
  * */
-
-import U from '../Utilities.js';
-const {
-    clamp,
-    pick,
-    stableSort
-} = U;
+import { clamp, pushUnique, stableSort } from '../../Shared/Utilities.js';
 
 /* *
  *
@@ -29,6 +25,7 @@ const {
  *
  * */
 
+/** @internal */
 namespace RendererUtilities {
 
     /* *
@@ -61,7 +58,6 @@ namespace RendererUtilities {
      *
      * */
 
-    /* eslint-disable valid-jsdoc */
 
     /**
      * General distribution algorithm for distributing labels of differing size
@@ -69,10 +65,10 @@ namespace RendererUtilities {
      * of objects containing a size, a target and a rank. It will place the
      * labels as close as possible to their targets, skipping the lowest ranked
      * labels if necessary.
-     * @private
+     * @internal
      */
     export function distribute<T extends BoxObject>(
-        boxes: Array<T>,
+        boxes: DistributedBoxArray<T>,
         len: number,
         maxDistance?: number
     ): DistributedBoxArray<T> {
@@ -88,18 +84,22 @@ namespace RendererUtilities {
                 a: BoxObject,
                 b: BoxObject
             ): number =>
-                a.target - b.target;
+                a.target - b.target,
+            restBoxes: DistributedBoxArray<T> = [], // The outranked overshoot
+            boxesLength = boxes.length,
+            forDeletion: Array<number> = [],
+            push = restBoxes.push;
 
         let i: number,
             overlapping = true,
-            restBoxes: Array<T> = [], // The outranked overshoot
-            box,
-            target,
-            total = 0;
+            box: T & DistributedBoxObject,
+            target: number,
+            total = 0,
+            equalRank: boolean;
 
         // If the total size exceeds the len, remove those boxes with the lowest
         // rank
-        i = boxes.length;
+        i = boxesLength;
         while (i--) {
             total += boxes[i].size;
         }
@@ -107,13 +107,52 @@ namespace RendererUtilities {
         // Sort by rank, then slice away overshoot
         if (total > reducedLen) {
             stableSort(boxes, sortByRank);
-            i = 0;
-            total = 0;
-            while (total <= reducedLen) {
-                total += boxes[i].size;
-                i++;
+            equalRank = boxes[0].rank === boxes[boxes.length - 1].rank;
+
+            // When all boxes have equal rank (pie data labels, flags - #10073),
+            // decimate from the center outwards by repeatedly splitting index
+            // ranges. This guarantees progress and avoids cursor/step stalling
+            // on repeated indices (#23541). When ranks differ, remove the
+            // lowest ranked boxes from the end.
+            if (equalRank) {
+                const ranges: Array<[number, number]> = [[0, boxesLength - 1]];
+
+                while (ranges.length && total > reducedLen) {
+                    const range = ranges.shift();
+                    if (!range) {
+                        break;
+                    }
+
+                    i = Math.floor((range[0] + range[1]) / 2);
+                    box = boxes[i];
+                    if (pushUnique(forDeletion, i)) {
+                        total -= box.size;
+                    }
+
+                    if (range[0] < i) {
+                        ranges.push([range[0], i - 1]);
+                    }
+                    if (i < range[1]) {
+                        ranges.push([i + 1, range[1]]);
+                    }
+                }
+            } else {
+                i = boxesLength - 1;
+                while (total > reducedLen && i >= 0) {
+                    box = boxes[i];
+                    if (pushUnique(forDeletion, i)) {
+                        total -= box.size;
+                    }
+                    i--;
+                }
             }
-            restBoxes = boxes.splice(i - 1, boxes.length);
+
+            // Clean out the boxes marked for deletion
+            forDeletion
+                .sort((a: number, b: number): number => b - a)
+                .forEach((i): number =>
+                    push.apply(restBoxes, boxes.splice(i, 1))
+                );
         }
 
         // Order by target
@@ -125,7 +164,7 @@ namespace RendererUtilities {
         boxes = boxes.map((box): (T&BoxObject) => ({
             size: box.size,
             targets: [box.target],
-            align: pick(box.align, 0.5)
+            align: (box.align ?? 0.5)
         } as (T&BoxObject)));
 
         while (overlapping) {
@@ -148,7 +187,8 @@ namespace RendererUtilities {
             overlapping = false;
             while (i--) {
                 // Overlap
-                if (i > 0 &&
+                if (
+                    i > 0 &&
                     (boxes[i - 1].pos as any) + boxes[i - 1].size >
                     (boxes[i].pos as any)
                 ) {
@@ -170,8 +210,7 @@ namespace RendererUtilities {
         }
 
         // Add the rest (hidden boxes)
-        origBoxes.push.apply(origBoxes, restBoxes as DistributedBoxArray<T>);
-
+        push.apply(origBoxes, restBoxes as DistributedBoxArray<T>);
 
         // Now the composite boxes are placed, we need to put the original boxes
         // within them
@@ -185,7 +224,7 @@ namespace RendererUtilities {
 
                 // If the distance between the position and the target exceeds
                 // maxDistance, abort the loop and decrease the length in
-                // increments of 10% to recursively reduce the  number of
+                // increments of 10% to recursively reduce the number of
                 // visible boxes by rank. Once all boxes are within the
                 // maxDistance, we're good.
                 if (
@@ -232,4 +271,5 @@ namespace RendererUtilities {
  *
  * */
 
+/** @internal */
 export default RendererUtilities;

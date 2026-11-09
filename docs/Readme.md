@@ -5,9 +5,9 @@ In this folder of the Highcharts repository we will gradually add Highcharts doc
 Topics
 ------
 
-*   [Installation](getting-started/installation.md)
-*   [Your first chart](getting-started/your-first-chart.md)
-*   [FAQs](getting-started/frequently-asked-questions.md)
+*   [Installation](https://www.highcharts.com/docs/getting-started/installation.md)
+*   [Your first chart](https://www.highcharts.com/docs/getting-started/your-first-chart.md)
+*   [FAQs](https://www.highcharts.com/docs/getting-started/frequently-asked-questions.md)
 
 Demo
 ----
@@ -22,7 +22,7 @@ For live examples see our demo pages:
 API
 ---
 
-For more specific information on Highcharts options and functions, visit our API sites which also include several live and customizeable examples.
+For more specific information on Highcharts options and functions, visit our API sites which also include several live and customizable examples.
 
 *   [Highcharts API reference](https://api.highcharts.com/highcharts)
 *   [Highcharts Stock API reference](https://api.highcharts.com/highstock)

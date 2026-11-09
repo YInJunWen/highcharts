@@ -44,8 +44,8 @@
                 target: points[15].series.group.element
             });
 
-            // I know, checking path is a bit risky,
-            // but at this moment, there's no visibility on the halo, only path change
+            // I know, checking path is a bit risky, but at this moment, there's
+            // no visibility on the halo, only path change
             assert.strictEqual(
                 chart.series[0].halo.d !== 'M 0 0',
                 true,
@@ -113,8 +113,7 @@ QUnit.test(
 );
 
 QUnit.test(
-    'Click event was called for a wrong series (#5622)',
-    function (assert) {
+    'Click event was called for a wrong series (#5622)', assert => {
         var $container = $('#container'),
             chart = $container
                 .highcharts({
@@ -212,8 +211,8 @@ QUnit.test(
     }
 );
 
-QUnit.test('Shared tooltip with pointPlacement and stickOnContact', function (assert) {
-    var chart = Highcharts.chart('container', {
+QUnit.test('Shared tooltip with pointPlacement and stickOnContact', assert => {
+    const chart = Highcharts.chart('container', {
         chart: {
             type: 'column'
         },
@@ -223,7 +222,7 @@ QUnit.test('Shared tooltip with pointPlacement and stickOnContact', function (as
             stickOnContact: true
         },
         plotOptions: {
-            column: {
+            series: {
                 stacking: 'normal',
                 kdNow: true
             }
@@ -256,8 +255,8 @@ QUnit.test('Shared tooltip with pointPlacement and stickOnContact', function (as
         ]
     });
 
-    var point = chart.series[0].points[0],
-        offset = Highcharts.offset(chart.container);
+    const offset = Highcharts.offset(chart.container),
+        point = chart.series[0].points[0];
 
     // Set hoverPoint
     point.onMouseOver();
@@ -269,14 +268,51 @@ QUnit.test('Shared tooltip with pointPlacement and stickOnContact', function (as
         target: chart.container
     });
 
-    assert.strictEqual(chart.hoverPoints.length, 5, '#5832: All series present');
+    assert.strictEqual(
+        chart.hoverPoints.length, 5, '#5832: All series ' +
+        'present'
+    );
 
     const heightBefore = chart.tooltip.tracker.attr('height');
     chart.series[1].points[0].onMouseOver();
     assert.strictEqual(
         chart.tooltip.tracker.attr('height'),
         heightBefore,
-        '#15843: Tracker height should be the same after hovering another point in the same stack'
+        '#15843: Tracker height should be the same after hovering another ' +
+        'point in the same stack'
+    );
+
+    // remove all series
+    while (chart.series.length) {
+        chart.series[0].remove(false);
+    }
+
+    chart.addSeries({
+        data: [4, 4]
+    }, false);
+    chart.addSeries({
+        data: [5, 15]
+    }, false);
+    chart.update({
+        chart: {
+            type: 'bar'
+        },
+        yAxis: {
+            reversedStacks: false
+        }
+    });
+
+    chart.series[0].points[0].onMouseOver();
+
+    const predictedTooltipX = chart.series[1].points[0].tooltipPos[0] +
+        chart.plotLeft + chart.tooltip.distance;
+
+    assert.close(
+        predictedTooltipX,
+        chart.tooltip.getLabel().x,
+        1,
+        `#17948: Tooltip should be displayed at the end of the bar,
+            when reversedStacks is set to false.`
     );
 });
 
@@ -288,7 +324,7 @@ QUnit.test('Shared tooltip with multiple axes', assert => {
             data: [2, 6, 4],
             type: 'column'
         }, {
-            data: [4, 7, 9],
+            data: [4, 7, 9, 1],
             type: 'column',
             yAxis: 1
         }],
@@ -306,12 +342,38 @@ QUnit.test('Shared tooltip with multiple axes', assert => {
     });
 
     const controller = new TestController(chart);
-    const point = chart.series[2].points[0];
+    let point = chart.series[2].points[0];
     const axis = chart.yAxis[1];
 
     controller.moveTo(axis.left + point.plotX, axis.top + point.plotY + 5);
     assert.notOk(
         chart.tooltip.isHidden,
         '#16004: Tooltip should be visible'
+    );
+
+    // Move to a single point
+    point = chart.series[2].points[3];
+    controller.moveTo(axis.left + point.plotX, axis.top + point.plotY + 5);
+
+    assert.ok(
+        !!chart.tooltip.label.anchorX,
+        'Tooltip should have anchorX for a single point'
+    );
+    assert.ok(
+        !!chart.tooltip.label.anchorY,
+        'Tooltip should have anchorY for a single point'
+    );
+
+    // Move from a single point to multiple points
+    point = chart.series[2].points[2];
+    controller.moveTo(axis.left + point.plotX, axis.top + point.plotY + 5);
+
+    assert.ok(
+        !chart.tooltip.label.anchorX,
+        'Tooltip should NOT have anchorX for multiple points'
+    );
+    assert.ok(
+        !chart.tooltip.label.anchorY,
+        'Tooltip should NOT have anchorY for multiple points'
     );
 });

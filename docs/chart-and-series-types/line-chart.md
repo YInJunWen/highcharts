@@ -1,9 +1,16 @@
+---
+description: >-
+  Plot data points connected by straight segments, explore the series
+  options, and use step interpolation to hold values between points. The
+  article includes a sample and the setting that enables steps.
+---
+
 Line chart
 ==========
 
 The line chart is represented by a series of datapoints connected with a straight line. Line charts are most often used to visualize data that changes over time.
 
-<iframe style="width: 100%; height: 470px; border: none;" src="https://www.highcharts.com/samples/embed/highcharts/demo/line-basic" allow="fullscreen"></iframe>
+<iframe style="width: 100%; height: 470px; border: none;" src="https://www.highcharts.com/samples/embed/highcharts/demo/line-chart" allow="fullscreen"></iframe>
 
 Line chart features
 ===================
@@ -23,9 +30,10 @@ Allows the use of steps instead of a straight line.
 
 Code to enable step:
 
-    
-    plotOptions: {
-        series: {
-            step: 'left' // or 'center' or 'right'
-        }
+```js
+plotOptions: {
+    series: {
+        step: 'left' // or 'center' or 'right'
     }
+}
+```

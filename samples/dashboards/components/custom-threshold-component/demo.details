@@ -1,0 +1,6 @@
+---
+ name: Highcharts Dashboards demo
+ authors:
+   - Dawid Draguła
+ js_wrap: b
+...

@@ -1,3 +1,10 @@
+---
+description: >-
+  Keep charts updated from a server using Data module polling or custom API
+  calls. Follow a fetch-based example that requests data repeatedly, adds
+  points, and removes older points from view.
+---
+
 Live data
 =========
 
@@ -10,7 +17,7 @@ There are basically two ways of working with a live data feed from the server in
 
 This feature was introduced in v6.1. The [data module](https://www.highcharts.com/docs/working-with-data/data-module) can load data directly from files and services online, and keep the chart updated by polling the server periodically. The chart can load data through one of the [data.csv](https://api.highcharts.com/highcharts/data.csv), [data.rows](https://api.highcharts.com/highcharts/data.rows), [data.columns](https://api.highcharts.com/highcharts/data.columns) or [data.googleSpreadsheetKey](https://api.highcharts.com/highcharts/data.googleSpreadsheetKey) options, and keep it updated by setting [data.enablePolling](https://api.highcharts.com/highcharts/data.enablePolling) to true. This feature also supports flexibility to the data structure. Data points can be shifted, typically old data points removed and new ones added, and the chart will animate to visualize what changed. A benefit of using this feature is that it is purely declarative, which makes it a good match for graphical user interfaces where chart editors set up a chart based on known sources.
 
-<iframe style="width: 100%; height: 650px; border: none;" src=https://www.highcharts.com/samples/highcharts/data/livedata-columns/ allow="fullscreen"></iframe>
+<iframe style="width: 100%; height: 650px; border: none;" src="https://www.highcharts.com/samples/embed/highcharts/demo/livedata-columns" allow="fullscreen"></iframe>
 
 
 ## API methods
@@ -22,7 +29,7 @@ This example shows how to run a live chart with data retrieved from the server e
 ### Set up the server
 In this case, we have a simple [Express](https://expressjs.com/) server that runs the following function every second, before serving it to [time-rows.json](https://demo-live-data.highcharts.com/time-rows.json):
 
-```javascript
+```js
 generate: (state, counter) => {
   state.rows = state.rows || [];
   state.rows.push([startDate.toISOString(), Math.random() * 10]);
@@ -32,7 +39,7 @@ generate: (state, counter) => {
 ```
 
 ### Define the chart variable globally
-We do this because we want to access the variable both from the document ready function and our requestData funcion. If the chart variable is defined inside the document ready callback function, it will not be available in the global scope later.
+We do this because we want to access the variable both from the document ready function and our requestData function. If the chart variable is defined inside the document ready callback function, it will not be available in the global scope later.
 
 ```js
 let chart; // global
@@ -41,7 +48,7 @@ let chart; // global
 ### Set up a data request function
 Here we use the [Fetch API](https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API/Using_Fetch) to retrieve the data from the server. After successfully receiving  the data, the point is added to the chart's first series using the [addPoint method](https://api.highcharts.com/class-reference/Highcharts.Series#addPoint). If the series length is greater than 20, we shift off the first point so that the series will move to the left rather than just cram the points tighter.
 
-```javascript
+```js
 /**
 * Request data from the server, add it to the graph and set a timeout to request again
 */
@@ -72,7 +79,7 @@ window.addEventListener('load', function () {
   chart = new Highcharts.Chart({
     chart: {
       renderTo: 'container',
-      defaultSeriesType: 'spline',
+      type: 'spline',
       events: {
         load: requestData
       }

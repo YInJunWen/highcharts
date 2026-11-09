@@ -1,0 +1,109 @@
+/* *
+ *
+ *  (c) 2010-2026 Highsoft AS
+ *  Author: Askel Eirik Johansson, Piotr Madej
+ *
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
+ *
+ *
+ * */
+
+'use strict';
+
+/* *
+ *
+ *  Imports
+ *
+ * */
+
+import type { FlowMapPointOptions } from './FlowMapPointOptions';
+import type { FlowMapSeries } from './FlowMapSeries';
+import type { MapLonLatObject } from '../../Maps/GeoJSON';
+import type { PositionObject } from '../../Core/Renderer/PositionObject';
+import type { ColorMapComposition } from '../ColorMapComposition.js';
+
+import MapLineSeries from '../MapLine/MapLineSeries.js';
+import { LonLatArray } from '../../Maps/MapViewOptions';
+import { isNumber, isString } from '../../Shared/Utilities.js';
+
+/* *
+ *
+ *  Constants
+ *
+ * */
+
+const MapLinePoint = MapLineSeries.prototype.pointClass;
+
+/* *
+ *
+ *  Class
+ *
+ * */
+
+class FlowMapPoint extends MapLinePoint {
+
+    /* *
+     *
+     *  Properties
+     *
+     * */
+
+    /** @internal */
+    public fromPos?: PositionObject;
+
+    /** @internal */
+    public toPos?: PositionObject;
+
+    public options!: FlowMapPointOptions;
+
+    /** @internal */
+    public series!: FlowMapSeries;
+
+    /* *
+     *
+     *  Functions
+     *
+     * */
+
+    /** @internal */
+    isValid(): boolean {
+        let valid = !!(this.options.to && this.options.from);
+        [this.options.to, this.options.from]
+            .forEach(function (toOrFrom): void {
+                valid = !!(valid && (toOrFrom && (
+                    isString(toOrFrom) || ( // Point id or has lat/lon coords
+                        isNumber(
+                            (toOrFrom as LonLatArray)[0] ??
+                            (toOrFrom as MapLonLatObject).lat
+                        ) &&
+                        isNumber(
+                            (toOrFrom as LonLatArray)[1] ??
+                            (toOrFrom as MapLonLatObject).lon
+                        )
+                    )
+                )));
+            });
+        return valid;
+    }
+}
+
+/* *
+ *
+ *  Class Prototype
+ *
+ * */
+
+interface FlowMapPoint {
+    /** @internal */
+    isValid: ColorMapComposition.PointComposition['isValid'];
+}
+
+/* *
+ *
+ *  Default Export
+ *
+ * */
+
+export default FlowMapPoint;

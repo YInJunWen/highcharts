@@ -101,7 +101,7 @@ QUnit.test('Test PSAR calculations on data updates.', function (assert) {
     });
 
     assert.deepEqual(
-        chart.series[1].yData,
+        chart.series[1].getColumn('y'),
         [
             9.35,
             9.35,
@@ -161,7 +161,7 @@ QUnit.test('Test PSAR calculations on data updates.', function (assert) {
     chart.series[0].points[chart.series[0].points.length - 1].remove();
 
     assert.deepEqual(
-        chart.series[1].yData,
+        chart.series[1].getColumn('y'),
         [
             9.35,
             9.35,
@@ -212,7 +212,7 @@ QUnit.test('Test PSAR calculations on data updates.', function (assert) {
         'Correct values after point.remove()'
     );
 
-    Highcharts.seriesTypes.psar.prototype.getValues(
+    Highcharts.Series.types.psar.prototype.getValues(
         {
             xData: [0, 1, 2, 3, 4, 5],
             yData: [
@@ -230,7 +230,7 @@ QUnit.test('Test PSAR calculations on data updates.', function (assert) {
     );
     assert.ok(true, 'No errors when data contains multiple null points.');
 
-    Highcharts.seriesTypes.psar.prototype.getValues(
+    Highcharts.Series.types.psar.prototype.getValues(
         {
             xData: [0],
             yData: [1]

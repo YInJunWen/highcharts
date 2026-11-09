@@ -1,9 +1,12 @@
-var names = ['Alexander', 'Marie', 'Maximilian', 'Sophia', 'Lukas', 'Maria', 'Leon', 'Anna', 'Tim', 'Laura'];
+const names = [
+    'Alexander', 'Marie', 'Maximilian', 'Sophia', 'Lukas', 'Maria', 'Leon',
+    'Anna', 'Tim', 'Laura'
+];
 
 function getRandomData(row) {
-    var data = [];
+    const data = [];
 
-    for (var i = 0; i < 10; i++) {
+    for (let i = 0; i < 10; i++) {
         if (!row) {
             data.push([names[i], row, Math.random() * 30 + 10]);
         } else {
@@ -13,7 +16,7 @@ function getRandomData(row) {
     return data;
 }
 
-var chart = Highcharts.chart('container', {
+const chart = Highcharts.chart('container', {
 
     chart: {
         type: 'heatmap',
@@ -64,13 +67,10 @@ var chart = Highcharts.chart('container', {
 
     plotOptions: {
         series: {
-            keys: ['y', 'value'],
             dataLabels: {
                 enabled: true,
                 color: '#000000',
-                formatter: function () {
-                    return Highcharts.numberFormat(this.point.value, 1);
-                }
+                format: '{value:.1f}'
             }
         }
     },
@@ -88,16 +88,19 @@ var chart = Highcharts.chart('container', {
         borderWidth: 1,
         linkedTo: 'mainSeries',
         data: getRandomData(1),
+        keys: ['y', 'value'],
         colorAxis: 1
     }, {
         borderWidth: 1,
         linkedTo: 'mainSeries',
         data: getRandomData(2),
+        keys: ['y', 'value'],
         colorAxis: 2
     }, {
         borderWidth: 1,
         linkedTo: 'mainSeries',
         data: getRandomData(3),
+        keys: ['y', 'value'],
         colorAxis: 3
     }]
 

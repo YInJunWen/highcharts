@@ -1,10 +1,12 @@
 /* *
  *
- *  (c) 2010-2021 Torstein Honsi
+ *  (c) 2010-2026 Highsoft AS
+ *  Author: Torstein Hønsi
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -16,7 +18,8 @@
  *
  * */
 
-import type FormatUtilities from '../../FormatUtilities';
+import type Chart from '../../Chart/Chart';
+import type { DeepPartial } from '../../../Shared/Types';
 import type {
     PlotBandLabelOptions,
     PlotBandOptions
@@ -30,20 +33,19 @@ import type SVGElement from '../../Renderer/SVG/SVGElement';
 import type SVGPath from '../../Renderer/SVG/SVGPath';
 
 import Axis from '../Axis.js';
-import { Palette } from '../../Color/Palettes.js';
 import PlotLineOrBandAxis from './PlotLineOrBandAxis.js';
-import U from '../../Utilities.js';
-const {
+import {
+    addEvent,
     arrayMax,
     arrayMin,
+    clamp,
     defined,
     destroyObjectProperties,
     erase,
     fireEvent,
     merge,
-    objectEach,
-    pick
-} = U;
+    objectEach
+} from '../../../Shared/Utilities.js';
 
 /* *
  *
@@ -71,9 +73,45 @@ class PlotLineOrBand {
      *
      * */
 
+    /**
+     * Composes `PlotLineOrBand` with `Axis` and `Chart`.
+     *
+     * @param {Highcharts.Chart} ChartClass
+     * Chart class to compose.
+     *
+     * @param {Highcharts.Axis} AxisClass
+     * Axis class to compose.
+     *
+     * @internal
+     */
     public static compose<T extends typeof Axis>(
+        ChartClass: Chart,
         AxisClass: T
-    ): ReturnType<typeof PlotLineOrBandAxis.compose> {
+    ): (T&typeof PlotLineOrBandAxis.Composition) {
+
+        addEvent(ChartClass, 'afterInit', function (): void {
+            this.labelCollectors.push((): SVGElement[] => {
+                const labels: SVGElement[] = [];
+
+                for (const axis of this.axes) {
+                    for (const coll of ['plotBands', 'plotLines'] as const) {
+                        for (const { label, options } of axis[coll]) {
+                            if (
+                                label && !(
+                                    options as PlotBandOptions
+                                )?.label?.allowOverlap
+                            ) {
+                                labels.push(label);
+                            }
+                        }
+                    }
+                }
+
+                return labels;
+            });
+        });
+
+
         return PlotLineOrBandAxis.compose(PlotLineOrBand, AxisClass);
     }
 
@@ -85,13 +123,26 @@ class PlotLineOrBand {
 
     public constructor(
         axis: PlotLineOrBandAxis.Composition,
-        options?: (PlotBandOptions|PlotLineOptions)
+        options: (PlotBandOptions|PlotLineOptions),
+        coll: 'plotLines'|'plotBands'
     ) {
+        /**
+         * Related axis.
+         *
+         * @name Highcharts.PlotLineOrBand#axis
+         * @type {Highcharts.Axis}
+         */
         this.axis = axis;
-        if (options) {
-            this.options = options;
-            this.id = options.id;
-        }
+        /**
+         * Options of the plot line or band.
+         *
+         * @name Highcharts.PlotLineOrBand#options
+         * @type {AxisPlotBandsOptions|AxisPlotLinesOptions}
+         */
+        this.options = options;
+        this.id = options.id;
+
+        this.coll = coll;
     }
 
     /* *
@@ -100,12 +151,40 @@ class PlotLineOrBand {
      *
      * */
 
+    /**
+     * Related axis.
+     *
+     * @name Highcharts.PlotLineOrBand#axis
+     * @type {Highcharts.Axis}
+     */
     public axis: PlotLineOrBandAxis.Composition;
+    public coll: 'plotLines'|'plotBands';
+    /**
+     * The id of the plot line or plot band.
+     *
+     * @name Highcharts.PlotLineOrBand#id
+     * @type {string}
+     */
     public id?: string;
+
+    /** @internal */
     public isActive?: boolean;
-    public eventsAdded?: boolean;
     public label?: SVGElement;
-    public options?: (PlotBandOptions|PlotLineOptions);
+
+    /**
+     * Options of the plot line or band.
+     *
+     * @name Highcharts.PlotLineOrBand#options
+     * @type {AxisPlotBandsOptions|AxisPlotLinesOptions}
+     */
+    public options: (PlotBandOptions|PlotLineOptions);
+
+    /**
+     * SVG element of the plot line or band.
+     *
+     * @name Highcharts.PlotLineOrBand#svgElem
+     * @type {Highcharts.SVGElement}
+     */
     public svgElem?: SVGElement;
 
     /* *
@@ -119,171 +198,183 @@ class PlotLineOrBand {
     /**
      * Render the plot line or plot band. If it is already existing,
      * move it.
-     * @private
+     * @internal
      * @function Highcharts.PlotLineOrBand#render
      */
-    public render(): (PlotLineOrBand|undefined) {
+    public render(): (PlotLineOrBand) {
         fireEvent(this, 'render');
 
-        const plotLine = this,
-            axis = plotLine.axis,
-            horiz = axis.horiz,
-            log = axis.logarithmic,
-            options = plotLine.options as (PlotBandOptions|PlotLineOptions),
-            color = options.color,
-            zIndex = pick(options.zIndex, 0),
-            events = options.events,
-            groupAttribs: SVGAttributes = {},
-            renderer = axis.chart.renderer;
+        const { axis, options } = this,
+            { chart, horiz, logarithmic } = axis,
+            { color, events, zIndex = 0 } = options,
+            { renderer, styledMode, time } = axis.chart,
+
+            // These properties only exist on either band or line
+            to = time.parse((options as PlotBandOptions).to),
+            from = time.parse((options as PlotBandOptions).from),
+            value = time.parse((options as PlotLineOptions).value),
+            borderWidth = (options as PlotBandOptions).borderWidth;
 
         let optionsLabel = options.label,
-            label = plotLine.label,
-            to = (options as any).to,
-            from = (options as any).from,
-            value = (options as any).value,
-            svgElem = plotLine.svgElem,
-            path = [] as SVGPath,
+            { label, svgElem } = this,
             group;
 
-        const isBand = defined(from) && defined(to),
-            isLine = defined(value),
+        const isBand = this.coll === 'plotBands',
+            shortKey = isBand ? 'band' : 'line',
+            groupName = `${shortKey}s-${zIndex}`,
             isNew = !svgElem,
             attribs: SVGAttributes = {
-                'class': 'highcharts-plot-' + (isBand ? 'band ' : 'line ') +
-                    (options.className || '')
-            };
+                'class': `highcharts-plot-${shortKey} ${options.className || ''}`
+            },
+            strokeWidth = isBand ?
+                (borderWidth || 0) :
+                ((options as PlotLineOptions).width ?? 1);
 
-        let groupName = isBand ? 'bands' : 'lines';
-
-        // logarithmic conversion
-        if (log) {
-            from = log.log2lin(from);
-            to = log.log2lin(to);
-            value = log.log2lin(value);
-        }
-
-        // Set the presentational attributes
-        if (!axis.chart.styledMode) {
-            if (isLine) {
-                attribs.stroke = color || Palette.neutralColor40;
-                attribs['stroke-width'] = pick(
-                    (options as PlotLineOptions).width,
-                    1
-                );
-                if ((options as PlotLineOptions).dashStyle) {
-                    attribs.dashstyle =
-                        (options as PlotLineOptions).dashStyle;
-                }
-
-            } else if (isBand) { // plot band
-                attribs.fill = color || Palette.highlightColor10;
-                if ((options as PlotBandOptions).borderWidth) {
-                    attribs.stroke = (
-                        options as PlotBandOptions
-                    ).borderColor;
-                    attribs['stroke-width'] = (
-                        options as PlotBandOptions
-                    ).borderWidth;
-                }
-            }
+        // Set the stroke width before the path is calculated
+        if (!styledMode) {
+            attribs['stroke-width'] = strokeWidth;
         }
 
         // Grouping and zIndex
-        groupAttribs.zIndex = zIndex;
-        groupName += '-' + zIndex;
-
         group = axis.plotLinesAndBandsGroups[groupName];
         if (!group) {
             axis.plotLinesAndBandsGroups[groupName] = group =
                 renderer.g('plot-' + groupName)
-                    .attr(groupAttribs).add();
+                    .clip(chart.plotClipOuter)
+                    .attr({ zIndex }).add();
         }
+        group[isNew ? 'attr' : 'animate']({ opacity: +axis.visible });
 
         // Create the path
-        if (isNew) {
+        if (!svgElem) {
             /**
              * SVG element of the plot line or band.
              *
-             * @name Highcharts.PlotLineOrBand#svgElement
+             * @name Highcharts.PlotLineOrBand#svgElem
              * @type {Highcharts.SVGElement}
              */
-            plotLine.svgElem = svgElem = renderer
+            this.svgElem = svgElem = renderer
                 .path()
-                .attr(attribs)
-                .add(group);
+                .attr(attribs);
         }
 
+        // Add it to the correct index while allowing dynamic z-index update
+        if (svgElem.parentGroup !== group) {
+            svgElem.add(group);
+        }
 
         // Set the path or return
-        if (isLine) {
+        let path: SVGPath | undefined;
+        if (!isBand && defined(value)) { // Plot line
             path = axis.getPlotLinePath({
-                value: value,
-                lineWidth: (svgElem as any).strokeWidth(),
+                value: logarithmic?.log2lin(value) ?? value,
+                lineWidth: svgElem.strokeWidth(),
                 acrossPanes: options.acrossPanes
-            }) as any;
-        } else if (isBand) { // plot band
-            path = axis.getPlotBandPath(from, to, options);
-        } else {
-            return;
-        }
-
-
-        // common for lines and bands
-        // Add events only if they were not added before.
-        if (!plotLine.eventsAdded && events) {
-            objectEach(events, function (event, eventType): void {
-                (svgElem as any).on(eventType, function (e: any): void {
-                    events[eventType].apply(plotLine, [e]);
-                });
             });
-            plotLine.eventsAdded = true;
+        } else if (isBand && defined(from) && defined(to)) { // Plot band
+            path = axis.getPlotBandPath(
+                logarithmic?.log2lin(from) ?? from,
+                logarithmic?.log2lin(to) ?? to,
+                options
+            );
+
+            // The band isn't fitted to the axis, so clip the ones that extend
+            // outside it. Only along the axis, to leave `acrossPanes` bands and
+            // the navigator alone (#6257).
+            let clip = axis.plotBandClip;
+            if (path.isOverflowing || clip) {
+                const { len, pos } = axis,
+                    // Left wide open across the axis, so that a scrollable plot
+                    // area isn't cut off
+                    clipBox = horiz ?
+                        { height: 1e5, width: len, x: pos, y: 0 } :
+                        { height: len, width: 1e5, x: 0, y: pos };
+
+                clip ||= axis.plotBandClip = renderer.clipRect(clipBox);
+                clip.attr(clipBox);
+                svgElem.clip(clip);
+            }
         }
-        if ((isNew || !(svgElem as any).d) && path && path.length) {
-            (svgElem as any).attr({ d: path });
-        } else if (svgElem) {
-            if (path) {
-                svgElem.show();
-                svgElem.animate({ d: path });
-            } else if (svgElem.d) {
-                svgElem.hide();
-                if (label) {
-                    plotLine.label = label = label.destroy();
+
+        if (path) {
+            attribs.d = path;
+        }
+
+        // Apply the styling
+        if (!styledMode) {
+            if (isBand) { // Plot band
+                attribs.fill = color || 'var(--highcharts-highlight-color-10)';
+                if (borderWidth) {
+                    attribs.stroke = (options as PlotBandOptions).borderColor;
+                }
+            } else {
+                attribs.stroke = color || 'var(--highcharts-neutral-color-40)';
+                if ((options as PlotLineOptions).dashStyle) {
+                    attribs.dashstyle = (options as PlotLineOptions).dashStyle;
                 }
             }
         }
 
-        // the plot band/line label
+        // Common for lines and bands. Add events only if they were not added
+        // before.
+        if (isNew && events) {
+            objectEach(events, (_event, eventType): void => {
+                svgElem?.on(
+                    eventType,
+                    (e: any): void => {
+                        events[eventType].apply(this, [e, this]);
+                    }
+                );
+            });
+        }
+
+        if ((isNew || !svgElem.d) && path?.length) {
+            svgElem.attr(attribs);
+        } else if (svgElem) {
+            if (path) {
+                svgElem.show();
+                svgElem.animate(attribs);
+            } else if (svgElem.d) {
+                svgElem.hide();
+                if (label) {
+                    this.label = label = label.destroy();
+                }
+            }
+        }
+
+        // The plot band/line label
         if (
             optionsLabel &&
             (defined(optionsLabel.text) || defined(optionsLabel.formatter)) &&
-            path &&
-            path.length &&
+            path?.length &&
             axis.width > 0 &&
             axis.height > 0 &&
-            !(path as any).isFlat
+            !path.isFlat
         ) {
-            // apply defaults
+            // Apply defaults
             optionsLabel = merge({
-                align: horiz && isBand && 'center',
+                align: horiz && isBand ? 'center' : void 0,
                 x: horiz ? !isBand && 4 : 10,
-                verticalAlign: !horiz && isBand && 'middle',
+                verticalAlign: !horiz && isBand ? 'middle' : void 0,
                 y: horiz ? isBand ? 16 : 10 : isBand ? 6 : -4,
-                rotation: horiz && !isBand && 90
+                rotation: horiz && !isBand ? 90 : 0,
+                ...(isBand ? { inside: true } : {})
             } as PlotLineLabelOptions, optionsLabel);
 
             this.renderLabel(optionsLabel, path, isBand, zIndex);
 
-        } else if (label) { // move out of sight
+        // Move out of sight
+        } else if (label) {
             label.hide();
         }
 
-        // chainable
-        return plotLine as any;
+        // Chainable
+        return this;
     }
 
     /**
      * Render and align label for plot line or band.
-     * @private
+     * @internal
      * @function Highcharts.PlotLineOrBand#renderLabel
      */
     public renderLabel(
@@ -294,11 +385,13 @@ class PlotLineOrBand {
     ): void {
         const plotLine = this,
             axis = plotLine.axis,
-            renderer = axis.chart.renderer;
+            chart = axis.chart,
+            renderer = chart.renderer,
+            inside = (optionsLabel as PlotBandLabelOptions).inside;
 
         let label = plotLine.label;
 
-        // add the SVG element
+        // Add the SVG element
         if (!label) {
             /**
              * SVG element of the label.
@@ -307,84 +400,155 @@ class PlotLineOrBand {
              * @type {Highcharts.SVGElement}
              */
             plotLine.label = label = renderer
-                .text(
-                    this.getLabelText(optionsLabel),
-                    0,
-                    0,
-                    optionsLabel.useHTML
-                )
-                .attr({
-                    align: optionsLabel.textAlign || optionsLabel.align,
-                    rotation: optionsLabel.rotation,
-                    'class': 'highcharts-plot-' + (isBand ? 'band' : 'line') +
-                        '-label ' + ((optionsLabel as any).className || ''),
-                    zIndex
-                })
-                .add();
-
-            if (!axis.chart.styledMode) {
-                label.css(merge({
-                    textOverflow: 'ellipsis'
-                }, optionsLabel.style));
-            }
+                .text('', 0, 0, optionsLabel.useHTML)
+                .attr({ zIndex });
         }
 
-        // get the bounding box and align the label
-        // #3000 changed to better handle choice between plotband or plotline
-        const xBounds = (path as any).xBounds ||
-            [path[0][1], path[1][1], (isBand ? path[2][1] : path[0][1])];
-        const yBounds = (path as any).yBounds ||
-            [path[0][2], path[1][2], (isBand ? path[2][2] : path[0][2])];
+        label
+            .attr({
+                text: this.getLabelText(optionsLabel),
+                align: optionsLabel.textAlign || optionsLabel.align,
+                'class': 'highcharts-plot-' + (isBand ? 'band' : 'line') +
+                    '-label ' + (optionsLabel.className || '')
+            })[label.placed ? 'animate' : 'attr']({
+                opacity: 1,
+                rotation: optionsLabel.rotation
+            });
 
-        const x = arrayMin(xBounds);
-        const y = arrayMin(yBounds);
+        if (!chart.styledMode) {
+            label.css(merge({
+                // To allow theming, and in lack of a general place to set
+                // default options for plot lines and bands, default to the
+                // title color. If we expose the palette, we should use that
+                // instead.
+                color: chart.options.title?.style?.color,
+                fontSize: '0.8em',
+                textOverflow: (isBand && !inside) ? '' : 'ellipsis'
+            }, optionsLabel.style));
+        }
+
+        if (!label.added) {
+            label.add();
+        }
+
+        // Get the bounding box and align the label
+        // #3000 changed to better handle choice between plotband or plotline
+        const { horiz, len, pos } = axis,
+            xBounds = path.xBounds ||
+                [path[0][1], path[1][1], (isBand ? path[2][1] : path[0][1])],
+            yBounds = path.yBounds ||
+                [path[0][2], path[1][2], (isBand ? path[2][2] : path[0][2])],
+            bounds = horiz ? xBounds : yBounds;
+
+        let low = arrayMin(bounds),
+            high = arrayMax(bounds);
+
+        // A clipped band is only partly visible, so align the label within the
+        // visible part (#6257)
+        if (path.isOverflowing) {
+            low = clamp(low, pos, pos + len);
+            high = clamp(high, pos, pos + len);
+        }
+
+        const x = horiz ? low : arrayMin(xBounds),
+            y = horiz ? arrayMin(yBounds) : low,
+            bBoxWidth = horiz ? high - low : arrayMax(xBounds) - x;
 
         label.align(optionsLabel, false, {
             x,
             y,
-            width: arrayMax(xBounds) - x,
-            height: arrayMax(yBounds) - y
+            width: bBoxWidth,
+            height: horiz ? arrayMax(yBounds) - y : high - low
         });
 
-        if (!label.alignValue || label.alignValue === 'left') {
+        label.alignAttr.y -= renderer.fontMetrics(label).b;
+
+        if (
+            !label.alignValue ||
+            label.alignValue === 'left' ||
+            defined(inside)
+        ) {
             label.css({
                 width: (
-                    label.rotation === 90 ?
-                        axis.height - (label.alignAttr.y - axis.top) :
-                        axis.width - (label.alignAttr.x - axis.left)
+                    optionsLabel.style?.width || (
+                        (
+                            !isBand ||
+                            !inside
+                        ) ? (
+                                label.rotation === 90 ?
+                                    axis.height - (
+                                        label.alignAttr.y -
+                                        axis.top
+                                    ) : (
+                                        optionsLabel.clip ?
+                                            (axis.width + axis.left) :
+                                            chart.chartWidth
+                                    ) - label.alignAttr.x
+                            ) :
+                            bBoxWidth
+                    )
                 ) + 'px'
             });
+        } else if (label.textWidth) {
+            label.css({ width: 'auto' });
         }
 
         label.show(true);
     }
 
     /**
+     * Update the plot line or band with new options.
+     *
+     * @param {Highcharts.AxisPlotLinesOptions|Highcharts.AxisPlotBandsOptions} options
+     *        The new options to apply
+     * @param {boolean} [redraw=true]
+     *        Whether to redraw the plot guide immediately
+     *
+     * @function Highcharts.PlotLineOrBand#update
+     */
+    public update(
+        options: DeepPartial<PlotBandOptions|PlotLineOptions>,
+        redraw = true
+    ): void {
+        merge(true, this.options, options);
+        if (redraw) {
+            this.render();
+        }
+    }
+
+    /**
      * Get label's text content.
-     * @private
+     * @internal
      * @function Highcharts.PlotLineOrBand#getLabelText
      */
     public getLabelText(
         optionsLabel: (PlotBandLabelOptions|PlotLineLabelOptions)
     ): string | undefined {
         return defined(optionsLabel.formatter) ?
-            (optionsLabel.formatter as
-              FormatUtilities.FormatterCallback<PlotLineOrBand>)
-                .call(this as any) :
+            optionsLabel.formatter.call(this, this) :
             optionsLabel.text;
     }
 
     /**
-     * Remove the plot line or band.
-     *
-     * @function Highcharts.PlotLineOrBand#destroy
+     * Destroy the item's elements
      */
     public destroy(): void {
-        // remove it from the lookup
-        erase(this.axis.plotLinesAndBands, this);
+        destroyObjectProperties(this, (this as Partial<this>).axis);
+    }
 
-        delete (this as Partial<this>).axis;
-        destroyObjectProperties(this);
+    /**
+     * Remove the plot line or band and destroy its elements.
+     *
+     * @function Highcharts.PlotLineOrBand#remove
+     */
+    public remove(): void {
+        // Remove it from the lookup
+        erase(this.axis[this.coll], this);
+
+        // Remove from options
+        erase(this.axis.options[this.coll] || [], this.options);
+
+        this.destroy();
     }
 
     /* eslint-enable no-invalid-this, valid-jsdoc */
@@ -397,6 +561,7 @@ class PlotLineOrBand {
  *
  * */
 
+/** @internal */
 namespace PlotLineOrBand {
 
     /* *
@@ -462,9 +627,23 @@ export default PlotLineOrBand;
  * In styled mode, the plot bands are styled by the `.highcharts-plot-band`
  * class in addition to the `className` option.
  *
+ * When doing `Chart.update()` or `Axis.update()`, the plot bands are updated
+ * by index or id. The following merging rules apply:
+ * - If `plotBands` are not defined in the new options, all existing plot bands
+ *   are kept.
+ * - If `plotBands` are defined without ids, the existing plot bands are updated
+ *   by index. If the new array has fewer plot bands, the remaining existing
+ *   plot bands are removed. If the new array has more plot bands, the extra
+ *   ones are added. An empty array removes all existing plot bands.
+ * - If `plotBands` are defined with ids, the existing plot bands are matched
+ *   by id, and remaining unmatched existing plot bands are removed.
+ *
  * @productdesc {highcharts}
  * In a gauge, a plot band on the Y axis (value axis) will stretch along the
  * perimeter of the gauge.
+ *
+ * @sample    {highcharts} highcharts/xaxis/plotbands-color/
+ *            Basic plot band
  *
  * @type      {Array<*>}
  * @product   highcharts highstock gantt
@@ -486,6 +665,17 @@ export default PlotLineOrBand;
  *
  * @type      {Highcharts.ColorString}
  * @apioption xAxis.plotBands.borderColor
+ */
+
+/**
+ * Border radius for the plot band. Applies only to gauges. Can be a pixel
+ * value or a percentage, for example `50%`.
+ *
+ * @type      {number|string|Highcharts.BorderRadiusOptionsObject}
+ * @since 11.4.2
+ * @sample    {highcharts} highcharts/xaxis/plotbands-gauge-borderradius
+ *            Angular gauge with rounded plot bands
+ * @apioption xAxis.plotBands.borderRadius
  */
 
 /**
@@ -513,8 +703,8 @@ export default PlotLineOrBand;
  * @sample {highstock} stock/xaxis/plotbands/
  *         Plot band on Y axis
  *
- * @type      {Highcharts.ColorString|Highcharts.GradientColorObject|Highcharts.PatternObject}
- * @default   ${palette.highlightColor10}
+ * @type      {Highcharts.ColorType}
+ * @default   var(--highcharts-highlight-color-10)
  * @apioption xAxis.plotBands.color
  */
 
@@ -560,6 +750,8 @@ export default PlotLineOrBand;
 /**
  * The start position of the plot band in axis units.
  *
+ * On datetime axes, the value can be given as a timestamp or a date string.
+ *
  * @sample {highcharts} highcharts/xaxis/plotbands-color/
  *         Datetime axis
  * @sample {highcharts} highcharts/xaxis/plotbands-from/
@@ -567,7 +759,7 @@ export default PlotLineOrBand;
  * @sample {highstock} stock/xaxis/plotbands/
  *         Plot band on Y axis
  *
- * @type      {number}
+ * @type      {number|string}
  * @apioption xAxis.plotBands.from
  */
 
@@ -586,6 +778,8 @@ export default PlotLineOrBand;
 /**
  * The end position of the plot band in axis units.
  *
+ * On datetime axes, the value can be given as a timestamp or a date string.
+ *
  * @sample {highcharts} highcharts/xaxis/plotbands-color/
  *         Datetime axis
  * @sample {highcharts} highcharts/xaxis/plotbands-from/
@@ -593,7 +787,7 @@ export default PlotLineOrBand;
  * @sample {highstock} stock/xaxis/plotbands/
  *         Plot band on Y axis
  *
- * @type      {number}
+ * @type      {number|string}
  * @apioption xAxis.plotBands.to
  */
 
@@ -635,6 +829,31 @@ export default PlotLineOrBand;
  * @default   center
  * @since     2.1
  * @apioption xAxis.plotBands.label.align
+ */
+
+/**
+ * Whether or not the label can be hidden if it overlaps with another label.
+ *
+ * @sample {highcharts} highcharts/xaxis/plotbands-label-allowoverlap/
+ *         A Plotband label overlapping another
+ *
+ * @type      {boolean}
+ * @default   undefined
+ * @since     11.4.8
+ * @apioption xAxis.plotBands.label.allowOverlap
+ */
+
+/**
+ * Wether or not the text of the label can exceed the width of the label.
+ *
+ * @type      {boolean}
+ * @product   highcharts highstock gantt
+ * @sample {highcharts} highcharts/xaxis/plotbands-label-textwidth/
+ *         Displaying text with text-wrapping/ellipsis, or the full text.
+ *
+ * @default   true
+ * @since     11.4.6
+ * @apioption xAxis.plotBands.label.inside
  */
 
 /**
@@ -745,12 +964,23 @@ export default PlotLineOrBand;
  * In styled mode, the plot lines are styled by the
  * `.highcharts-plot-line` class in addition to the `className` option.
  *
+ * When doing `Chart.update()` or `Axis.update()`, the plot lines are updated
+ * by index or id. The following merging rules apply:
+ * - If `plotLines` are not defined in the new options, all existing plot lines
+ *   are kept.
+ * - If `plotLines` are defined without ids, the existing plot lines are updated
+ *   by index. If the new array has fewer plot lines, the remaining existing
+ *   plot lines are removed. If the new array has more plot lines, the extra
+ *   ones are added. An empty array removes all existing plot lines.
+ * - If `plotLines` are defined with ids, the existing plot lines are matched
+ *   by id, and remaining unmatched existing plot lines are removed.
+ *
  * @type      {Array<*>}
  * @product   highcharts highstock gantt
- * @sample {highcharts} highcharts/xaxis/plotlines-color/
- *         Basic plot line
- * @sample {highcharts} highcharts/series-solidgauge/labels-auto-aligned/
- *         Solid gauge plot line
+ * @sample    {highcharts} highcharts/xaxis/plotlines-color/
+ *            Basic plot line
+ * @sample    {highcharts} highcharts/series-solidgauge/labels-auto-aligned/
+ *            Solid gauge plot line
  * @apioption xAxis.plotLines
  */
 
@@ -785,7 +1015,7 @@ export default PlotLineOrBand;
  *         Plot line on Y axis
  *
  * @type      {Highcharts.ColorString}
- * @default   ${palette.neutralColor40}
+ * @default   var(--highcharts-neutral-color-40)
  * @apioption xAxis.plotLines.color
  */
 
@@ -856,12 +1086,14 @@ export default PlotLineOrBand;
 /**
  * The position of the line in axis units.
  *
+ * On datetime axes, the value can be given as a timestamp or a date string.
+ *
  * @sample {highcharts} highcharts/xaxis/plotlines-color/
  *         Between two categories on X axis
  * @sample {highstock} stock/xaxis/plotlines/
  *         Plot line on Y axis
  *
- * @type      {number}
+ * @type      {number|string}
  * @apioption xAxis.plotLines.value
  */
 
@@ -894,7 +1126,7 @@ export default PlotLineOrBand;
  */
 
 /**
- * Text labels for the plot bands
+ * Text labels for the plot lines
  *
  * @apioption xAxis.plotLines.label
  */
@@ -915,9 +1147,29 @@ export default PlotLineOrBand;
  */
 
 /**
+ * Whether or not the label can be hidden if it overlaps with another label.
+ *
+ * @type      {boolean}
+ * @default   undefined
+ * @since     11.4.8
+ * @apioption xAxis.plotBands.label.allowOverlap
+ */
+
+/**
+ * Whether to hide labels that are outside the plot area.
+ *
+ * @type      {boolean}
+ * @default   false
+ * @since 10.3.3
+ * @apioption xAxis.plotLines.labels.clip
+ */
+
+/**
  * Callback JavaScript function to format the label. Useful properties like
  * the value of plot line or the range of plot band (`from` & `to`
- * properties) can be found in `this.options` object.
+ * properties) can be found in `this.options` object. Since v12.6.0, the
+ * callback also receives `ctx` as the first argument, so that arrow functions
+ * can access the same context as regular functions using `this`.
  *
  * @sample {highcharts} highcharts/xaxis/plotlines-plotbands-label-formatter
  *         Label formatters for plot line and plot band.
@@ -1063,17 +1315,14 @@ export default PlotLineOrBand;
  */
 
 /**
- * In a gauge chart, this option sets the width of the plot band
- * stretching along the perimeter. It can be given as a percentage
- * string, like `"10%"`, or as a pixel number, like `10`. The default
- * value 10 is the same as the default [tickLength](#yAxis.tickLength),
- * thus making the plot band act as a background for the tick markers.
+ * In a gauge chart, this option sets the width of the plot band stretching
+ * along the perimeter. It can be given as a percentage string, like `'10%'`, or
+ * as a pixel number, like `10`. If `undefined`, the plot band fills out the
+ * range between `pane.size` and `pane.innerSize`.
  *
- * @sample {highcharts} highcharts/xaxis/plotbands-gauge
- *         Gauge plot band
+ * @sample {highcharts} highcharts/xaxis/plotbands-gauge Gauge plot band
  *
  * @type      {number|string}
- * @default   10
  * @since     2.3
  * @product   highcharts
  * @apioption yAxis.plotBands.thickness
@@ -1085,4 +1334,4 @@ export default PlotLineOrBand;
  * @apioption yAxis.plotLines
  */
 
-(''); // keeps doclets above in JS file
+(''); // Keeps doclets above in JS file

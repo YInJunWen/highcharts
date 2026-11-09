@@ -9,40 +9,10 @@ Highcharts.chart('container', {
         text: 'Speedometer'
     },
 
-    pane: {
-        startAngle: -150,
-        endAngle: 150,
-        background: [{
-            className: 'outer-pane',
-            outerRadius: '115%'
-        }, {
-            className: 'middle-pane',
-            outerRadius: '112%'
-        }, {
-            // default background
-        }, {
-            className: 'inner-pane',
-            outerRadius: '105%',
-            innerRadius: '103%'
-        }]
-    },
-
     // the value axis
     yAxis: {
         min: 0,
         max: 200,
-
-        minorTickInterval: 'auto',
-        minorTickLength: 10,
-        minorTickPosition: 'inside',
-
-        tickPixelInterval: 30,
-        tickPosition: 'inside',
-        tickLength: 10,
-        labels: {
-            step: 2,
-            rotation: 'auto'
-        },
         title: {
             text: 'km/h'
         },
@@ -74,11 +44,10 @@ Highcharts.chart('container', {
 function (chart) {
     if (!chart.renderer.forExport) {
         setInterval(function () {
-            var point = chart.series[0].points[0],
-                newVal,
+            const point = chart.series[0].points[0],
                 inc = Math.round((Math.random() - 0.5) * 20);
 
-            newVal = point.y + inc;
+            let newVal = point.y + inc;
             if (newVal < 0 || newVal > 200) {
                 newVal = point.y - inc;
             }

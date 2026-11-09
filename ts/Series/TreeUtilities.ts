@@ -1,12 +1,13 @@
 /* *
  *
- *  (c) 2014-2021 Highsoft AS
+ *  (c) 2014-2026 Highsoft AS
  *
- *  Authors: Jon Arild Nygard / Oystein Moseng
+ *  Authors: Jon Arild Nygård / Øystein Moseng
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -20,19 +21,20 @@
 
 import type CorePoint from '../Core/Series/Point';
 import type CorePointOptions from '../Core/Series/PointOptions';
+import type SankeySeries from '../Series/Sankey/SankeySeries';
+import type TreegraphSeries from '../Series/Treegraph/TreegraphSeries';
 import type CoreSeries from '../Core/Series/Series';
 import type ColorType from '../Core/Color/ColorType';
 
 import Color from '../Core/Color/Color.js';
-import U from '../Core/Utilities.js';
-const {
+import {
     extend,
     isArray,
     isNumber,
     isObject,
     merge,
-    pick
-} = U;
+    relativeLength
+} from '../Shared/Utilities.js';
 
 /* *
  *
@@ -40,10 +42,9 @@ const {
  *
  * */
 
-/* eslint-disable valid-jsdoc */
 
 /**
- * @private
+ * @internal
  */
 function getColor(
     node: TreeUtilities.NodeObject,
@@ -68,7 +69,7 @@ function getColor(
         colorIndex;
 
     /**
-     * @private
+     * @internal
      */
     const variateColor = (color: ColorType): ColorType => {
         const colorVariation = level && level.colorVariation;
@@ -102,20 +103,20 @@ function getColor(
 
         // Select either point color, level color or inherited color.
         if (!series.chart.styledMode) {
-            color = pick(
-                point && point.options.color,
-                level && level.color,
-                colorByPoint,
-                parentColor && variateColor(parentColor),
+            color = (
+                (point && point.options.color) ??
+                (level && level.color) ??
+                colorByPoint ??
+                (parentColor && variateColor(parentColor)) ??
                 series.color
             );
         }
 
-        colorIndex = pick(
-            point && point.options.colorIndex,
-            level && level.colorIndex,
-            colorIndexByPoint,
-            parentColorIndex,
+        colorIndex = (
+            (point && point.options.colorIndex) ??
+            (level && level.colorIndex) ??
+            colorIndexByPoint ??
+            parentColorIndex ??
             options.colorIndex
         );
     }
@@ -128,7 +129,7 @@ function getColor(
 /**
  * Creates a map from level number to its given options.
  *
- * @private
+ * @internal
  *
  * @param {Object} params
  * Object containing parameters.
@@ -145,8 +146,8 @@ function getColor(
 function getLevelOptions<T extends TreeUtilities.Series>(
     params: any
 ): (T['mapOptionsToLevel']) {
-    let result: T['mapOptionsToLevel'] = {},
-        defaults: any,
+    const result: T['mapOptionsToLevel'] = {};
+    let defaults: any,
         converted,
         i: number,
         from: any,
@@ -166,10 +167,8 @@ function getLevelOptions<T extends TreeUtilities.Series>(
 
                 if (isObject(item) && isNumber(item.level)) {
                     options = merge({}, item);
-                    levelIsConstant = pick(
-                        options.levelIsConstant,
-                        defaults.levelIsConstant
-                    );
+                    levelIsConstant =
+                        options.levelIsConstant ?? defaults.levelIsConstant;
                     // Delete redundant properties.
                     delete options.levelIsConstant;
                     delete options.level;
@@ -197,7 +196,7 @@ function getLevelOptions<T extends TreeUtilities.Series>(
 }
 
 /**
- * @private
+ * @internal
  * @todo Combine buildTree and buildNode with setTreeValues
  * @todo Remove logic from Treemap and make it utilize this mixin.
  */
@@ -218,7 +217,7 @@ function setTreeValues<T extends TreeUtilities.Series>(
     let childrenTotal = 0;
 
     tree.levelDynamic = tree.level - (levelIsConstant ? 0 : nodeRoot.level);
-    tree.name = pick(point && point.name, '');
+    tree.name = ((point && point.name) ?? '');
     tree.visible = (
         idRoot === tree.id ||
         options.visible === true
@@ -245,7 +244,7 @@ function setTreeValues<T extends TreeUtilities.Series>(
         }
     });
     // Set the values
-    const value = pick(optionsPoint.value, childrenTotal);
+    const value = (optionsPoint.value ?? childrenTotal);
     tree.visible = value >= 0 && (childrenTotal > 0 || tree.visible);
     tree.children = children;
     tree.childrenTotal = childrenTotal;
@@ -259,7 +258,7 @@ function setTreeValues<T extends TreeUtilities.Series>(
  * Update the rootId property on the series. Also makes sure that it is
  * accessible to exporting.
  *
- * @private
+ * @internal
  *
  * @param {Object} series
  * The series to operate on.
@@ -278,7 +277,7 @@ function updateRootId(
         options = isObject(series.options) ? series.options : {};
 
         // Calculate the rootId.
-        rootId = pick(series.rootNode, options.rootId, '');
+        rootId = (series.rootNode ?? options.rootId ?? '');
 
         // Set rootId on series.userOptions to pick it up in exporting.
         if (isObject(series.userOptions)) {
@@ -289,6 +288,40 @@ function updateRootId(
     }
     return rootId;
 }
+
+/**
+ * Get the node width, which relies on the plot width and the nodeDistance
+ * option.
+ *
+ * @internal
+ */
+function getNodeWidth(
+    series: SankeySeries|TreegraphSeries,
+    columnCount: number
+): number {
+    const { chart, options } = series,
+        { nodeDistance = 0, nodeWidth = 0 } = options,
+        { plotSizeX = 1 } = chart;
+
+    // Node width auto means they are evenly distributed along the width of
+    // the plot area
+    if (nodeWidth === 'auto') {
+        if (typeof nodeDistance === 'string' && /%$/.test(nodeDistance)) {
+            const fraction = parseFloat(nodeDistance) / 100,
+                total = columnCount + fraction * (columnCount - 1);
+            return plotSizeX / total;
+        }
+        const nDistance = Number(nodeDistance);
+
+        return (
+            (plotSizeX + nDistance) /
+            (columnCount || 1)
+        ) - nDistance;
+    }
+
+    return relativeLength(nodeWidth, plotSizeX);
+}
+
 
 /* *
  *
@@ -304,11 +337,13 @@ namespace TreeUtilities {
      *
      * */
 
+    /** @internal */
     export interface ColorObject {
         color: ColorType;
         colorIndex: number;
     }
 
+    /** @internal */
     export interface GetColorOptions {
         colorIndex?: number;
         colors?: Array<ColorType>;
@@ -320,6 +355,7 @@ namespace TreeUtilities {
         siblings?: number;
     }
 
+    /** @internal */
     export interface NodeObject {
         children: Array<NodeObject>;
         childrenTotal?: number;
@@ -333,24 +369,29 @@ namespace TreeUtilities {
         visible: boolean;
     }
 
+    /** @internal */
     export interface Point extends CorePoint {
         options: PointOptions;
     }
 
+    /** @internal */
     export interface PointOptions extends CorePointOptions {
         value?: (number|null);
     }
 
+    /** @internal */
     export interface Series extends CoreSeries {
         mapOptionsToLevel: any;
         points: Array<Point>;
         tree: NodeObject;
     }
 
+    /** @internal */
     export interface SetTreeValuesBeforeCallbackFunction<T extends Series> {
         (node: T['tree'], options: SetTreeValuesOptions<T>): T['tree'];
     }
 
+    /** @internal */
     export interface SetTreeValuesOptions<T extends Series> {
         before?: SetTreeValuesBeforeCallbackFunction<T>;
         idRoot: string;
@@ -374,6 +415,7 @@ namespace TreeUtilities {
 const TreeUtilities = {
     getColor,
     getLevelOptions,
+    getNodeWidth,
     setTreeValues,
     updateRootId
 };

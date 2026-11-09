@@ -1,8 +1,9 @@
 /* *
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -19,19 +20,13 @@ import type {
     EMAParamsOptions
 } from './EMAOptions';
 import type EMAPoint from './EMAPoint';
+import type { IndicatorLinkedSeriesBase } from '../IndicatorBase';
 import type IndicatorValuesObject from '../IndicatorValuesObject';
 import type LineSeries from '../../../Series/Line/LineSeries';
 
+import SMAIndicator from '../SMA/SMAIndicator.js';
 import SeriesRegistry from '../../../Core/Series/SeriesRegistry.js';
-const {
-    sma: SMAIndicator
-} = SeriesRegistry.seriesTypes;
-import U from '../../../Core/Utilities.js';
-const {
-    correctFloat,
-    isArray,
-    merge
-} = U;
+import { correctFloat, isArray, merge } from '../../../Shared/Utilities.js';
 
 /* *
  *
@@ -42,7 +37,6 @@ const {
 /**
  * The EMA series type.
  *
- * @private
  * @class
  * @name Highcharts.seriesTypes.ema
  *
@@ -60,14 +54,15 @@ class EMAIndicator extends SMAIndicator {
      * Exponential moving average indicator (EMA). This series requires the
      * `linkedTo` option to be set.
      *
-     * @sample stock/indicators/ema
+     * @sample {highstock} stock/indicators/ema
      * Exponential moving average indicator
      *
      * @extends      plotOptions.sma
      * @since        6.0.0
      * @product      highstock
-     * @requires     stock/indicators/indicators
+     * @requires     indicators/indicators
      * @optionparent plotOptions.ema
+     * @internal
      */
     public static defaultOptions: EMAOptions = merge(SMAIndicator.defaultOptions, {
         params: {
@@ -92,11 +87,11 @@ class EMAIndicator extends SMAIndicator {
      *
      * */
 
-    public data: Array<EMAPoint> = void 0 as any;
+    public data!: Array<EMAPoint>;
 
-    public options: EMAOptions = void 0 as any;
+    public options!: EMAOptions;
 
-    public points: Array<EMAPoint> = void 0 as any;
+    public points!: Array<EMAPoint>;
 
     /* *
      *
@@ -104,6 +99,7 @@ class EMAIndicator extends SMAIndicator {
      *
      * */
 
+    /** @internal */
     public accumulatePeriodPoints(
         period: number,
         index: number,
@@ -122,6 +118,7 @@ class EMAIndicator extends SMAIndicator {
         return sum;
     }
 
+    /** @internal */
     public calculateEma(
         xVal: Array<number>,
         yVal: (Array<number>|Array<Array<number>>),
@@ -131,37 +128,38 @@ class EMAIndicator extends SMAIndicator {
         index: number,
         SMA: number
     ): [number, number] {
-        let x: number = xVal[i - 1],
+        const x: number = xVal[i - 1],
             yValue: number = index < 0 ?
                 yVal[i - 1] :
                 (yVal as any)[i - 1][index],
-            y: number;
-
-        y = typeof calEMA === 'undefined' ?
-            SMA : correctFloat((yValue * EMApercent) +
-            (calEMA * (1 - EMApercent)));
-
+            y: number = typeof calEMA === 'undefined' ?
+                SMA : correctFloat(
+                    (yValue * EMApercent) +
+                (calEMA * (1 - EMApercent))
+                );
         return [x, y];
     }
 
+    /** @internal */
     public getValues<TLinkedSeries extends LineSeries>(
-        series: TLinkedSeries,
+        series: TLinkedSeries&IndicatorLinkedSeriesBase,
         params: EMAParamsOptions
     ): (IndicatorValuesObject<TLinkedSeries>|undefined) {
-        let period: number = (params.period as any),
+        const period: number = (params.period as any),
             xVal: Array<number> = (series.xData as any),
             yVal: Array<Array<number>> = (series.yData as any),
             yValLen = yVal ? yVal.length : 0,
             EMApercent = 2 / (period + 1),
-            sum = 0,
             EMA: Array<Array<number>> = [],
             xData: Array<number> = [],
-            yData: Array<number> = [],
-            index = -1,
-            SMA = 0,
-            calEMA: (number|undefined),
+            yData: Array<number> = [];
+
+        let calEMA: (number|undefined),
             EMAPoint: [number, number],
-            i: number;
+            i: number,
+            index = -1,
+            sum = 0,
+            SMA = 0;
 
         // Check period, if bigger than points length, skip
         if (yValLen < period) {
@@ -180,7 +178,7 @@ class EMAIndicator extends SMAIndicator {
             yVal
         );
 
-        // first point
+        // First point
         SMA = sum / period;
 
         // Calculate value one-by-one for each period in visible data
@@ -253,9 +251,8 @@ export default EMAIndicator;
  * @extends   series,plotOptions.ema
  * @since     6.0.0
  * @product   highstock
- * @excluding dataParser, dataURL
- * @requires  stock/indicators/indicators
+ * @requires  indicators/indicators
  * @apioption series.ema
  */
 
-''; // adds doclet above to the transpiled file
+''; // Adds doclet above to the transpiled file

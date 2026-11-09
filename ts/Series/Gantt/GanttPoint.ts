@@ -1,12 +1,13 @@
 /* *
  *
- *  (c) 2016-2021 Highsoft AS
+ *  (c) 2016-2026 Highsoft AS
  *
  *  Author: Lars A. V. Cabrera
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -20,18 +21,17 @@
 
 import type GanttPointOptions from './GanttPointOptions';
 import type GanttSeries from './GanttSeries';
-import SeriesRegistry from '../../Core/Series/SeriesRegistry.js';
-const {
-    seriesTypes: {
-        xrange: {
-            prototype: {
-                pointClass: XRangePoint
-            }
-        }
-    }
-} = SeriesRegistry;
-import U from '../../Core/Utilities.js';
-const { pick } = U;
+import type Chart from '../../Core/Chart/Chart';
+
+import XRangeSeries from '../XRange/XRangeSeries.js';
+
+/* *
+ *
+ *  Constants
+ *
+ * */
+
+const XRangePoint = XRangeSeries.prototype.pointClass;
 
 /* *
  *
@@ -47,32 +47,22 @@ class GanttPoint extends XRangePoint {
      *
      * */
 
-    /* eslint-disable valid-jsdoc */
-
     /**
-     * @private
+     * @internal
      */
     public static setGanttPointAliases(
-        options: (GanttPoint|GanttPointOptions)
+        options: (GanttPoint|GanttPointOptions),
+        chart: Chart
     ): void {
-        /**
-         * Add a value to options if the value exists.
-         * @private
-         */
-        function addIfExists(prop: string, val: unknown): void {
-            if (typeof val !== 'undefined') {
-                (options as any)[prop] = val;
-            }
-        }
-
-        addIfExists('x', pick(options.start, options.x));
-        addIfExists('x2', pick(options.end, options.x2));
-        addIfExists(
-            'partialFill', pick(options.completed, options.partialFill)
+        options.x = options.start = chart.time.parse(
+            options.start ?? options.x
         );
+        options.x2 = options.end = chart.time.parse(
+            options.end ?? options.x2
+        );
+        (options as any).partialFill = options.completed =
+            options.completed ?? options.partialFill;
     }
-
-    /* eslint-enable valid-jsdoc */
 
     /* *
      *
@@ -80,18 +70,24 @@ class GanttPoint extends XRangePoint {
      *
      * */
 
+    /** @internal */
     public collapsed?: boolean;
 
+    /** @internal */
     public completed?: boolean;
 
+    /** @internal */
     public end?: number;
 
+    /** @internal */
     public milestone?: boolean;
 
-    public options: GanttPointOptions = void 0 as any;
+    public options!: GanttPointOptions;
 
-    public series: GanttSeries = void 0 as any;
+    /** @internal */
+    public series!: GanttSeries;
 
+    /** @internal */
     public start?: number;
 
     /* *
@@ -100,13 +96,11 @@ class GanttPoint extends XRangePoint {
      *
      * */
 
-    /* eslint-disable valid-jsdoc */
-
     /**
      * Applies the options containing the x and y data and possible some
      * extra properties. This is called on point init or from point.update.
      *
-     * @private
+     * @internal
      * @function Highcharts.Point#applyOptions
      *
      * @param {Object} options
@@ -122,15 +116,17 @@ class GanttPoint extends XRangePoint {
         options: GanttPointOptions,
         x: number
     ): GanttPoint {
-        let point = this,
-            ganttPoint: GanttPoint;
+        const ganttPoint = super.applyOptions(options, x) as GanttPoint;
 
-        ganttPoint = super.applyOptions.call(point, options, x) as any;
-        GanttPoint.setGanttPointAliases(ganttPoint);
+        GanttPoint.setGanttPointAliases(ganttPoint, ganttPoint.series.chart);
+
+        this.isNull = !this.isValid?.();
+        this.formatPrefix = this.isNull ? 'null' : 'point'; // #23605
 
         return ganttPoint;
     }
 
+    /** @internal */
     public isValid(): boolean {
         return (
             (
@@ -145,10 +141,7 @@ class GanttPoint extends XRangePoint {
         );
     }
 
-    /* eslint-enable valid-jsdoc */
-
 }
-
 
 /* *
  *

@@ -5,11 +5,15 @@ Highcharts.chart('container', {
     },
 
     subtitle: {
-        text: 'backgroundColor, borderColor, borderRadius, borderWidth, padding and shadow'
+        text: 'backgroundColor, borderColor, borderRadius, borderWidth, ' +
+            'padding and shadow'
     },
 
     xAxis: {
-        categories: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+        categories: [
+            'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep',
+            'Oct', 'Nov', 'Dec'
+        ]
     },
 
     plotOptions: {
@@ -17,9 +21,10 @@ Highcharts.chart('container', {
             dataLabels: {
                 enabled: true,
                 borderRadius: 5,
-                backgroundColor: 'rgba(252, 255, 197, 0.7)',
+                backgroundColor: '#d3eaffcc',
                 borderWidth: 1,
                 borderColor: '#AAA',
+                padding: [3, 5],
                 y: -6
             }
         }
@@ -31,7 +36,6 @@ Highcharts.chart('container', {
             dataLabels: {
                 borderColor: 'red',
                 borderWidth: 2,
-                padding: 5,
                 shadow: true,
                 style: {
                     fontWeight: 'bold'

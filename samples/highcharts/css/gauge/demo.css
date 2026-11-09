@@ -1,23 +1,10 @@
-@import "https://code.highcharts.com/css/highcharts.css";
+@import url("https://code.highcharts.com/css/highcharts.css");
 
 #container {
     min-width: 310px;
     max-width: 400px;
     height: 300px;
     margin: 0 auto;
-}
-
-.outer-pane {
-    fill: #efefef;
-}
-
-.middle-pane {
-    stroke-width: 1px;
-    stroke: #aaa;
-}
-
-.inner-pane {
-    fill: #ddd;
 }
 
 .green-band {

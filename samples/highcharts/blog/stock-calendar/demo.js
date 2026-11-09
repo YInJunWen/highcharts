@@ -1,4 +1,8 @@
-Highcharts.getJSON('https://demo-live-data.highcharts.com/aapl-ohlcv.json', data => {
+(async () => {
+
+    let data = await fetch(
+        'https://demo-live-data.highcharts.com/aapl-ohlcv.json'
+    ).then(response => response.json());
 
     const DAY = 1000 * 60 * 60 * 24;
 
@@ -13,16 +17,8 @@ Highcharts.getJSON('https://demo-live-data.highcharts.com/aapl-ohlcv.json', data
         firstX = data[0][0],
         lastX = data[data.length - 1][0],
         showDataInfo = (chart, point, date) => {
-            const plotLinesAndBands = chart.xAxis[0].plotLinesAndBands;
-
-            if (plotLinesAndBands && plotLinesAndBands.length) {
-                plotLinesAndBands[0].destroy();
-            }
-
-            chart.xAxis[0].addPlotLine({
-                value: date,
-                color: 'red',
-                lineWidth: 3
+            chart.xAxis[0].plotLines[0].update({
+                value: date
             });
 
             document.getElementById('openCell').innerText =
@@ -36,6 +32,11 @@ Highcharts.getJSON('https://demo-live-data.highcharts.com/aapl-ohlcv.json', data
         };
 
     Highcharts.stockChart('chart-container', {
+        chart: {
+            animation: {
+                duration: 150
+            }
+        },
 
         navigator: {
             enabled: false
@@ -55,7 +56,12 @@ Highcharts.getJSON('https://demo-live-data.highcharts.com/aapl-ohlcv.json', data
 
         xAxis: {
             min: data[data.length - 21][0],
-            max: lastX
+            max: lastX,
+            plotLines: [{
+                color: 'red',
+                width: 3
+            }],
+            crosshair: false
         },
 
         series: [{
@@ -131,4 +137,4 @@ Highcharts.getJSON('https://demo-live-data.highcharts.com/aapl-ohlcv.json', data
             }
         });
     });
-});
+})();

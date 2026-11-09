@@ -1,10 +1,9 @@
 ---
 name: HLC
 authors:
-  - Pawel Lysy
+  - Paweł Lysy
 compareTooltips: true
 js_wrap: b
-new_until: 2021-12-31
 tags:
   - Highcharts Stock demo
 categories:

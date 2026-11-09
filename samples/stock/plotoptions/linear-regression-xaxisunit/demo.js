@@ -1,4 +1,9 @@
-Highcharts.getJSON('https://demo-live-data.highcharts.com/aapl-ohlc.json', function (data) {
+(async () => {
+
+    // Load the dataset
+    const data = await fetch(
+        'https://demo-live-data.highcharts.com/aapl-ohlc.json'
+    ).then(response => response.json());
 
     Highcharts.setOptions({
         yAxis: {
@@ -45,7 +50,7 @@ Highcharts.getJSON('https://demo-live-data.highcharts.com/aapl-ohlc.json', funct
             data: data,
             id: 'base'
         }, {
-            type: 'linearRegressionSlope',
+            type: 'linearregressionslope',
             name: 'Linear Regression Slope: 1 mintue xAxisUnit',
             linkedTo: 'base',
             yAxis: 1,
@@ -61,4 +66,4 @@ Highcharts.getJSON('https://demo-live-data.highcharts.com/aapl-ohlc.json', funct
             split: false
         }
     });
-});
+})();

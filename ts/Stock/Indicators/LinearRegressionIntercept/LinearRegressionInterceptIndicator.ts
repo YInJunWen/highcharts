@@ -1,10 +1,12 @@
-/**
+/* *
  *
- *  (c) 2010-2021 Kamil Kulig
+ *  (c) 2010-2026 Highsoft AS
+ *  Author: Kamil Kulig
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -18,21 +20,14 @@
 
 import type {
     LinearRegressionOptions,
-    LinearRegressionParamsOptions,
     RegressionLineParametersObject
 } from '../LinearRegression/LinearRegressionOptions';
 import type LinearRegressionInterceptPoint from
     './LinearRegressionInterceptPoint';
 
+import LinearRegressionIndicator from '../LinearRegression/LinearRegressionIndicator.js';
 import SeriesRegistry from '../../../Core/Series/SeriesRegistry.js';
-const {
-    linearRegression: LinearRegressionIndicator
-} = SeriesRegistry.seriesTypes;
-import U from '../../../Core/Utilities.js';
-const {
-    extend,
-    merge
-} = U;
+import { extend, merge } from '../../../Shared/Utilities.js';
 
 /* *
  *
@@ -43,7 +38,6 @@ const {
 /**
  * The Linear Regression Intercept series type.
  *
- * @private
  * @class
  * @name Highcharts.seriesTypes.linearRegressionIntercept
  *
@@ -62,16 +56,17 @@ class LinearRegressionInterceptIndicator extends LinearRegressionIndicator {
      * option to be set.
      *
      * @sample {highstock} stock/indicators/linear-regression-intercept
-     *         Linear intercept slope indicator
+     *         Linear regression intercept indicator
      *
      * @extends      plotOptions.linearregression
      * @since        7.0.0
      * @product      highstock
-     * @requires     stock/indicators/indicators
-     * @requires  stock/indicators/regressions
+     * @requires     indicators/indicators
+     * @requires     indicators/regressions
      * @optionparent plotOptions.linearregressionintercept
+     * @internal
      */
-    public static defaultOptions: LinearRegressionParamsOptions = merge(
+    public static defaultOptions: LinearRegressionOptions = merge(
         LinearRegressionIndicator.defaultOptions
     );
 
@@ -81,9 +76,9 @@ class LinearRegressionInterceptIndicator extends LinearRegressionIndicator {
      *
      * */
 
-    public data: Array<LinearRegressionInterceptPoint> = void 0 as any;
-    public options: LinearRegressionOptions = void 0 as any;
-    public points: Array<LinearRegressionInterceptPoint> = void 0 as any;
+    public data!: Array<LinearRegressionInterceptPoint>;
+    public options!: LinearRegressionOptions;
+    public points!: Array<LinearRegressionInterceptPoint>;
 
     /* *
      *
@@ -91,6 +86,7 @@ class LinearRegressionInterceptIndicator extends LinearRegressionIndicator {
      *
      * */
 
+    /** @internal */
     public getEndPointY(
         lineParameters: RegressionLineParametersObject
     ): number {
@@ -121,10 +117,17 @@ extend(LinearRegressionInterceptIndicator.prototype, {
 
 declare module '../../../Core/Series/SeriesType' {
     interface SeriesTypeRegistry {
+        linearregressionintercept: typeof LinearRegressionInterceptIndicator;
         linearRegressionIntercept: typeof LinearRegressionInterceptIndicator;
     }
 }
 
+SeriesRegistry.registerSeriesType(
+    'linearregressionintercept',
+    LinearRegressionInterceptIndicator
+);
+
+// Keep for backwards compatibility
 SeriesRegistry.registerSeriesType(
     'linearRegressionIntercept',
     LinearRegressionInterceptIndicator
@@ -152,10 +155,9 @@ export default LinearRegressionInterceptIndicator;
  * @extends   series,plotOptions.linearregressionintercept
  * @since     7.0.0
  * @product   highstock
- * @excluding dataParser,dataURL
- * @requires  stock/indicators/indicators
- * @requires  stock/indicators/regressions
+ * @requires  indicators/indicators
+ * @requires  indicators/regressions
  * @apioption series.linearregressionintercept
  */
 
-''; // to include the above in the js output
+''; // To include the above in the js output

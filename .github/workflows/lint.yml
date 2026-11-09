@@ -1,0 +1,99 @@
+name: Linting
+
+on:
+  pull_request:
+    branches: [ 'master', 'dash/**', 'grid/**' ]
+    paths:
+      - 'ts/**'
+      - 'samples/**'
+      - 'gulpfile.ts'
+      - 'tools/gulptasks/lint-samples.js'
+      - 'tools/gulptasks/typecheck-samples.js'
+      - '.github/workflows/lint.yml'
+
+permissions:
+   contents: read # to fetch code (actions/checkout)
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint_hc:
+    timeout-minutes: 10
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [lts/*]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Lint (ts)
+        run: npx gulp lint
+
+      - name: Lint CSS
+        run: npx stylelint --config css/.stylelintrc.json "css/**/*.css"
+
+  lint_dts:
+    timeout-minutes: 10
+    runs-on: ubuntu-latest
+    needs: lint_hc
+    strategy:
+      matrix:
+        node-version: [lts/*]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Build definitions
+        run: npx gulp jsdoc-dts
+
+      - name: Lint definitions
+        run: npx gulp lint-dts
+
+      - name: Typecheck samples
+        run: npx gulp typecheck-samples
+
+  lint_samples:
+    timeout-minutes: 10
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [lts/*]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Lint samples TS and JS
+        run: npx gulp lint-samples
+
+      - name: Lint samples CSS
+        run: npx stylelint --config .stylelintrc.json "samples/**/*.css"

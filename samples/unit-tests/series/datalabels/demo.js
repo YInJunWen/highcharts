@@ -67,7 +67,9 @@ QUnit.test('Bottom -90', function (assert) {
     });
 
     assert.ok(
-        chart.series[0].points[0].dataLabel.element.getAttribute('visibility') !== 'hidden',
+        chart.series[0].points[0].dataLabel.element.getAttribute(
+            'visibility'
+        ) !== 'hidden',
         'Labels are visible'
     );
     assert.close(
@@ -109,7 +111,9 @@ QUnit.test('Top -90', function (assert) {
     });
 
     assert.ok(
-        chart.series[0].points[0].dataLabel.element.getAttribute('visibility') !== 'hidden',
+        chart.series[0].points[0].dataLabel.element.getAttribute(
+            'visibility'
+        ) !== 'hidden',
         'Labels are visible'
     );
     assert.ok(
@@ -195,7 +199,9 @@ QUnit.test('Bottom 90', function (assert) {
     });
 
     assert.ok(
-        chart.series[0].points[0].dataLabel.element.getAttribute('visibility') !== 'hidden',
+        chart.series[0].points[0].dataLabel.element.getAttribute(
+            'visibility'
+        ) !== 'hidden',
         'Labels are visible'
     );
     assert.ok(
@@ -232,7 +238,9 @@ QUnit.test('Top 90', function (assert) {
     });
 
     assert.ok(
-        chart.series[0].points[0].dataLabel.element.getAttribute('visibility') !== 'hidden',
+        chart.series[0].points[0].dataLabel.element.getAttribute(
+            'visibility'
+        ) !== 'hidden',
         'Labels are visible'
     );
     assert.ok(
@@ -267,46 +275,67 @@ QUnit.test('Top 90', function (assert) {
     );
 });
 
-QUnit.test(
-    'Connect ends and data label still visible (#6465)',
-    function (assert) {
-        var chart = Highcharts.chart('container', {
-            chart: {
-                polar: true,
-                type: 'line'
-            },
+QUnit.test('Various data labels edge cases', function (assert) {
+    const chart = Highcharts.chart('container', {
+        chart: {
+            polar: true,
+            type: 'line'
+        },
 
-            plotOptions: {
-                series: {
-                    dataLabels: {
-                        allowOverlap: true,
-                        enabled: true,
-                        padding: 0,
-                        defer: false
-                    }
+        plotOptions: {
+            series: {
+                dataLabels: {
+                    allowOverlap: true,
+                    enabled: true,
+                    padding: 0,
+                    defer: false,
+                    zIndex: 4
                 }
-            },
-            yAxis: {
-                max: 60000
-            },
+            }
+        },
+        yAxis: {
+            max: 60000
+        },
 
-            series: [
-                {
-                    name: 'Actual Spending',
-                    data: [45000, 39000, 42000, 31000, 26000, 14000],
-                    pointPlacement: 'on',
-                    animation: false
+        series: [{
+            name: 'Actual Spending',
+            data: [45000, 39000, 42000, 14000],
+            pointPlacement: 'on',
+            animation: false
+        }, {
+            type: 'venn',
+            data: [{
+                name: 'A',
+                sets: ['A'],
+                value: 20,
+                dataLabels: {
+                    zIndex: 5
                 }
-            ]
-        });
+            }, {
+                sets: ['B'],
+                value: 2
+            }, {
+                sets: ['A', 'B'],
+                value: 1
+            }]
+        }]
+    });
 
+    // Connect ends and data label still visible (#6465)
+    assert.strictEqual(
+        chart.series[0].points[0].dataLabel.opacity,
+        1,
+        'First data label is visible'
+    );
+
+    chart.series.forEach(s => {
         assert.strictEqual(
-            chart.series[0].points[0].dataLabel.opacity,
-            1,
-            'First data label is visible'
+            s.dataLabelsGroup.element.getAttribute('data-z-index'),
+            '4',
+            `Data label group has correct z-index (${s.type})`
         );
-    }
-);
+    });
+});
 
 // Highcharts 4.1.1, Issue #3866
 // Data Labels are not rendering for column charts when series are shown/hidden
@@ -402,9 +431,12 @@ QUnit.test(
                     ],
                     dataLabels: {
                         enabled: true,
-                        formatter: function () {
-                            if (this.y > 0.5 && this.y < 4.5) {
-                                return this.y;
+                        formatter: function (options) {
+                            // Read the value the label is aligned to, `high`
+                            // or `low` (#23904)
+                            const value = this[options.alignToKey];
+                            if (value > 0.5 && value < 4.5) {
+                                return value;
                             }
                             return null;
                         }
@@ -487,5 +519,28 @@ QUnit.test('defer:true and exporting (#10661)', assert => {
         ),
         [null, null, null],
         'Data labels should be visible'
+    );
+
+    chart.series[0].update({
+        type: 'line',
+        marker: {
+            enabled: false
+        }
+    });
+
+    chart.series[0].points[0].onMouseOver();
+    chart.series[0].points[0].onMouseOut();
+    assert.strictEqual(
+        chart.series[0].points[0].dataLabel.element.getAttribute('opacity'),
+        '1',
+        `Hovering over points without markers should not set labels opacity,
+        #17957.`
+    );
+    assert.deepEqual(
+        chart.series[0].points.map(p =>
+            p.dataLabel.element.getAttribute('visibility')
+        ),
+        [null, null, null],
+        'Hovering over points without markers should not hide labels, #17957.'
     );
 });

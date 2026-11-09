@@ -1,17 +1,21 @@
 /* *
  *
- *  (c) 2020-2022 Highsoft AS
+ *  (c) 2009-2026 Highsoft AS
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  *  Authors:
  *  - Sophie Bremer
+ *  - Dawid Draguła
  *
  * */
 
+
 'use strict';
+
 
 /* *
  *
@@ -19,15 +23,16 @@
  *
  * */
 
-import type DataEventEmitter from '../DataEventEmitter';
-import type JSON from '../../Core/JSON';
+
+import type {
+    DataEventDetail
+} from '../DataEvent';
+import type { RangeModifierOptions } from './RangeModifierOptions';
 
 import DataModifier from './DataModifier.js';
 import DataTable from '../DataTable.js';
-import U from '../../Core/Utilities.js';
-const {
-    merge
-} = U;
+import { merge } from '../../Shared/Utilities.js';
+
 
 /* *
  *
@@ -35,12 +40,12 @@ const {
  *
  * */
 
+
 /**
- * Filters out table rows with a specific value range.
- *
- * @private
+ * Slices the table rows based on the specified range.
  */
 class RangeModifier extends DataModifier {
+
 
     /* *
      *
@@ -48,14 +53,16 @@ class RangeModifier extends DataModifier {
      *
      * */
 
+
     /**
      * Default options for the range modifier.
      */
-    public static readonly defaultOptions: RangeModifier.Options = {
-        modifier: 'Range',
-        strict: false,
-        ranges: []
+    public static readonly defaultOptions: RangeModifierOptions = {
+        type: 'Range',
+        start: 0,
+        end: Infinity
     };
+
 
     /* *
      *
@@ -63,17 +70,21 @@ class RangeModifier extends DataModifier {
      *
      * */
 
+
     /**
      * Constructs an instance of the range modifier.
      *
-     * @param {RangeModifier.Options} [options]
+     * @param {Partial<RangeModifierOptions>} [options]
      * Options to configure the range modifier.
      */
-    public constructor(options?: DeepPartial<RangeModifier.Options>) {
+    public constructor(
+        options?: Partial<RangeModifierOptions>
+    ) {
         super();
 
         this.options = merge(RangeModifier.defaultOptions, options);
     }
+
 
     /* *
      *
@@ -81,10 +92,12 @@ class RangeModifier extends DataModifier {
      *
      * */
 
+
     /**
      * Options of the range modifier.
      */
-    public readonly options: Readonly<RangeModifier.Options>;
+    public readonly options: RangeModifierOptions;
+
 
     /* *
      *
@@ -92,170 +105,72 @@ class RangeModifier extends DataModifier {
      *
      * */
 
+
     /**
-     * Replaces table rows with filtered rows.
+     * Replaces table rows with ranged rows. If the given table does not have
+     * defined a `modified` property, the filtering is applied in-place on the
+     * original table rather than on a `modified` copy.
      *
      * @param {DataTable} table
      * Table to modify.
      *
-     * @param {DataEventEmitter.EventDetail} [eventDetail]
+     * @param {DataEventDetail} [eventDetail]
      * Custom information for pending events.
      *
      * @return {DataTable}
-     * Table with `modified` property as a reference.
+     * Table with `modified` property as a reference or modified table, if
+     * `modified` property of the original table is undefined.
      */
-    public modifyTable<T extends DataTable>(
-        table: T,
-        eventDetail?: DataEventEmitter.EventDetail
-    ): T {
+    public override modifyTable(
+        table: DataTable,
+        eventDetail?: DataEventDetail
+    ): DataTable {
         const modifier = this;
 
         modifier.emit({ type: 'modify', detail: eventDetail, table });
 
-        const {
-            ranges,
-            strict
-        } = modifier.options;
+        let { start, end } = modifier.options;
+        start = Math.max(0, start || 0);
+        end = Math.min(end || Infinity, table.getRowCount());
+        const length = Math.max(end - start, 0);
 
-        if (ranges.length) {
-            const columns = table.getColumns(),
-                rows: Array<DataTable.Row> = [],
-                modified = table.modified;
+        const modified = table.getModified();
 
-            for (
-                let i = 0,
-                    iEnd = ranges.length,
-                    range: RangeModifier.RangeOptions,
-                    rangeColumn: DataTable.Column;
-                i < iEnd;
-                ++i
-            ) {
-                range = ranges[i];
-
-                if (
-                    strict &&
-                    typeof range.minValue !== typeof range.maxValue
-                ) {
-                    continue;
-                }
-
-                rangeColumn = (columns[range.column] || []);
-
-                for (
-                    let j = 0,
-                        jEnd = rangeColumn.length,
-                        cell: DataTable.CellType,
-                        row: (DataTable.Row|undefined);
-                    j < jEnd;
-                    ++j
-                ) {
-                    cell = rangeColumn[j];
-
-                    switch (typeof cell) {
-                        default:
-                            continue;
-                        case 'boolean':
-                        case 'number':
-                        case 'string':
-                            break;
-                    }
-
-                    if (
-                        strict &&
-                        typeof cell !== typeof range.minValue
-                    ) {
-                        continue;
-                    }
-
-                    if (
-                        cell >= range.minValue &&
-                        cell <= range.maxValue
-                    ) {
-                        row = table.getRow(j);
-
-                        if (row) {
-                            rows.push(row);
-                        }
-                    }
-                }
-            }
-
-            modified.deleteRows();
-            modified.setRows(rows);
-        }
+        modified.deleteRows();
+        modified.setRows(table.getRows(start, length));
+        modified.setOriginalRowIndexes(Array.from(
+            { length },
+            (_, i): number | undefined => table.getOriginalRowIndex(start + i)
+        ));
 
         modifier.emit({ type: 'afterModify', detail: eventDetail, table });
 
         return table;
     }
-
 }
+
 
 /* *
  *
- *  Namespace
+ *  Registry
  *
  * */
 
-/**
- * Additionally provided types for modifier events and options, and JSON
- * conversion.
- */
-namespace RangeModifier {
 
-    /**
-     * Options to configure the modifier.
-     */
-    export interface Options extends DataModifier.Options {
-        /**
-         * Value ranges to include in the result.
-         */
-        ranges: Array<RangeOptions>;
-        /**
-         * If set to true, it will also compare the value type.
-         */
-        strict: boolean;
-    }
-
-    /**
-     * Options to configure a range.
-     */
-    export interface RangeOptions extends JSON.Object {
-        /**
-         * Column containing the filtered values. This can be an index or a
-         * name.
-         */
-        column: string;
-        /**
-         * Maximum including value (`<=` operator).
-         */
-        maxValue: (boolean|number|string);
-        /**
-         * Minimum including value (`>=` operator).
-         */
-        minValue: (boolean|number|string);
-    }
-
-}
-
-/* *
- *
- *  Register
- *
- * */
-
-DataModifier.addModifier(RangeModifier);
-
-declare module './ModifierType' {
-    interface ModifierTypeRegistry {
+declare module './DataModifierType' {
+    interface DataModifierTypes {
         Range: typeof RangeModifier;
     }
 }
 
+DataModifier.registerType('Range', RangeModifier);
+
+
 /* *
  *
- *  Export
+ *  Default Export
  *
  * */
+
 
 export default RangeModifier;

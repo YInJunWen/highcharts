@@ -2,13 +2,14 @@
  *
  *  Timeline Series.
  *
- *  (c) 2010-2021 Highsoft AS
+ *  (c) 2010-2026 Highsoft AS
  *
  *  Author: Daniel Studencki
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -21,33 +22,30 @@
  * */
 
 import type { PointShortOptions, PointOptions } from '../../Core/Series/PointOptions';
-import type SVGLabel from '../../Core/Renderer/SVG/SVGLabel';
 import type SVGPath from '../../Core/Renderer/SVG/SVGPath';
 import type TimelineDataLabelOptions from './TimelineDataLabelOptions';
 import type TimelinePointOptions from './TimelinePointOptions';
 import type TimelineSeries from './TimelineSeries';
 
 import Point from '../../Core/Series/Point.js';
-import SeriesRegistry from '../../Core/Series/SeriesRegistry.js';
-const {
-    series: Series,
-    seriesTypes: {
-        pie: {
-            prototype: {
-                pointClass: PiePoint
-            }
-        }
-    }
-} = SeriesRegistry;
+import LineSeries from '../Line/LineSeries.js';
+import PieSeries from '../Pie/PieSeries.js';
 import SVGElement from '../../Core/Renderer/SVG/SVGElement.js';
-import U from '../../Core/Utilities.js';
-const {
+import {
     defined,
     isNumber,
     merge,
-    objectEach,
-    pick
-} = U;
+    objectEach
+} from '../../Shared/Utilities.js';
+
+/* *
+ *
+ *  Constants
+ *
+ * */
+
+const LinePoint = LineSeries.prototype.pointClass;
+const PiePoint = PieSeries.prototype.pointClass;
 
 /* *
  *
@@ -55,7 +53,7 @@ const {
  *
  * */
 
-class TimelinePoint extends Series.prototype.pointClass {
+class TimelinePoint extends LinePoint {
 
     /* *
      *
@@ -63,12 +61,15 @@ class TimelinePoint extends Series.prototype.pointClass {
      *
      * */
 
+    /** @internal */
     public label?: string;
 
-    public options: TimelinePointOptions = void 0 as any;
+    public options!: TimelinePointOptions;
 
-    public series: TimelineSeries = void 0 as any;
+    /** @internal */
+    public series!: TimelineSeries;
 
+    /** @internal */
     public userDLOptions?: TimelineDataLabelOptions;
 
     /* *
@@ -77,34 +78,30 @@ class TimelinePoint extends Series.prototype.pointClass {
      *
      * */
 
-    /* eslint-disable valid-jsdoc */
-
+    /** @internal */
     public alignConnector(): void {
-        let point = this,
+        const point = this,
             series = point.series,
-            connector: SVGElement = point.connector as any,
-            dl: SVGElement = point.dataLabel as any,
-            dlOptions = (point.dataLabel as any).options = merge(
-                series.options.dataLabels,
-                point.options.dataLabels
-            ),
+            dataLabel: SVGElement = point.dataLabel as any,
+            connector: SVGElement = dataLabel.connector as any,
+            dlOptions = (dataLabel.options || {}) as TimelineDataLabelOptions,
+            connectorWidth = dlOptions.connectorWidth || 0,
             chart = point.series.chart,
             bBox = connector.getBBox(),
             plotPos = {
-                x: bBox.x + dl.translateX,
-                y: bBox.y + dl.translateY
-            },
-            isVisible;
+                x: bBox.x + (dataLabel.translateX || 0),
+                y: bBox.y + (dataLabel.translateY || 0)
+            };
 
         // Include a half of connector width in order to run animation,
         // when connectors are aligned to the plot area edge.
         if (chart.inverted) {
-            plotPos.y -= dl.options.connectorWidth / 2;
+            plotPos.y -= connectorWidth / 2;
         } else {
-            plotPos.x += dl.options.connectorWidth / 2;
+            plotPos.x += connectorWidth / 2;
         }
 
-        isVisible = chart.isInsidePlot(
+        const isVisible = chart.isInsidePlot(
             plotPos.x, plotPos.y
         );
 
@@ -112,114 +109,137 @@ class TimelinePoint extends Series.prototype.pointClass {
             d: point.getConnectorPath()
         });
 
+        connector.addClass('highcharts-color-' + point.colorIndex);
+
         if (!series.chart.styledMode) {
             connector.attr({
                 stroke: dlOptions.connectorColor || point.color,
                 'stroke-width': dlOptions.connectorWidth,
-                opacity: dl[
-                    defined(dl.newOpacity) ? 'newOpacity' : 'opacity'
+                opacity: dataLabel[
+                    defined(dataLabel.newOpacity) ? 'newOpacity' : 'opacity'
                 ]
             });
         }
     }
 
+    /** @internal */
     public drawConnector(): void {
         const point = this,
-            series = point.series;
+            { dataLabel, series } = point;
 
-        if (!point.connector) {
-            point.connector = series.chart.renderer
-                .path(point.getConnectorPath())
-                .attr({
-                    zIndex: -1
-                })
-                .add(point.dataLabel);
-        }
+        if (dataLabel) {
+            if (!dataLabel.connector) {
+                dataLabel.connector = series.chart.renderer
+                    .path(point.getConnectorPath())
+                    .attr({
+                        zIndex: -1
+                    })
+                    .add(dataLabel);
+            }
 
-        if (point.series.chart.isInsidePlot( // #10507
-            (point.dataLabel as any).x, (point.dataLabel as any).y
-        )) {
-            point.alignConnector();
+            if (point.series.chart.isInsidePlot( // #10507
+                dataLabel.x || 0, dataLabel.y || 0
+            )) {
+                point.alignConnector();
+            }
         }
     }
 
+    /** @internal */
     public getConnectorPath(): SVGPath {
-        let point = this,
-            chart = point.series.chart,
-            xAxisLen = point.series.xAxis.len,
+        const {
+                plotX = 0,
+                plotY = 0,
+                series,
+                dataLabel
+            } = this,
+            chart = series.chart,
+            xAxisLen = series.xAxis.len,
             inverted = chart.inverted,
-            direction = inverted ? 'x2' : 'y2',
-            dl: SVGLabel = point.dataLabel as any,
-            targetDLPos = dl.targetPosition,
-            coords: Record<string, (number|string)> = {
-                x1: point.plotX as any,
-                y1: point.plotY as any,
-                x2: point.plotX as any,
-                y2: isNumber(targetDLPos.y) ? targetDLPos.y : dl.y
-            },
-            negativeDistance = (
-                (dl.alignAttr || dl)[direction[0]] <
-                    point.series.yAxis.len / 2
-            ),
-            path: SVGPath;
+            direction: 'x2'|'y2' = inverted ? 'x2' : 'y2';
 
-        // Recalculate coords when the chart is inverted.
-        if (inverted) {
-            coords = {
-                x1: point.plotY as any,
-                y1: xAxisLen - (point.plotX as any),
-                x2: targetDLPos.x || dl.x,
-                y2: xAxisLen - (point.plotX as any)
+        if (dataLabel) {
+            const targetDLPos = dataLabel.targetPosition,
+                negativeDistance = (
+                    (dataLabel.alignAttr || dataLabel)[direction[0]] <
+                        series.yAxis.len / 2
+                );
+
+            let coords: Record<'x1'|'y1'|'x2'|'y2', (number)> = {
+                x1: plotX,
+                y1: plotY,
+                x2: plotX,
+                y2: isNumber(targetDLPos.y) ? targetDLPos.y : dataLabel.y
             };
+
+            // Recalculate coords when the chart is inverted.
+            if (inverted) {
+                coords = {
+                    x1: plotY,
+                    y1: xAxisLen - plotX,
+                    x2: targetDLPos.x || dataLabel.x,
+                    y2: xAxisLen - plotX
+                };
+            }
+
+            // Subtract data label width or height from expected coordinate so
+            // that the connector would start from the appropriate edge.
+            if (negativeDistance) {
+                coords[direction] += dataLabel[
+                    inverted ? 'width' : 'height'
+                ] || 0;
+            }
+
+            // Change coordinates so that they will be relative to data label.
+            objectEach(coords, (_coord, i): void => {
+                coords[i] -= (dataLabel.alignAttr || dataLabel)[i[0]];
+            });
+
+            return chart.renderer.crispLine(
+                [
+                    ['M', coords.x1, coords.y1],
+                    ['L', coords.x2, coords.y2]
+                ],
+                (
+                    dataLabel.options as TimelineDataLabelOptions
+                )?.connectorWidth || 0
+            );
         }
 
-        // Subtract data label width or height from expected coordinate so
-        // that the connector would start from the appropriate edge.
-        if (negativeDistance) {
-            coords[direction] += dl[inverted ? 'width' : 'height'];
-        }
+        return [];
+    }
 
-        // Change coordinates so that they will be relative to data label.
-        objectEach(coords, function (
-            _coord: (number|string),
-            i: string
-        ): void {
-            (coords[i] as any) -= (dl.alignAttr || dl)[i[0]];
-        });
+    public constructor(series: TimelineSeries, options: TimelinePointOptions) {
+        super(series, options);
 
-        path = chart.renderer.crispLine(
-            [
-                ['M', coords.x1, coords.y1],
-                ['L', coords.x2, coords.y2]
-            ] as SVGPath,
-            dl.options.connectorWidth
+        this.name ??= (
+            // If options is null, we are dealing with a null point
+            (
+                (options && options.y !== null) ||
+                !series.options.nullInteraction) &&
+                    'Event' ||
+                    'Null'
         );
 
-        return path;
+        this.y = 1;
     }
 
-    public init(): TimelinePoint {
-        const point: TimelinePoint = super.init.apply(this, arguments) as any;
-
-        point.name = pick(point.name, 'Event');
-        point.y = 1;
-
-        return point;
-    }
-
+    /** @internal */
     public isValid(): boolean {
         return this.options.y !== null;
     }
 
+    /** @internal */
     public setState(): void {
         const proceed = super.setState;
 
         // Prevent triggering the setState method on null points.
-        if (!this.isNull) {
+        if (!this.isNull || this.series.options.nullInteraction) {
             proceed.apply(this, arguments);
         }
     }
 
+    /** @internal */
     public setVisible(
         visible: boolean,
         redraw?: boolean
@@ -227,7 +247,7 @@ class TimelinePoint extends Series.prototype.pointClass {
         const point = this,
             series = point.series;
 
-        redraw = pick(redraw, series.options.ignoreHiddenPoint);
+        redraw = (redraw ?? series.options.ignoreHiddenPoint);
 
         PiePoint.prototype.setVisible.call(point, visible, false);
         // Process new data
@@ -238,16 +258,36 @@ class TimelinePoint extends Series.prototype.pointClass {
         }
     }
 
+    /** @internal */
     public applyOptions(
         options: (PointOptions|PointShortOptions),
-        x?: number
+        x?: number,
+        isMock?: boolean
     ): Point {
-        options = Point.prototype.optionsToObject.call(this, options);
-        this.userDLOptions = merge(this.userDLOptions, options.dataLabels);
-        return super.applyOptions(options, x);
-    }
+        const series = this.series;
 
-    /* eslint-enable valid-jsdoc */
+        if (!x && !(options as any)?.x) {
+            if (isNumber(this.x)) {
+                x = this.x;
+            } else if (isNumber(series?.xIncrement) || NaN) {
+                x = series.xIncrement || 0;
+                series.autoIncrement();
+            }
+        }
+
+        options = Point.prototype.optionsToObject.call(
+            this,
+            options
+        );
+
+        const p = super.applyOptions(options, x, isMock);
+
+        if (!isMock) {
+            this.userDLOptions = merge(this.userDLOptions, options.dataLabels);
+        }
+
+        return p;
+    }
 
 }
 

@@ -1,12 +1,15 @@
-Highcharts.getJSON('https://demo-live-data.highcharts.com/aapl-ohlcv.json', function (data) {
+(async () => {
+
+    const data = await fetch(
+        'https://demo-live-data.highcharts.com/aapl-ohlcv.json'
+    ).then(response => response.json());
 
     // split the data set into ohlc and volume
-    var ohlc = [],
+    const ohlc = [],
         volume = [],
-        dataLength = data.length,
-        i = 0;
+        dataLength = data.length;
 
-    for (i; i < dataLength; i += 1) {
+    for (let i = 0; i < dataLength; i += 1) {
         ohlc.push([
             data[i][0], // the date
             data[i][1], // open
@@ -34,7 +37,14 @@ Highcharts.getJSON('https://demo-live-data.highcharts.com/aapl-ohlcv.json', func
     Highcharts.stockChart('container', {
         stockTools: {
             gui: {
-                buttons: ['linLogSwitch', 'separator', 'indicators', 'separator', 'simpleShapes', 'lines', 'crookedLines', 'measure', 'advanced', 'toggleAnnotations', 'separator', 'verticalLabels', 'flags', 'separator', 'zoomChange', 'fullScreen', 'typeChange', 'separator', 'currentPriceIndicator', 'saveChart'],
+                buttons: [
+                    'linLogSwitch', 'separator', 'indicators', 'separator',
+                    'simpleShapes', 'lines', 'crookedLines', 'measure',
+                    'advanced', 'toggleAnnotations', 'separator',
+                    'verticalLabels', 'flags', 'separator', 'zoomChange',
+                    'fullScreen', 'typeChange', 'separator',
+                    'currentPriceIndicator', 'saveChart'
+                ],
                 definitions: {
                     linLogSwitch: {
                         className: 'highcharts-lin-log-switch',
@@ -50,7 +60,8 @@ Highcharts.getJSON('https://demo-live-data.highcharts.com/aapl-ohlcv.json', func
                     init: function (button) {
                         const chart = this.chart,
                             isLogarithmic = chart.yAxis[0].logarithmic,
-                            axisTypeIcon = isLogarithmic ? 'logarithmic.svg' : 'linear.svg',
+                            axisTypeIcon = isLogarithmic ?
+                                'logarithmic.svg' : 'linear.svg',
                             iconURL = 'https://code.highcharts.com/9.2.2/gfx/stock-icons/' + axisTypeIcon;
 
                         // Change the axis type accordingly.
@@ -64,7 +75,8 @@ Highcharts.getJSON('https://demo-live-data.highcharts.com/aapl-ohlcv.json', func
                         });
 
                         // Change the button icon.
-                        button.firstChild.style['background-image'] = `url(${iconURL})`;
+                        button.firstChild.style[
+                            'background-image'] = `url(${iconURL})`;
 
                         // Deselect button after click.
                         Highcharts.fireEvent(
@@ -93,36 +105,7 @@ Highcharts.getJSON('https://demo-live-data.highcharts.com/aapl-ohlcv.json', func
             offset: 0
         }],
         tooltip: {
-            shape: 'square',
-            headerShape: 'callout',
-            borderWidth: 0,
-            shadow: false,
-            positioner: function (width, height, point) {
-                var chart = this.chart,
-                    position;
-
-                if (point.isHeader) {
-                    position = {
-                        x: Math.max(
-                        // Left side limit
-                            chart.plotLeft,
-                            Math.min(
-                                point.plotX + chart.plotLeft - width / 2,
-                                // Right side limit
-                                chart.chartWidth - width - chart.marginRight
-                            )
-                        ),
-                        y: point.plotY
-                    };
-                } else {
-                    position = {
-                        x: point.series.chart.plotLeft,
-                        y: point.series.yAxis.top - chart.plotTop
-                    };
-                }
-
-                return position;
-            }
+            fixed: true
         },
         series: [{
             type: 'ohlc',
@@ -149,4 +132,4 @@ Highcharts.getJSON('https://demo-live-data.highcharts.com/aapl-ohlcv.json', func
             }]
         }
     });
-});
+})();

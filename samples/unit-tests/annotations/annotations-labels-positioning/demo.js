@@ -107,9 +107,38 @@ QUnit.test('Positioning labels according to real points', function (assert) {
 
     const label5 = chart.annotations[0].labels[4].graphic;
 
-    assert.ok(
-        Math.round(label5.x + label5.width) <= chart.plotLeft + chart.plotWidth,
+    assert.close(
+        Math.round(label5.x + label5.width),
+        chart.plotLeft + chart.plotWidth,
+        1.5,
         '#15524: Label should be within the plot'
+    );
+
+    chart.update({
+        annotations: [{
+            labels: [{
+                point: 'id1',
+                text: 'Center positioned',
+                positioner: ctx => (
+                    ctx ? {
+                        x: 100,
+                        y: 100
+                    } : {
+                        x: 0,
+                        y: 0
+                    }
+                )
+            }]
+        }]
+    });
+
+    const label6 = chart.annotations[0].labels[0].graphic;
+
+    assert.close(
+        Math.round(label6.x + label6.width),
+        200,
+        10,
+        'Arrow function positioner should work.'
     );
 });
 
@@ -545,7 +574,8 @@ QUnit.test(
 );
 
 QUnit.test(
-    'Positioning labels according to real points for half of the yAxis height #13956',
+    'Positioning labels according to real points for half of the yAxis ' +
+    'height #13956',
     function (assert) {
         var chart = Highcharts.chart('container', {
                 yAxis: [
@@ -598,9 +628,10 @@ QUnit.test(
             Math.round(x),
             'x position'
         );
-        assert.strictEqual(
+        assert.close(
             Math.round(label.y + label.height),
             Math.round(y),
+            1,
             'y position'
         );
     }

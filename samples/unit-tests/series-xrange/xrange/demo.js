@@ -132,11 +132,12 @@ QUnit.test('X-Range', function (assert) {
 
     var point = chart.series[0].points[0],
         clipRect = point.graphic.partialClipRect;
-    assert.strictEqual(
+    assert.close(
         Math.floor(
             chart.xAxis[0].toValue(clipRect.attr('width') - clipRect.attr('x'))
         ),
         (point.x2 - point.x) * point.partialFill,
+        1,
         'Clip rect ends at correct position after zoom (#7617).'
     );
 
@@ -173,7 +174,7 @@ QUnit.test('X-Range', function (assert) {
     });
 
     assert.strictEqual(
-        chart.series[0].points[0].graphic.getBBox().width,
+        Math.round(chart.series[0].points[0].graphic.getBBox().width),
         10,
         'Correct width for minPointLength on a reversed xAxis (#8933).'
     );
@@ -290,7 +291,9 @@ QUnit.test('X-Range', function (assert) {
     assert.ok(result, 'Drag handles should be in correct positions (#12872).');
 
     assert.strictEqual(
-        document.querySelector('.highcharts-drag-handle').attributes.cursor.value,
+        document.querySelector(
+            '.highcharts-drag-handle'
+        ).attributes.cursor.value,
         'grab',
         '#16470: DragHandle cursor should use general options.'
     );
@@ -299,7 +302,8 @@ QUnit.test('X-Range', function (assert) {
 QUnit.test('Partial fill reversed', assert => {
     const chart = Highcharts.chart('container', {
         chart: {
-            type: 'xrange'
+            type: 'xrange',
+            styledMode: true
         },
         xAxis: {
             type: 'datetime'
@@ -311,6 +315,7 @@ QUnit.test('Partial fill reversed', assert => {
                         x: Date.UTC(2019, 0, 1),
                         x2: Date.UTC(2019, 0, 2),
                         y: 1,
+                        colorIndex: 0,
                         partialFill: 0.5
                     }
                 ]
@@ -330,11 +335,35 @@ QUnit.test('Partial fill reversed', assert => {
 
     assert.close(
         chart.series[0].points[0].graphic.rect.attr('x') +
-            chart.series[0].points[0].graphic.rect.attr('width'),
+        chart.series[0].points[0].graphic.rect.attr('width'),
         chart.series[0].points[0].graphic.partialClipRect.attr('x') +
-            chart.series[0].points[0].graphic.partialClipRect.attr('width'),
+        chart.series[0].points[0].graphic.partialClipRect.attr('width'),
         1,
         'Partial fill should be aligned left'
+    );
+
+    const graphic = chart.series[0].points[0].graphic;
+
+    chart.series[0].setData([
+        {
+            x: Date.UTC(2019, 0, 1),
+            x2: Date.UTC(2019, 0, 2),
+            y: 1,
+            colorIndex: 2,
+            partialFill: 0.25
+        }
+    ]);
+
+    assert.strictEqual(
+        graphic.element.classList.contains('highcharts-color-2'),
+        true,
+        'The reused point group color class was refreshed, #24547.'
+    );
+
+    assert.strictEqual(
+        graphic.rect.element.classList.contains('highcharts-color-2'),
+        true,
+        'The reused point rect color class was refreshed, #24547.'
     );
 });
 
@@ -636,7 +665,7 @@ QUnit.test('XRange series and tooltip position', assert => {
     var pointGraphicBox = chart.series[0].points[0].graphic.element
         .getBoundingClientRect();
 
-    //Precision up to 2 pixels
+    // Precision up to 2 pixels
     assert.close(
         labelBox.left + labelBox.width / 2,
         pointGraphicBox.left + pointGraphicBox.width / 2,
@@ -656,7 +685,7 @@ QUnit.test('XRange series and tooltip position', assert => {
     pointGraphicBox = chart.series[0].points[0].graphic.element
         .getBoundingClientRect();
 
-    //Precision up to 2 pixels
+    // Precision up to 2 pixels
     assert.close(
         labelBox.left + labelBox.width / 2,
         pointGraphicBox.left + pointGraphicBox.width / 2,
@@ -676,7 +705,7 @@ QUnit.test('XRange series and tooltip position', assert => {
     pointGraphicBox = chart.series[0].points[0].graphic.element
         .getBoundingClientRect();
 
-    //Precision up to 2 pixels
+    // Precision up to 2 pixels
     assert.close(
         labelBox.left + labelBox.width / 2,
         pointGraphicBox.left + pointGraphicBox.width / 2,
@@ -699,7 +728,7 @@ QUnit.test('XRange series and tooltip position', assert => {
     pointGraphicBox = chart.series[0].points[0].graphic.element
         .getBoundingClientRect();
 
-    //Precision up to 2 pixels
+    // Precision up to 2 pixels
     assert.close(
         labelBox.left + labelBox.width / 2,
         pointGraphicBox.left + pointGraphicBox.width / 2,
@@ -725,7 +754,7 @@ QUnit.test('XRange series and tooltip position', assert => {
     pointGraphicBox = chart.series[0].points[0].graphic.element
         .getBoundingClientRect();
 
-    //Precision up to 2 pixels
+    // Precision up to 2 pixels
     assert.close(
         labelBox.top + labelBox.height / 2,
         pointGraphicBox.top + pointGraphicBox.height / 2,
@@ -745,7 +774,7 @@ QUnit.test('XRange series and tooltip position', assert => {
     pointGraphicBox = chart.series[0].points[0].graphic.element
         .getBoundingClientRect();
 
-    //Precision up to 2 pixels
+    // Precision up to 2 pixels
     assert.close(
         labelBox.top + labelBox.height / 2,
         pointGraphicBox.top + pointGraphicBox.height / 2,
@@ -768,7 +797,7 @@ QUnit.test('XRange series and tooltip position', assert => {
     pointGraphicBox = chart.series[0].points[0].graphic.element
         .getBoundingClientRect();
 
-    //Precision up to 2 pixels
+    // Precision up to 2 pixels
     assert.close(
         labelBox.top + labelBox.height / 2,
         pointGraphicBox.top + pointGraphicBox.height / 2,
@@ -791,11 +820,501 @@ QUnit.test('XRange series and tooltip position', assert => {
     pointGraphicBox = chart.series[0].points[0].graphic.element
         .getBoundingClientRect();
 
-    //Precision up to 2 pixels
+    // Precision up to 2 pixels
     assert.close(
         labelBox.top + labelBox.height / 2,
         pointGraphicBox.top + pointGraphicBox.height / 2,
         2.001,
         'Inverted chart, no reversed xAxis, reversed yAxis'
     );
+
+    chart.update({
+        chart: {
+            inverted: false
+        },
+        xAxis: {
+            reversed: false
+        }
+    });
+
+    chart.xAxis[0].setExtremes(4.8, 10);
+    chart.tooltip.refresh(chart.series[0].points[0]);
+
+    const chartContainer = chart.container.getBoundingClientRect();
+    labelBox = chart.tooltip.label.element.getBoundingClientRect();
+
+    assert.close(
+        labelBox.left + labelBox.width / 2,
+        chart.plotLeft + chartContainer.left,
+        2,
+        'Tooltip on plotLeft when only far right part of the point is visible'
+    );
+
+    chart.update({
+        xAxis: {
+            left: '75%',
+            width: '25%'
+        },
+        yAxis: {
+            top: '75%',
+            height: '25%'
+        }
+    });
+
+    const point = chart.series[0].points[0];
+
+    assert.strictEqual(
+        point.tooltipPos[0],
+        chart.xAxis[0].left - chart.plotLeft,
+        'Tooltip position should be correct on the resized x-axis. (#19343)'
+    );
+
+    assert.ok(
+        point.tooltipPos[1] > chart.yAxis[0].top - chart.plotTop,
+        `Tooltip y position should be greater than the top boundery of the
+        resized y-axis. (#19343)`
+    );
 });
+
+QUnit.test('XRange series tooltip correct formatting (#19362)', assert => {
+
+    const chart = Highcharts.chart('container', {
+        chart: {
+            type: 'xrange'
+        },
+        lang: {
+            locale: 'es' // Consistent between browsers
+        },
+        title: {
+            text: 'X-range standard'
+        },
+        yAxis: {
+            title: {
+                text: ''
+            },
+            categories: ['Prototyping', 'Development', 'Testing'],
+            reversed: true
+        },
+        series: [{
+            name: 'Project 1',
+            data: [{
+                x: 1,
+                x2: 2,
+                name: 'Start prototype',
+                y: 0
+            }, {
+                x: 2,
+                x2: 5,
+                name: 'Develop',
+                y: 1
+            }, {
+                x: 6,
+                x2: 8,
+                name: 'Run acceptance tests',
+                y: 2
+            }]
+        }]
+    });
+
+    // Open the tooltip for the first point
+    chart.tooltip.refresh(chart.series[0].points[0]);
+    // Get the tooltip text
+    let tooltipText = chart.tooltip.label.text.textStr;
+
+    assert.ok(
+        tooltipText.includes('1 - 2'),
+        'Tooltip for number axis is correctly formatted.'
+    );
+
+    chart.update({
+        title: {
+            text: 'X-range datatime'
+        },
+        xAxis: {
+            type: 'datetime'
+        },
+        yAxis: {
+            title: {
+                text: ''
+            },
+            categories: ['Prototyping', 'Development', 'Testing'],
+            reversed: true
+        },
+        series: [{
+            name: 'Project 1',
+            data: [{
+                x: Date.UTC(2023, 10, 21),
+                x2: Date.UTC(2023, 11, 2),
+                y: 0
+            }, {
+                x: Date.UTC(2023, 11, 2),
+                x2: Date.UTC(2023, 11, 5),
+                name: 'Develop',
+                y: 1
+            }, {
+                x: Date.UTC(2023, 11, 10),
+                x2: Date.UTC(2023, 11, 23),
+                name: 'Run acceptance tests',
+                y: 2
+            }]
+        }]
+    });
+
+    chart.tooltip.refresh(chart.series[0].points[1]);
+
+    tooltipText = chart.tooltip.label.text.textStr;
+
+    const expectedText = 'Sábado, 2 de dic de 2023 - martes, 5 de dic de 2023';
+    assert.ok(
+        tooltipText.includes(expectedText),
+        `Tooltip for datetime axis should include "${expectedText}"`
+    );
+
+});
+
+QUnit.test('X-range zooming', assert => {
+    const chart = Highcharts.chart('container', {
+        chart: {
+            type: 'xrange',
+            zoomType: 'x',
+            width: 600
+        },
+        title: {
+            text: 'Highcharts X-range'
+        },
+        xAxis: {
+            type: 'datetime'
+        },
+        yAxis: {
+            title: {
+                text: ''
+            },
+            categories: ['Prototyping', 'Development', 'Testing'],
+            reversed: true
+        },
+        series: [{
+            name: 'Project 1',
+            // pointPadding: 0,
+            // groupPadding: 0,
+            borderColor: 'gray',
+            pointWidth: 20,
+            data: [{
+                x: Date.UTC(2014, 10, 21),
+                x2: Date.UTC(2014, 11, 2),
+                y: 0,
+                partialFill: 0.25
+            }, {
+                x: Date.UTC(2014, 11, 2),
+                x2: Date.UTC(2014, 11, 5),
+                y: 1
+            }, {
+                x: Date.UTC(2014, 11, 8),
+                x2: Date.UTC(2014, 11, 9),
+                y: 2
+            }, {
+                x: Date.UTC(2014, 11, 9),
+                x2: Date.UTC(2014, 11, 19),
+                y: 1
+            }, {
+                x: Date.UTC(2014, 11, 10),
+                x2: Date.UTC(2014, 11, 23),
+                y: 2
+            }, {
+                x: Date.UTC(2014, 11, 24),
+                x2: Date.UTC(2014, 11, 25),
+                y: 2
+            }, {
+                x: Date.UTC(2014, 11, 26),
+                x2: Date.UTC(2014, 11, 27),
+                y: 2
+            }, {
+                x: Date.UTC(2014, 11, 28),
+                x2: Date.UTC(2014, 11, 29),
+                y: 2
+            }, {
+                x: Date.UTC(2014, 12, 1),
+                x2: Date.UTC(2014, 12, 2),
+                y: 2
+            }, {
+                x: Date.UTC(2014, 12, 3),
+                x2: Date.UTC(2014, 12, 4),
+                y: 2
+            }, {
+                x: Date.UTC(2014, 12, 5),
+                x2: Date.UTC(2014, 12, 6),
+                y: 2
+            }, {
+                x: Date.UTC(2014, 12, 7),
+                x2: Date.UTC(2014, 12, 8),
+                y: 2
+            }, {
+                x: Date.UTC(2014, 12, 9),
+                x2: Date.UTC(2014, 12, 10),
+                y: 2
+            }, {
+                x: Date.UTC(2014, 12, 11),
+                x2: Date.UTC(2014, 12, 12),
+                y: 2
+            }, {
+                x: Date.UTC(2014, 12, 13),
+                x2: Date.UTC(2014, 12, 14),
+                y: 2
+            }, {
+                x: Date.UTC(2014, 12, 15),
+                x2: Date.UTC(2014, 12, 16),
+                y: 2
+            }, {
+                x: Date.UTC(2014, 12, 17),
+                x2: Date.UTC(2014, 12, 18),
+                y: 2
+            }, {
+                x: Date.UTC(2014, 12, 19),
+                x2: Date.UTC(2014, 12, 20),
+                y: 2
+            }, {
+                x: Date.UTC(2014, 12, 21),
+                x2: Date.UTC(2014, 12, 22),
+                y: 2
+            }, {
+                x: Date.UTC(2014, 12, 23),
+                x2: Date.UTC(2014, 12, 24),
+                y: 2
+            }, {
+                x: Date.UTC(2014, 12, 25),
+                x2: Date.UTC(2014, 12, 26),
+                y: 2
+            }, {
+                x: Date.UTC(2014, 11, 8),
+                x2: Date.UTC(2014, 11, 9),
+                y: 0
+            }, {
+                x: Date.UTC(2014, 11, 9),
+                x2: Date.UTC(2014, 11, 19),
+                y: 1
+            }, {
+                x: Date.UTC(2014, 11, 10),
+                x2: Date.UTC(2014, 11, 23),
+                y: 0
+            }, {
+                x: Date.UTC(2014, 11, 24),
+                x2: Date.UTC(2014, 11, 25),
+                y: 0
+            }, {
+                x: Date.UTC(2014, 11, 26),
+                x2: Date.UTC(2014, 11, 27),
+                y: 0
+            }, {
+                x: Date.UTC(2014, 11, 28),
+                x2: Date.UTC(2014, 11, 29),
+                y: 0
+            }, {
+                x: Date.UTC(2014, 12, 1),
+                x2: Date.UTC(2014, 12, 2),
+                y: 0
+            }, {
+                x: Date.UTC(2014, 12, 3),
+                x2: Date.UTC(2014, 12, 4),
+                y: 0
+            }, {
+                x: Date.UTC(2014, 12, 5),
+                x2: Date.UTC(2014, 12, 6),
+                y: 0
+            }, {
+                x: Date.UTC(2014, 12, 7),
+                x2: Date.UTC(2014, 12, 8),
+                y: 0
+            }, {
+                x: Date.UTC(2014, 12, 9),
+                x2: Date.UTC(2014, 12, 10),
+                y: 0
+            }, {
+                x: Date.UTC(2014, 12, 11),
+                x2: Date.UTC(2014, 12, 12),
+                y: 0
+            }, {
+                x: Date.UTC(2014, 12, 13),
+                x2: Date.UTC(2014, 12, 14),
+                y: 0
+            }, {
+                x: Date.UTC(2014, 12, 15),
+                x2: Date.UTC(2014, 12, 16),
+                y: 0
+            }, {
+                x: Date.UTC(2014, 12, 17),
+                x2: Date.UTC(2014, 12, 18),
+                y: 0
+            }, {
+                x: Date.UTC(2014, 12, 19),
+                x2: Date.UTC(2014, 12, 20),
+                y: 0
+            }, {
+                x: Date.UTC(2014, 12, 21),
+                x2: Date.UTC(2014, 12, 22),
+                y: 0
+            }, {
+                x: Date.UTC(2014, 12, 23),
+                x2: Date.UTC(2014, 12, 24),
+                y: 0
+            }, {
+                x: Date.UTC(2014, 12, 25),
+                x2: Date.UTC(2014, 12, 26),
+                y: 0
+            }, {
+                x: Date.UTC(2014, 11, 8),
+                x2: Date.UTC(2014, 11, 9),
+                y: 1
+            }, {
+                x: Date.UTC(2014, 11, 9),
+                x2: Date.UTC(2014, 11, 19),
+                y: 1
+            }, {
+                x: Date.UTC(2014, 11, 10),
+                x2: Date.UTC(2014, 11, 23),
+                y: 1
+            }, {
+                x: Date.UTC(2014, 11, 24),
+                x2: Date.UTC(2014, 11, 25),
+                y: 1
+            }, {
+                x: Date.UTC(2014, 11, 26),
+                x2: Date.UTC(2014, 11, 27),
+                y: 1
+            }, {
+                x: Date.UTC(2014, 11, 28),
+                x2: Date.UTC(2014, 11, 29),
+                y: 1
+            }, {
+                x: Date.UTC(2014, 12, 1),
+                x2: Date.UTC(2014, 12, 2),
+                y: 1
+            }, {
+                x: Date.UTC(2014, 12, 3),
+                x2: Date.UTC(2014, 12, 4),
+                y: 1
+            }, {
+                x: Date.UTC(2014, 12, 5),
+                x2: Date.UTC(2014, 12, 6),
+                y: 1
+            }, {
+                x: Date.UTC(2014, 12, 7),
+                x2: Date.UTC(2014, 12, 8),
+                y: 1
+            }, {
+                x: Date.UTC(2014, 12, 9),
+                x2: Date.UTC(2014, 12, 10),
+                y: 1
+            }, {
+                x: Date.UTC(2014, 12, 11),
+                x2: Date.UTC(2014, 12, 12),
+                y: 1
+            }, {
+                x: Date.UTC(2014, 12, 13),
+                x2: Date.UTC(2014, 12, 14),
+                y: 1
+            }, {
+                x: Date.UTC(2014, 12, 15),
+                x2: Date.UTC(2014, 12, 16),
+                y: 1
+            }, {
+                x: Date.UTC(2014, 12, 17),
+                x2: Date.UTC(2014, 12, 18),
+                y: 1
+            }, {
+                x: Date.UTC(2014, 12, 19),
+                x2: Date.UTC(2014, 12, 20),
+                y: 1
+            }, {
+                x: Date.UTC(2014, 12, 21),
+                x2: Date.UTC(2014, 12, 22),
+                y: 1
+            }, {
+                x: Date.UTC(2014, 12, 23),
+                x2: Date.UTC(2014, 12, 24),
+                y: 1
+            }, {
+                x: Date.UTC(2014, 12, 25),
+                x2: Date.UTC(2014, 12, 26),
+                y: 1
+            }],
+            dataLabels: {
+                enabled: true
+            }
+        }]
+
+    });
+
+    chart.xAxis[0].setExtremes(
+        Date.UTC(2014, 11, 30),
+        Date.UTC(2015, 0, 10, 12)
+    );
+
+    assert.ok(
+        chart.series[0].points.length >= 15,
+        'Points within the plot area (at least) should be kept (#21003)'
+    );
+});
+
+QUnit.test(
+    'Equally sized bars should rank data labels equally (#23585)',
+    function (assert) {
+        var rows = [
+            'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L'
+        ];
+
+        var chart = Highcharts.chart('container', {
+            chart: {
+                type: 'xrange',
+                height: 200,
+                animation: false
+            },
+            title: {
+                text: undefined
+            },
+            legend: {
+                enabled: false
+            },
+            xAxis: {
+                visible: false
+            },
+            yAxis: {
+                categories: rows,
+                title: {
+                    text: null
+                },
+                gridLineWidth: 0
+            },
+            series: [
+                {
+                    pointWidth: 8,
+                    dataLabels: {
+                        enabled: true,
+                        format: '{point.yCategory}',
+                        style: {
+                            fontSize: '20px'
+                        }
+                    },
+                    data: rows.map(function (name, y) {
+                        return { x: 0, x2: 10, y: y };
+                    })
+                }
+            ]
+        });
+
+        // The xrange series reuses the column translation and then replaces
+        // shapeArgs with its own geometry, so every bar ends up the same
+        // height. The ranking must follow the rendered shape, not a height
+        // left over from the column translation.
+        var ranks = chart.series[0].points.map(function (point) {
+            return point.dataLabels[0].labelrank;
+        });
+
+        assert.deepEqual(
+            ranks,
+            ranks.map(function () {
+                return ranks[0];
+            }),
+            'All equally sized bars should get the same labelrank, got ' +
+                ranks.join(', ')
+        );
+    }
+);

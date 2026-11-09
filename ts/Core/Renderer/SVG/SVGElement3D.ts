@@ -1,12 +1,14 @@
 /* *
  *
- *  (c) 2010-2021 Torstein Honsi
+ *  (c) 2010-2026 Highsoft AS
+ *  Author: Torstein Hønsi
  *
  *  Extensions to the SVGRenderer class to enable 3D shapes
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -21,44 +23,66 @@
 import type AnimationOptions from '../../Animation/AnimationOptions';
 import type ColorType from '../../Color/ColorType';
 import type SVGArc3D from './SVGArc3D';
-import type SVGAttributes from './SVGAttributes';
+import type SVGAttributes3D from './SVGAttributes3D';
 import type SVGCuboid from './SVGCuboid';
-import type {
-    SVGElement3DLike,
-    SVGElement3DLikeBase,
-    SVGElement3DLikeCuboid
-} from './SVGElement3DLike';
 import type SVGPath from './SVGPath';
+import type SVGRenderer3D from './SVGRenderer3D';
 
 import Color from '../../Color/Color.js';
 const { parse: color } = Color;
 import SVGElement from './SVGElement.js';
-import U from '../../Utilities.js';
-const {
-    defined,
-    merge,
-    objectEach,
-    pick
-} = U;
+import { defined } from '../../../Shared/Utilities.js';
 
 /* *
  *
- *  Constants
+ *  Class
  *
  * */
 
-const SVGElement3D = {} as SVGElement3DLike;
 
-SVGElement3D.base = {
-    /* eslint-disable valid-jsdoc */
+/** @internal */
+class SVGElement3D extends SVGElement {
+
+
+    /* *
+     *
+     *  Static Properties
+     *
+     * */
+
+
+    public static types: Record<string, typeof SVGElement3D> = {
+        base: SVGElement3D,
+        cuboid: SVGElement3D
+    };
+
+
+    /* *
+     *
+     *  Properties
+     *
+     * */
+
+
+    public parts = ['front', 'top', 'side'];
+
+
+    public pathType = 'cuboid';
+
+
+    /* *
+     *
+     *  Functions
+     *
+     * */
+
 
     /**
      * The init is used by base - renderer.Element
-     * @private
+     * @internal
      */
-    initArgs: function (
-        this: SVGElement,
-        args: SVGAttributes
+    public initArgs(
+        args: SVGAttributes3D
     ): void {
         const elem3d = this,
             renderer = elem3d.renderer,
@@ -66,9 +90,9 @@ SVGElement3D.base = {
                 (renderer as any)[elem3d.pathType + 'Path'](args),
             zIndexes = (paths as any).zIndexes;
 
-        // build parts
-        (elem3d.parts as any).forEach(function (part: string): void {
-            const attribs: SVGAttributes = {
+        // Build parts
+        for (const part of elem3d.parts) {
+            const attribs: SVGAttributes3D = {
                 'class': 'highcharts-3d-' + part,
                 zIndex: zIndexes[part] || 0
             };
@@ -82,38 +106,34 @@ SVGElement3D.base = {
             elem3d[part] = renderer.path((paths as any)[part])
                 .attr(attribs)
                 .add(elem3d);
-        });
+        }
 
         elem3d.attr({
             'stroke-linejoin': 'round',
             zIndex: zIndexes.group
         });
 
-        // store original destroy
-        elem3d.originalDestroy = elem3d.destroy;
-        elem3d.destroy = elem3d.destroyParts;
         // Store information if any side of element was rendered by force.
         elem3d.forcedSides = (paths as any).forcedSides;
 
-    },
+    }
 
     /**
      * Single property setter that applies options to each part
-     * @private
+     * @internal
      */
-    singleSetterForParts: function (
-        this: SVGElement,
+    public singleSetterForParts(
         prop: string,
         val: any,
         values?: AnyRecord,
         verb?: string,
         duration?: any,
         complete?: any
-    ): SVGElement {
+    ): this {
         const elem3d = this,
             newAttr = {} as AnyRecord,
             optionsToApply = [null, null, (verb || 'attr'), duration, complete],
-            hasZIndexes = values && values.zIndexes;
+            hasZIndexes = values?.zIndexes;
 
         if (!values) {
             newAttr[prop] = val;
@@ -121,82 +141,76 @@ SVGElement3D.base = {
         } else {
             // It is needed to deal with the whole group zIndexing
             // in case of graph rotation
-            if (hasZIndexes && hasZIndexes.group) {
-                this.attr({
+            if (hasZIndexes?.group) {
+                elem3d.attr({
                     zIndex: hasZIndexes.group
                 });
             }
-            objectEach(values, function (partVal: any, part: string): void {
+            for (const part of Object.keys(values)) {
                 newAttr[part] = {};
-                newAttr[part][prop] = partVal;
+                newAttr[part][prop] = values[part];
 
-                // include zIndexes if provided
+                // Include zIndexes if provided
                 if (hasZIndexes) {
                     newAttr[part].zIndex = values.zIndexes[part] || 0;
                 }
-            });
+            }
             optionsToApply[1] = newAttr;
         }
 
-        return elem3d.processParts.apply(elem3d, optionsToApply);
-    },
+        return this.processParts.apply(elem3d, optionsToApply as any);
+    }
 
     /**
      * Calls function for each part. Used for attr, animate and destroy.
-     * @private
+     * @internal
      */
-    processParts: function (
-        this: SVGElement,
+    public processParts(
         props: any,
-        partsProps: AnyRecord,
+        partsProps: (AnyRecord|null),
         verb: string,
         duration?: any,
         complete?: any
-    ): SVGElement {
+    ): this {
         const elem3d = this;
 
-        (elem3d.parts as any).forEach(function (part: string): void {
-            // if different props for different parts
+        for (const part of elem3d.parts) {
+            // If different props for different parts
             if (partsProps) {
-                props = pick(partsProps[part], false);
+                props = (partsProps[part] ?? false);
             }
 
-            // only if something to set, but allow undefined
+            // Only if something to set, but allow undefined
             if (props !== false) {
                 elem3d[part][verb](props, duration, complete);
             }
-        });
+        }
         return elem3d;
-    },
+    }
 
     /**
      * Destroy all parts
-     * @private
+     * @internal
      */
-    destroyParts: function (this: SVGElement): void {
+    public destroy(): undefined {
         this.processParts(null, null, 'destroy');
-        return this.originalDestroy();
+        return super.destroy();
     }
 
-    /* eslint-enable valid-jsdoc */
-} as SVGElement3DLikeBase;
+    // Following functions are SVGElement3DCuboid (= base)
 
-SVGElement3D.cuboid = merge(SVGElement3D.base, {
-    parts: ['front', 'top', 'side'],
-    pathType: 'cuboid',
-
-    attr: function (
-        this: SVGElement,
-        args: (string|SVGAttributes),
-        val?: (number|string|SVGPath),
+    /** @internal */
+    public attr(
+        args: (string|SVGAttributes3D),
+        val?: (number|string|ColorType|SVGPath),
         complete?: Function,
         continueAnimation?: boolean
-    ): SVGElement {
+    ): (number|string|this) {
         // Resolve setting attributes by string name
         if (typeof args === 'string' && typeof val !== 'undefined') {
             const key = args;
 
-            args = {} as SVGAttributes;
+            args = {} as SVGAttributes3D;
             (args as any)[key] = val;
         }
 
@@ -210,16 +224,15 @@ SVGElement3D.cuboid = merge(SVGElement3D.base, {
             );
         }
 
-        return SVGElement.prototype.attr.call(
-            this, args as any, void 0, complete, continueAnimation
-        );
-    },
-    animate: function (
-        this: SVGElement,
-        args: SVGAttributes,
+        return super.attr(args as any, void 0, complete, continueAnimation);
+    }
+
+    /** @internal */
+    public animate(
+        args: SVGAttributes3D,
         duration?: (boolean|Partial<AnimationOptions>),
         complete?: Function
-    ): SVGElement {
+    ): this {
         if (defined(args.x) && defined(args.y)) {
             const paths = (this.renderer as any)[this.pathType + 'Path'](args),
                 forcedSides = paths.forcedSides;
@@ -235,19 +248,21 @@ SVGElement3D.cuboid = merge(SVGElement3D.base, {
             if (forcedSides !== this.forcedSides) {
                 this.forcedSides = forcedSides;
                 if (!this.renderer.styledMode) {
-                    SVGElement3D.cuboid.fillSetter.call(this, this.fill);
+                    this.fillSetter(this.fill);
                 }
             }
         } else {
-            SVGElement.prototype.animate.call(this, args, duration, complete);
+            super.animate(args, duration, complete);
         }
         return this;
-    },
-    fillSetter: function (
-        this: SVGElement,
+    }
+
+    /** @internal */
+    public fillSetter(
         fill: ColorType
-    ): SVGElement {
+    ): this {
         const elem3d = this;
+
         elem3d.forcedSides = elem3d.forcedSides || [];
         elem3d.singleSetterForParts('fill', null, {
             front: fill,
@@ -260,12 +275,39 @@ SVGElement3D.cuboid = merge(SVGElement3D.base, {
             ).get()
         });
 
-        // fill for animation getter (#6776)
+        // Fill for animation getter (#6776)
         elem3d.color = elem3d.fill = fill;
 
         return elem3d;
     }
-} as SVGElement3DLikeCuboid);
+
+}
+
+/* *
+ *
+ *  Class Prototype
+ *
+ * */
+
+/** @internal */
+interface SVGElement3D {
+    renderer: SVGRenderer3D.Composition;
+    add(parent?: SVGElement3D): this;
+    attr(key: string): (number|string);
+    attr(
+        key: string,
+        val: (number|string|ColorType|SVGPath),
+        complete?: Function,
+        continueAnimation?: boolean
+    ): this;
+    attr(
+        hash: SVGAttributes3D,
+        val?: undefined,
+        complete?: Function,
+        continueAnimation?: boolean
+    ): this;
+}
+
 
 /* *
  *
@@ -273,4 +315,6 @@ SVGElement3D.cuboid = merge(SVGElement3D.base, {
  *
  * */
 
+
+/** @internal */
 export default SVGElement3D;

@@ -1,10 +1,12 @@
 /* *
  *
- *  (c) 2010-2021 Grzegorz Blachlinski, Sebastian Bochan
+ *  (c) 2010-2026 Highsoft AS
+ *  Author: Grzegorz Blachliński, Sebastian Bochan
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -21,19 +23,19 @@ import type { DragNodesPoint } from '../DragNodesComposition';
 import type NetworkgraphPoint from '../Networkgraph/NetworkgraphPoint';
 import type PackedBubblePointOptions from './PackedBubblePointOptions';
 import type PackedBubbleSeries from './PackedBubbleSeries';
+import type { StatesOptionsKey } from '../../Core/Series/StatesOptions';
 
 import Chart from '../../Core/Chart/Chart.js';
 import Point from '../../Core/Series/Point.js';
-import SeriesRegistry from '../../Core/Series/SeriesRegistry.js';
-const {
-    seriesTypes: {
-        bubble: {
-            prototype: {
-                pointClass: BubblePoint
-            }
-        }
-    }
-} = SeriesRegistry;
+import BubbleSeries from '../Bubble/BubbleSeries.js';
+
+/* *
+ *
+ *  Constants
+ *
+ * */
+
+const BubblePoint = BubbleSeries.prototype.pointClass;
 
 /* *
  *
@@ -41,8 +43,8 @@ const {
  *
  * */
 
-declare module '../../Core/Series/PointLike' {
-    interface PointLike {
+declare module '../../Core/Series/PointBase' {
+    interface PointBase {
         degree?: number;
     }
 }
@@ -61,39 +63,55 @@ class PackedBubblePoint extends BubblePoint implements DragNodesPoint {
      *
      * */
 
+    /** @internal */
     public collisionNmb?: number;
 
+    /** @internal */
     public dataLabelOnNull?: boolean;
 
-    public degree: number = NaN;
+    /** @internal */
+    public degree!: number;
 
+    /** @internal */
     public dispX?: number;
 
+    /** @internal */
     public dispY?: number;
 
+    /** @internal */
     public fixedPosition: DragNodesPoint['fixedPosition'];
 
+    /** @internal */
     public isParentNode?: boolean;
 
-    public mass: number = NaN;
+    /** @internal */
+    public mass!: number;
 
-    public neighbours?: number;
+    /** @internal */
+    public neighbors?: number;
 
+    /** @internal */
     public prevX?: number;
 
+    /** @internal */
     public prevY?: number;
 
-    public radius: number = NaN;
+    /** @internal */
+    public radius!: number;
 
+    /** @internal */
     public removed?: boolean;
 
-    public options: PackedBubblePointOptions = void 0 as any;
+    public options!: PackedBubblePointOptions;
 
-    public series: PackedBubbleSeries = void 0 as any;
+    /** @internal */
+    public series!: PackedBubbleSeries;
 
+    /** @internal */
     public seriesIndex?: number;
 
-    public value: (number|null) = null;
+    /** @internal */
+    public value?: (number|null);
 
     /* *
      *
@@ -101,25 +119,25 @@ class PackedBubblePoint extends BubblePoint implements DragNodesPoint {
      *
      * */
 
-    /* eslint-disable valid-jsdoc */
 
     /**
      * Destroy point.
      * Then remove point from the layout.
-     * @private
+     * @internal
      */
     public destroy(): void {
-        if (this.series.layout) {
+        if (this.series?.layout) {
             this.series.layout.removeElementFromCollection(
-                this, this.series.layout.nodes
+                this,
+                this.series.layout.nodes as Array<PackedBubblePoint>
             );
         }
         return Point.prototype.destroy.apply(this, arguments as any);
     }
 
+    /** @internal */
     public firePointEvent(): void {
-        const point = this,
-            series = this.series,
+        const series = this.series,
             seriesOptions = series.options;
 
         if (this.isParentNode && seriesOptions.parentNode) {
@@ -134,6 +152,7 @@ class PackedBubblePoint extends BubblePoint implements DragNodesPoint {
         }
     }
 
+    /** @internal */
     public select(): void {
         const point = this,
             series = this.series,
@@ -147,7 +166,16 @@ class PackedBubblePoint extends BubblePoint implements DragNodesPoint {
         }
     }
 
-    /* eslint-enable valid-jsdoc */
+    /** @internal */
+    public setState(
+        state?: StatesOptionsKey,
+        move?: boolean
+    ): void {
+        if (this?.graphic?.parentGroup?.element) {
+            super.setState(state, move);
+        }
+    }
+
 
 }
 
@@ -157,14 +185,16 @@ class PackedBubblePoint extends BubblePoint implements DragNodesPoint {
  *
  * */
 
+/** @internal */
 interface PackedBubblePoint extends NetworkgraphPoint {
+    /** @internal */
     className: BubblePointType['className'];
     fromNode: NetworkgraphPoint;
     linksFrom: Array<NetworkgraphPoint>;
     linksTo: Array<NetworkgraphPoint>;
     toNode: NetworkgraphPoint;
-    init: NetworkgraphPoint['init'];
     isValid: NetworkgraphPoint['isValid'];
+    /** @internal */
     remove: BubblePointType['remove'];
 }
 

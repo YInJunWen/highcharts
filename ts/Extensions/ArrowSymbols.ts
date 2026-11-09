@@ -1,11 +1,12 @@
 /* *
  *
- *  (c) 2017 Highsoft AS
+ *  (c) 2017-2026 Highsoft AS
  *  Authors: Lars A. V. Cabrera
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -18,9 +19,30 @@
  * */
 
 import type SVGPath from '../Core/Renderer/SVG/SVGPath';
+import type SVGRenderer from '../Core/Renderer/SVG/SVGRenderer';
 
-import SVGRenderer from '../Core/Renderer/SVG/SVGRenderer.js';
-const { prototype: { symbols } } = SVGRenderer;
+/* *
+ *
+ *  Declarations
+ *
+ * */
+
+declare module '../Core/Renderer/SVG/SymbolType' {
+    interface SymbolTypeRegistry {
+        /** @requires modules/arrow-symbols */
+        arrow: typeof arrow;
+        /** @requires modules/arrow-symbols */
+        'arrow-filled': typeof triangleLeft;
+        /** @requires modules/arrow-symbols */
+        'arrow-filled-half': typeof triangleLeftHalf;
+        /** @requires modules/arrow-symbols */
+        'arrow-half': typeof arrowHalf;
+        /** @requires modules/arrow-symbols */
+        'triangle-left': typeof triangleLeft;
+        /** @requires modules/arrow-symbols */
+        'triangle-left-half': typeof triangleLeftHalf;
+    }
+}
 
 /* *
  *
@@ -40,7 +62,6 @@ const { prototype: { symbols } } = SVGRenderer;
  *                   o
  * ```
  *
- * @private
  * @function
  *
  * @param {number} x
@@ -82,7 +103,6 @@ function arrow(
  *       o
  * ```
  *
- * @private
  * @function
  *
  * @param {number} x
@@ -110,6 +130,24 @@ function arrowHalf(
 }
 
 /**
+ * Adds the arrow symbols to the SVGRenderer.
+ *
+ * @internal
+ */
+export function composeArrowSymbols(
+    SVGRendererClass: typeof SVGRenderer
+): void {
+    const symbols = SVGRendererClass.prototype.symbols;
+
+    symbols.arrow = arrow;
+    symbols['arrow-filled'] = triangleLeft;
+    symbols['arrow-filled-half'] = triangleLeftHalf;
+    symbols['arrow-half'] = arrowHalf;
+    symbols['triangle-left'] = triangleLeft;
+    symbols['triangle-left-half'] = triangleLeftHalf;
+}
+
+/**
  * Creates a left-oriented triangle.
  * ```
  *             o
@@ -119,7 +157,6 @@ function arrowHalf(
  *             o
  * ```
  *
- * @private
  * @function
  *
  * @param {number} x
@@ -161,7 +198,6 @@ function triangleLeft(
  *       o
  * ```
  *
- * @private
  * @function
  *
  * @param {number} x
@@ -187,41 +223,3 @@ function triangleLeftHalf(
 ): SVGPath {
     return triangleLeft(x, y, w / 2, h);
 }
-
-/* *
- *
- *  Registry
- *
- * */
-
-declare module '../Core/Renderer/SVG/SymbolType' {
-    interface SymbolTypeRegistry {
-        /** @requires Extensions/ArrowSymbols */
-        arrow: typeof arrow;
-        /** @requires Extensions/ArrowSymbols */
-        'arrow-filled': typeof triangleLeft;
-        /** @requires Extensions/ArrowSymbols */
-        'arrow-filled-half': typeof triangleLeftHalf;
-        /** @requires Extensions/ArrowSymbols */
-        'arrow-half': typeof arrowHalf;
-        /** @requires Extensions/ArrowSymbols */
-        'triangle-left': typeof triangleLeft;
-        /** @requires Extensions/ArrowSymbols */
-        'triangle-left-half': typeof triangleLeftHalf;
-    }
-}
-
-symbols.arrow = arrow;
-symbols['arrow-filled'] = triangleLeft;
-symbols['arrow-filled-half'] = triangleLeftHalf;
-symbols['arrow-half'] = arrowHalf;
-symbols['triangle-left'] = triangleLeft;
-symbols['triangle-left-half'] = triangleLeftHalf;
-
-/* *
- *
- *  Default Export
- *
- * */
-
-export default symbols;

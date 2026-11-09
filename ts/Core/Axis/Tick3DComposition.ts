@@ -1,12 +1,14 @@
 /* *
  *
- *  (c) 2010-2021 Torstein Honsi
+ *  (c) 2010-2026 Highsoft AS
+ *  Author: Torstein Hønsi
  *
- *  Extenstion for 3d axes
+ *  Extension for 3d axes
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -21,20 +23,10 @@
 import type Position3DObject from '../Renderer/Position3DObject';
 import type SVGPath from '../Renderer/SVG/SVGPath';
 import type Tick from './Tick.js';
-import U from '../Utilities.js';
-const {
-    addEvent,
-    extend,
-    wrap
-} = U;
 
-/* *
- *
- *  Constants
- *
- * */
-
-const composedClasses: Array<Function> = [];
+import H from '../Globals.js';
+const { composed } = H;
+import { addEvent, extend, pushUnique, wrap } from '../../Shared/Utilities.js';
 
 /* *
  *
@@ -42,16 +34,12 @@ const composedClasses: Array<Function> = [];
  *
  * */
 
-/**
- * @private
- */
+/** @internal */
 function compose(
     TickClass: typeof Tick
 ): void {
 
-    if (composedClasses.indexOf(TickClass) === -1) {
-        composedClasses.push(TickClass);
-
+    if (pushUnique(composed, 'Axis.Tick3D')) {
         addEvent(
             TickClass,
             'afterGetLabelPosition',
@@ -63,9 +51,7 @@ function compose(
 
 }
 
-/**
- * @private
- */
+/** @internal */
 function onTickAfterGetLabelPosition(
     this: Tick,
     e: {
@@ -81,9 +67,7 @@ function onTickAfterGetLabelPosition(
     }
 }
 
-/**
- * @private
- */
+/** @internal */
 function wrapTickGetMarkPath(
     this: Tick,
     proceed: Function
@@ -116,8 +100,10 @@ function wrapTickGetMarkPath(
  *
  * */
 
+/** @internal */
 const Tick3DAdditions = {
     compose
 };
 
+/** @internal */
 export default Tick3DAdditions;

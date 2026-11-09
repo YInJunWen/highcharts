@@ -1,0 +1,110 @@
+name: Highcharts headless tests
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test_unit_tests:
+    name: Node unit tests
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 'lts/*'
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Build Highcharts
+        run: npx gulp scripts
+
+      - name: Verify webpack bundles
+        run: |
+          node tools/webpacks/check-duplicates.mjs
+          node tools/webpacks/check-namespace-exposure.mjs
+
+      - name: Run unit tests
+        run: npm run test-node
+
+  test_cypress:
+    name: Cypress tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          path: highcharts
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 'lts/*'
+          cache: 'npm'
+          cache-dependency-path: highcharts/package-lock.json
+
+      - name: Install Highcharts deps
+        run: |
+          cd highcharts
+          npm ci
+
+      - name: Build Highcharts
+        run: |
+          cd highcharts
+          npx gulp scripts
+
+      - name: Checkout utils
+        uses: actions/checkout@v6
+        with:
+          repository: highcharts/highcharts-utils
+          path: utils
+          fetch-depth: 1
+
+      - name: Install Highcharts Utils
+        run: |
+          cd utils
+          npm ci
+
+      - name: Run Cypress test
+        uses: cypress-io/github-action@v7
+        with:
+          start: node ../utils/server --localOnly
+          wait-on: 'http://localhost:3031/highcharts.js'
+          browser: chrome
+          working-directory: highcharts
+          config-file: test/cypress/highcharts/config.mjs
+          install: false
+
+  test_playwright:
+    name: Playwright tests
+    timeout-minutes: 15
+    runs-on: ubuntu-latest
+    env:
+      DISPLAY: :99
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 'lts/*'
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Setup Display
+        run: sudo Xvfb -ac :99 -screen 0 1280x1024x24 > /dev/null 2>&1 &
+
+      - name: Build Highcharts
+        run: npx gulp scripts
+
+      - name: Run Highcharts Playwright tests
+        run: npx playwright test --project=highcharts
+
+      - name: Run QUnit Playwright tests
+        run: npx playwright test --project=qunit

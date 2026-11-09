@@ -1,13 +1,14 @@
 Highcharts.chart('container', {
     chart: {
         type: 'scatter',
-        zoomType: 'xy'
+        zooming: {
+            type: 'xy'
+        }
     },
     title: {
         text: 'Vitamin D in preventing COVID-19 infection'
     },
     subtitle: {
-        HTML: true,
         text: 'Source: <a href="https://www.sciencedirect.com/science/article/pii/S1876034120305311" target="_blank">Sciencedirect</a>'
     },
 
@@ -55,7 +56,8 @@ Highcharts.chart('container', {
     },
     series: [{
         name: null,
-        data: [[57, 4736],
+        data: [
+            [57, 4736],
             [65, 1123],
             [73.3, 834],
             [67.7, 449],
@@ -74,6 +76,7 @@ Highcharts.chart('container', {
             [81.5, 125],
             [60.6, 93],
             [51.8, 453],
-            [39, 1289]]
+            [39, 1289]
+        ]
     }]
 });

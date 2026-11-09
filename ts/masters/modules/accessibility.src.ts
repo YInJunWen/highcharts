@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: LicenseRef-Highcharts
 /**
  * @license Highcharts JS v@product.version@ (@product.date@)
  * @module highcharts/modules/accessibility
@@ -5,10 +6,11 @@
  *
  * Accessibility module
  *
- * (c) 2010-2021 Highsoft AS
- * Author: Oystein Moseng
+ * (c) 2010-2026 Highsoft AS
+ * Author: Øystein Moseng
  *
- * License: www.highcharts.com/license
+ * A commercial license may be required depending on use,
+ * see www.highcharts.com/license
  */
 
 'use strict';
@@ -20,17 +22,16 @@ import ChartUtilities from '../../Accessibility/Utils/ChartUtilities.js';
 import HTMLUtilities from '../../Accessibility/Utils/HTMLUtilities.js';
 import KeyboardNavigationHandler from '../../Accessibility/KeyboardNavigationHandler.js';
 import SeriesDescriber from '../../Accessibility/Components/SeriesComponent/SeriesDescriber.js';
-
 const G: AnyRecord = Highcharts;
+// Classes
 G.i18nFormat = Accessibility.i18nFormat;
 G.A11yChartUtilities = ChartUtilities;
 G.A11yHTMLUtilities = HTMLUtilities;
 G.AccessibilityComponent = AccessibilityComponent;
 G.KeyboardNavigationHandler = KeyboardNavigationHandler;
 G.SeriesAccessibilityDescriber = SeriesDescriber;
-
+// Compositions
 Accessibility.compose(
-    G.Axis,
     G.Chart,
     G.Legend,
     G.Point,
@@ -38,3 +39,4 @@ Accessibility.compose(
     G.SVGElement,
     G.RangeSelector
 );
+export default Highcharts;

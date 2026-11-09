@@ -2,11 +2,13 @@
  *
  *  Popup generator for Stock tools
  *
- *  (c) 2009-2021 Sebastian Bochan
+ *  (c) 2009-2026 Highsoft AS
+ *  Author: Sebastian Bochan
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -28,15 +30,16 @@ const {
     doc,
     isFirefox
 } = H;
-import U from '../../../Core/Utilities.js';
-const {
+import BaseFormIcons from '../../../Shared/BaseFormIcons.js';
+import getIcon from '../../../Shared/BaseFormUtils.js';
+
+import {
     createElement,
     isArray,
     isObject,
     objectEach,
-    pick,
     stableSort
-} = U;
+} from '../../../Shared/Utilities.js';
 
 /* *
  *
@@ -47,7 +50,8 @@ const {
 /**
  * Create annotation simple form.
  * It contains fields with param names.
- * @private
+ *
+ * @internal
  * @param {Highcharts.Chart} chart
  * Chart
  * @param {Object} options
@@ -72,7 +76,7 @@ function addForm(
     const popupDiv = this.container,
         lang = this.lang;
 
-    // create title of annotations
+    // Create title of annotations
     let lhsCol = createElement('h2', {
         className: 'highcharts-popup-main-title'
     }, void 0, popupDiv);
@@ -82,7 +86,7 @@ function addForm(
         )
     );
 
-    // left column
+    // Left column
     lhsCol = createElement(
         'div',
         {
@@ -127,10 +131,14 @@ function addForm(
 /**
  * Create annotation simple form. It contains two buttons
  * (edit / remove) and text label.
- * @private
- * @param {Highcharts.Chart} - chart
- * @param {Highcharts.AnnotationsOptions} - options
- * @param {Function} - on click callback
+ *
+ * @internal
+ * @param {Highcharts.Chart} chart
+ *        The Chart instance
+ * @param {Highcharts.AnnotationsOptions} options
+ *        Annotation options
+ * @param {Function} callback
+ *        On click callback
  */
 function addToolbar(
     this: Popup,
@@ -143,41 +151,39 @@ function addToolbar(
         showForm = this.showForm,
         toolbarClass = 'highcharts-annotation-toolbar';
 
-    // set small size
+    // Set small size
     if (popupDiv.className.indexOf(toolbarClass) === -1) {
-        popupDiv.className += ' ' + toolbarClass;
+        popupDiv.className += ' ' + toolbarClass + ' highcharts-no-mousewheel';
     }
 
-    // set position
+    // Set position
     if (chart) {
         popupDiv.style.top = chart.plotTop + 10 + 'px';
     }
 
-    // create label
-    createElement('span', void 0, void 0, popupDiv).appendChild(
-        doc.createTextNode(pick(
-            // Advanced annotations:
-            lang[options.langKey as any] || options.langKey,
-            // Basic shapes:
-            options.shapes && options.shapes[0].type,
-            ''
-        ))
+    // Create label
+    const label = createElement(
+        'p',
+        {
+            className: 'highcharts-annotation-label'
+        },
+        void 0,
+        popupDiv
+    );
+    label.setAttribute('aria-label', 'Annotation type');
+    label.appendChild(
+        doc.createTextNode(
+            (
+                (lang[options.langKey as any] || options.langKey) ??
+                (options.shapes && options.shapes[0].type) ??
+                ''
+            )
+        )
     );
 
-    // add buttons
+    // Add buttons
+
     let button = this.addButton(
-        popupDiv,
-        lang.removeButton || 'Remove',
-        'remove',
-        popupDiv,
-        callback
-    );
-
-    button.className += ' highcharts-annotation-remove-button';
-    button.style['background-image' as any] = 'url(' +
-        this.iconsURL + 'destroy.svg)';
-
-    button = this.addButton(
         popupDiv,
         lang.editButton || 'Edit',
         'edit',
@@ -194,14 +200,32 @@ function addToolbar(
     );
 
     button.className += ' highcharts-annotation-edit-button';
-    button.style['background-image' as any] = 'url(' +
-        this.iconsURL + 'edit.svg)';
+    createElement('span', {
+        className: 'highcharts-icon'
+    }, {
+        backgroundImage: getIcon('edit.svg', this.iconsURL, BaseFormIcons)
+    }, button);
 
+    button = this.addButton(
+        popupDiv,
+        lang.removeButton || 'Remove',
+        'remove',
+        popupDiv,
+        callback
+    );
+
+    button.className += ' highcharts-annotation-remove-button';
+    createElement('span', {
+        className: 'highcharts-icon'
+    }, {
+        backgroundImage: getIcon('destroy.svg', this.iconsURL, BaseFormIcons)
+    }, button);
 }
 
 /**
  * Create annotation's form fields.
- * @private
+ *
+ * @internal
  * @param {Highcharts.HTMLDOMElement} parentDiv
  * Div where inputs are placed
  * @param {Highcharts.Chart} chart
@@ -237,14 +261,14 @@ function addFormFields(
 
     objectEach(options, (value, option): void => {
 
-        // create name like params.styles.fontSize
+        // Create name like params.styles.fontSize
         parentFullName = parentNode !== '' ? parentNode + '.' + option : option;
 
         if (isObject(value)) {
             if (
-                // value is object of options
+                // Value is object of options
                 !isArray(value) ||
-                // array of objects with params. i.e labels in Fibonacci
+                // Array of objects with params. i.e labels in Fibonacci
                 (isArray(value) && isObject(value[0]))
             ) {
                 titleName = lang[option] || option;
@@ -317,9 +341,11 @@ function addFormFields(
  *
  * */
 
+/** @internal */
 const PopupAnnotations = {
     addForm,
     addToolbar
 };
 
+/** @internal */
 export default PopupAnnotations;

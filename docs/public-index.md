@@ -1,28 +1,45 @@
+---
+slug: index
+description: >-
+  Find starting points for creating charts and dashboards, learning about
+  Grid, and answering common questions, with links to product demos and API
+  references for options and functions.
+---
+
 # Highcharts Documentation
 
 Topics
 ------
 
-*   [Installation](getting-started/installation)
-*   [Your first chart](getting-started/your-first-chart)
-*   [FAQs](getting-started/frequently-asked-questions)
+*   [Installation](https://www.highcharts.com/docs/getting-started/installation)
+*   [Your first chart](https://www.highcharts.com/docs/getting-started/your-first-chart)
+*   [Your first dashboard](https://www.highcharts.com/docs/dashboards/your-first-dashboard)
+*   [General FAQs](https://www.highcharts.com/docs/getting-started/frequently-asked-questions)
+*   [Dashboards FAQs](https://www.highcharts.com/docs/dashboards/frequently-asked-questions)
+*   [Introduction to Grid](https://www.highcharts.com/docs/grid/general)
 
-Demo
+
+Demos
 ----
 
 For live examples see our demo pages:
 
-*   [Highcharts demo](https://highcharts.com/demo/)
-*   [Highcharts Stock demo](https://highcharts.com/stock/demo/)
-*   [Highcharts Maps demo](https://highcharts.com/maps/demo/)
-*   [Highcharts Gantt demo](https://highcharts.com/gantt/demo/)
+*   [Highcharts demo](https://www.highcharts.com/demo#highcharts-demo-line-charts)
+*   [Highcharts Stock demo](https://www.highcharts.com/demo/stock#highcharts-stock-demo-general)
+*   [Highcharts Maps demo](https://www.highcharts.com/demo/maps#highcharts-maps-demo-general)
+*   [Highcharts Gantt demo](https://www.highcharts.com/demo/gantt#highcharts-gantt-demo-highcharts-gantt)
+*   [Highcharts Dashboards demo](https://www.highcharts.com/demo/dashboards#highcharts-dashboards-demo-general)
+*   [Highcharts Grid demo](https://www.highcharts.com/demo#highcharts-grid-demo-general)
+
 
 API
 ---
 
-For more specific information on Highcharts options and functions, visit our API sites which also include several live and customizeable examples.
+For more specific information on Highcharts options and functions, visit our API sites which also include several live and customizable examples.
 
 *   [Highcharts API reference](https://api.highcharts.com/highcharts)
 *   [Highcharts Stock API reference](https://api.highcharts.com/highstock)
 *   [Highcharts Maps API reference](https://api.highcharts.com/highmaps)
 *   [Highcharts Gantt API reference](https://api.highcharts.com/gantt)
+*   [Highcharts Dashboards API reference](https://api.highcharts.com/dashboards)
+*   [Highcharts Grid API reference](https://api.highcharts.com/grid/)

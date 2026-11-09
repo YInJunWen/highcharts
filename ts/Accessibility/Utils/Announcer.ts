@@ -1,12 +1,14 @@
 /* *
  *
- *  (c) 2009-2021 Øystein Moseng
+ *  (c) 2009-2026 Highsoft AS
+ *  Author: Øystein Moseng
  *
  *  Create announcer to speak messages to screen readers and other AT.
  *
- *  License: www.highcharts.com/license
+ *  Integration of this software requires a license.
+ *  - For commercial use, see www.highcharts.com/license
+ *  - For non-commercial, see www.highcharts.com/license-eula
  *
- *  !!!!!!! SOURCE GETS TRANSPILED BY TYPESCRIPT. EDIT TS FILE ONLY. !!!!!!!
  *
  * */
 
@@ -30,8 +32,7 @@ const {
     addClass,
     visuallyHideElement
 } = HU;
-import U from '../../Core/Utilities.js';
-const { attr } = U;
+import { attr, internalClearTimeout } from '../../Shared/Utilities.js';
 
 /* *
  *
@@ -41,10 +42,11 @@ const { attr } = U;
 
 /**
  * Internal types.
- * @private
+ *
+ * @internal
  */
-declare module '../../Core/Chart/ChartLike'{
-    interface ChartLike {
+declare module '../../Core/Chart/ChartBase'{
+    interface ChartBase {
         announcerContainer?: HTMLDOMElement;
     }
 }
@@ -55,6 +57,7 @@ declare module '../../Core/Chart/ChartLike'{
  *
  * */
 
+/** @internal */
 class Announcer {
 
     /* *
@@ -97,12 +100,12 @@ class Announcer {
         // Delete contents after a little while to avoid user finding the live
         // region in the DOM.
         if (this.clearAnnouncementRegionTimer) {
-            clearTimeout(this.clearAnnouncementRegionTimer);
+            internalClearTimeout(this.clearAnnouncementRegionTimer);
         }
         this.clearAnnouncementRegionTimer = setTimeout((): void => {
             this.announceRegion.innerHTML = AST.emptyHTML;
             delete this.clearAnnouncementRegionTimer;
-        }, 1000);
+        }, 3000);
     }
 
     private addAnnounceRegion(type: Announcer.Type): HTMLDOMElement {
@@ -113,13 +116,15 @@ class Announcer {
 
         attr(div, {
             'aria-hidden': false,
-            'aria-live': type
+            'aria-live': type,
+            'aria-atomic': true
         });
 
+        // Apply inline hidden styles too as the class alone depends on
+        // `highcharts.css` being loaded
+        visuallyHideElement(div);
         if (this.chart.styledMode) {
             addClass(div, 'highcharts-visually-hidden');
-        } else {
-            visuallyHideElement(div);
         }
 
         chartContainer.appendChild(div);
@@ -134,7 +139,10 @@ class Announcer {
             'aria-hidden': false,
             'class': 'highcharts-announcer-container'
         });
-        container.style.position = 'relative';
+
+        // Hide inline so the container stays out of flow even when
+        // `highcharts.css` is missing in styled mode
+        visuallyHideElement(container);
 
         chart.renderTo.insertBefore(container, chart.renderTo.firstChild);
         chart.announcerContainer = container;
@@ -148,7 +156,9 @@ class Announcer {
  *
  * */
 
+/** @internal */
 namespace Announcer {
+    /** @internal */
     export type Type = ('assertive'|'polite');
 }
 
@@ -158,4 +168,5 @@ namespace Announcer {
  *
  * */
 
+/** @internal */
 export default Announcer;

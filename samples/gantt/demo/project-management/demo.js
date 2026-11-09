@@ -1,32 +1,83 @@
-var today = new Date(),
-    day = 1000 * 60 * 60 * 24,
-    // Utility functions
-    dateFormat = Highcharts.dateFormat,
-    defined = Highcharts.defined,
-    isObject = Highcharts.isObject;
+const day = 24 * 36e5,
+    today = Math.floor(Date.now() / day) * day;
 
-// Set to 00:00:00:000 today
-today.setUTCHours(0);
-today.setUTCMinutes(0);
-today.setUTCSeconds(0);
-today.setUTCMilliseconds(0);
-today = today.getTime();
+const options = {
+    chart: {
+        plotBorderColor: 'rgba(128,128,128,0.1)',
+        plotBorderWidth: 1,
+        plotBorderRadius: 5
+    },
 
-Highcharts.ganttChart('container', {
+    plotOptions: {
+        gantt: {
+            borderRadius: '50%',
+            groupPadding: 0
+        },
+        series: {
+            connectors: {
+                lineWidth: 1,
+                lineColor: 'var(--highcharts-neutral-color-60, #666)',
+                radius: 10,
+                endMarker: {
+                    verticalAlign: 'bottom',
+                    align: 'center',
+                    yOffset: 5
+                },
+                startMarker: {
+                    symbol: 'arrow-half',
+                    lineWidth: 1,
+                    lineColor: 'var(--highcharts-neutral-color-60, #666)',
+                    xOffset: -5
+                }
+            },
+            dataLabels: [{
+                enabled: true,
+                align: 'left',
+                format: '{point.name}',
+                padding: 10,
+                style: {
+                    fontWeight: 'normal',
+                    textOutline: 'none'
+                }
+            }, {
+                enabled: true,
+                align: 'right',
+                format: `{#if point.completed}
+                    {(multiply point.completed.amount 100):.0f}%
+                {/if}`,
+                padding: 10,
+                style: {
+                    fontWeight: 'normal',
+                    textOutline: 'none',
+                    opacity: 0.6
+                }
+            }]
+        }
+    },
+
     series: [{
         name: 'Offices',
         data: [{
             name: 'New offices',
             id: 'new_offices',
-            owner: 'Peter'
+            owner: 'Peter',
+            pointWidth: 3,
+            color: 'var(--highcharts-neutral-color-60, #666)',
+            dataLabels: {
+                align: 'right',
+                style: {
+                    color: 'var(--highcharts-neutral-color-60, #666)'
+                },
+                x: 72
+            }
         }, {
             name: 'Prepare office building',
             id: 'prepare_building',
             parent: 'new_offices',
-            start: today - (2 * day),
+            start: today - (8 * day),
             end: today + (6 * day),
             completed: {
-                amount: 0.2
+                amount: 0.5
             },
             owner: 'Linda'
         }, {
@@ -48,9 +99,16 @@ Highcharts.ganttChart('container', {
         }, {
             name: 'Relocate',
             id: 'relocate',
-            dependency: 'passed_inspection',
-            parent: 'new_offices',
-            owner: 'Josh'
+            owner: 'Josh',
+            pointWidth: 3,
+            color: 'var(--highcharts-neutral-color-60, #666)',
+            dataLabels: {
+                align: 'right',
+                style: {
+                    color: 'var(--highcharts-neutral-color-60, #666)'
+                },
+                x: 57
+            }
         }, {
             name: 'Relocate staff',
             id: 'relocate_staff',
@@ -77,7 +135,17 @@ Highcharts.ganttChart('container', {
         data: [{
             name: 'New product launch',
             id: 'new_product',
-            owner: 'Peter'
+            owner: 'Peter',
+            pointWidth: 3,
+            color: 'var(--highcharts-neutral-color-60, #666)',
+            dataLabels: {
+                align: 'right',
+                style: {
+                    color: 'var(--highcharts-neutral-color-60, #666)'
+                },
+                format: 'Launch',
+                x: 50
+            }
         }, {
             name: 'Development',
             id: 'development',
@@ -85,8 +153,7 @@ Highcharts.ganttChart('container', {
             start: today - day,
             end: today + (11 * day),
             completed: {
-                amount: 0.6,
-                fill: '#e80'
+                amount: 0.6
             },
             owner: 'Susan'
         }, {
@@ -114,57 +181,108 @@ Highcharts.ganttChart('container', {
         }]
     }],
     tooltip: {
-        pointFormatter: function () {
-            var point = this,
-                format = '%e. %b',
-                options = point.options,
-                completed = options.completed,
-                amount = isObject(completed) ? completed.amount : completed,
-                status = ((amount || 0) * 100) + '%',
-                lines;
-
-            lines = [{
-                value: point.name,
-                style: 'font-weight: bold;'
-            }, {
-                title: 'Start',
-                value: dateFormat(format, point.start)
-            }, {
-                visible: !options.milestone,
-                title: 'End',
-                value: dateFormat(format, point.end)
-            }, {
-                title: 'Completed',
-                value: status
-            }, {
-                title: 'Owner',
-                value: options.owner || 'unassigned'
-            }];
-
-            return lines.reduce(function (str, line) {
-                var s = '',
-                    style = (
-                        defined(line.style) ? line.style : 'font-size: 0.8em;'
-                    );
-                if (line.visible !== false) {
-                    s = (
-                        '<span style="' + style + '">' +
-                        (defined(line.title) ? line.title + ': ' : '') +
-                        (defined(line.value) ? line.value : '') +
-                        '</span><br/>'
-                    );
-                }
-                return str + s;
-            }, '');
-        }
+        pointFormat: '<span style="font-weight: bold">{point.name}</span><br>' +
+            '{point.start:%e %b}' +
+            '{#unless point.milestone} → {point.end:%e %b}{/unless}' +
+            '<br>' +
+            '{#if point.completed}' +
+            'Completed: {multiply point.completed.amount 100}%<br>' +
+            '{/if}' +
+            'Owner: {#if point.owner}{point.owner}{else}unassigned{/if}'
     },
     title: {
-        text: 'Gantt Project Management'
+        text: 'Gantt Project Management',
+        align: 'left'
     },
-    xAxis: {
-        currentDateIndicator: true,
+    xAxis: [{
+        currentDateIndicator: {
+            color: '#ef4444',
+            dashStyle: 'ShortDot',
+            width: 2,
+            label: {
+                format: ''
+            }
+        },
+        dateTimeLabelFormats: {
+            day: '%e<br><span style="opacity: 0.5; font-size: 0.7em">%a</span>'
+        },
+        grid: {
+            borderWidth: 0,
+            cellHeight: 46
+        },
+        gridLineWidth: 1,
         min: today - 3 * day,
-        max: today + 18 * day
+        max: today + 19 * day,
+        custom: {
+            weekendBackground: {
+                pattern: {
+                    path: 'M 0 10 L 10 0 M -1 1 L 1 -1 M 9 11 L 11 9',
+                    width: 10,
+                    height: 10,
+                    color: 'rgba(128,128,128,0.15)'
+                }
+            }
+        }
+    }, {
+
+        dateTimeLabelFormats: {
+            month: '%[bY]'
+        },
+        labels: {
+            align: 'left',
+            x: 5,
+            style: {
+                fontSize: '0.7em',
+                fontWeight: 'bold',
+                textTransform: 'uppercase'
+            }
+        },
+        grid: {
+            borderWidth: 0,
+            cellHeight: 24
+        },
+        tickInterval: 30 * 24 * 36e5
+    }],
+    yAxis: {
+        grid: {
+            borderWidth: 0,
+            enabled: true,
+            columns: [{
+                title: {
+                    text: 'Title',
+                    textAlign: 'left',
+                    x: 18
+                },
+                labels: {
+                    format: '{value}',
+                    indentation: 0
+                }
+            }, {
+                title: {
+                    text: 'Duration',
+                    textAlign: 'left',
+                    x: 8
+                },
+                labels: {
+                    format: '{#if point.x2}' +
+                        '{(divide (subtract point.x2 point.x) 86400000)} days' +
+                        '{else} - {/if}',
+                    style: {
+                        opacity: 0.7
+                    }
+                }
+            }]
+        },
+        gridLineWidth: 0,
+        labels: {
+            symbol: {
+                width: 8,
+                height: 6,
+                x: -4,
+                y: -2
+            }
+        },
+        staticScale: 30
     },
     accessibility: {
         keyboardNavigation: {
@@ -174,19 +292,24 @@ Highcharts.ganttChart('container', {
         },
         point: {
             descriptionFormatter: function (point) {
-                var completedValue = point.completed ?
+                const completedValue = point.completed ?
                         point.completed.amount || point.completed : null,
                     completed = completedValue ?
-                        ' Task ' + Math.round(completedValue * 1000) / 10 + '% completed.' :
+                        ' Task ' + Math.round(completedValue * 1000) / 10 +
+                            '% completed.' :
                         '',
                     dependency = point.dependency &&
                         point.series.chart.get(point.dependency).name,
-                    dependsOn = dependency ? ' Depends on ' + dependency + '.' : '';
+                    dependsOn = dependency ?
+                        ' Depends on ' + dependency + '.' : '';
 
                 return Highcharts.format(
                     point.milestone ?
-                        '{point.yCategory}. Milestone at {point.x:%Y-%m-%d}. Owner: {point.owner}.{dependsOn}' :
-                        '{point.yCategory}.{completed} Start {point.x:%Y-%m-%d}, end {point.x2:%Y-%m-%d}. Owner: {point.owner}.{dependsOn}',
+                        '{point.yCategory}. Milestone at {point.x:%Y-%m-%d}. ' +
+                        'Owner: {point.owner}.{dependsOn}' :
+                        '{point.yCategory}.{completed} Start ' +
+                        '{point.x:%Y-%m-%d}, end {point.x2:%Y-%m-%d}. Owner: ' +
+                        '{point.owner}.{dependsOn}',
                     { point, completed, dependsOn }
                 );
             }
@@ -195,8 +318,52 @@ Highcharts.ganttChart('container', {
     lang: {
         accessibility: {
             axis: {
-                xAxisDescriptionPlural: 'The chart has a two-part X axis showing time in both week numbers and days.'
+                xAxisDescriptionPlural: 'The chart has a two-part X axis ' +
+                    'showing time in both week numbers and days.'
+            }
+        }
+    }
+};
+
+// Plug-in to render plot bands for the weekends
+Highcharts.addEvent(Highcharts.Axis, 'foundExtremes', e => {
+    if (e.target.options.custom?.weekendBackground) {
+        const axis = e.target,
+            chart = axis.chart,
+            day = 24 * 36e5,
+            isWeekend = t => /[06]/.test(chart.time.dateFormat('%w', t));
+
+        let inWeekend = false,
+            last;
+
+        for (
+            let x = Math.floor(axis.min / day) * day;
+            x <= Math.ceil(axis.max / day) * day;
+            x += day
+        ) {
+            if (isWeekend(x) && !inWeekend) {
+                const plotBand = {
+                    from: x,
+                    color: axis.options.custom.weekendBackground
+                };
+
+                if (!axis.options.plotBands?.some(
+                    pb => pb.from === plotBand.from
+                )) {
+                    axis.addPlotBand(plotBand);
+                }
+
+                inWeekend = true;
+
+                last = plotBand;
+            }
+
+            if (!isWeekend(x) && inWeekend && last) {
+                last.to = x;
+                inWeekend = false;
             }
         }
     }
 });
+
+Highcharts.ganttChart('container', options);
